@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>KBetz™</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="bg-layer"></div>
+
+<div class="app">
+  <h1>KBetz™</h1>
+
+  <!-- AUTH -->
+  <h2>Login / Register</h2>
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="register()">Register</button>
+  <button onclick="login()">Login</button>
+
+  <!-- SUBSCRIPTION -->
+  <h2>Subscription</h2>
+  <button onclick="subscribe()">Upgrade to Pro</button>
+  <div id="subStatus"></div>
+
+  <hr>
+
+  <!-- SLIP -->
+  <h2>Add Leg</h2>
+  <input id="game" placeholder="Game">
+  <input id="odds" placeholder="Odds (e.g. -110)">
+  <input id="prob" placeholder="Your Win % (0–100)">
+  <button onclick="addLeg()">Add</button>
+
+  <div id="legs"></div>
+
+  <h2>Bankroll</h2>
+  <input id="bankroll" placeholder="Bankroll ($)">
+
+  <button onclick="analyzeSlip()">Analyze</button>
+  <div id="results"></div>
+
+  <canvas id="evChart"></canvas>
+
+  <!-- SHARE -->
+  <h2>Share Slip</h2>
+  <button onclick="shareSlip()">Generate Share Link</button>
+  <div id="shareLink"></div>
+
+  <h2>Saved Slips</h2>
+  <button onclick="loadSlips()">Load My Slips</button>
+  <div id="savedSlips"></div>
+</div>
+
+<script src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker.js");
+}
+</script>
+</body>
+</html>

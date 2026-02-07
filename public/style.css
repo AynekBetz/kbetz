@@ -1,0 +1,96 @@
+/* ===== RESET ===== */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Arial, sans-serif;
+}
+
+/* ===== BACKGROUND ===== */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(
+      rgba(11,11,15,0.65),
+      rgba(11,11,15,0.65)
+    ),
+    url("bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: -1;
+}
+
+/* ===== APP CONTAINER ===== */
+.app {
+  padding: 20px;
+  color: white;
+}
+
+/* ===== HEADERS ===== */
+h1, h2 {
+  color: #ff2fa4;
+}
+
+/* ===== INPUTS ===== */
+input {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  background: #1b1026;
+  border: 1px solid #6a2cff;
+  color: white;
+}
+
+/* ===== BUTTONS ===== */
+button {
+  background: linear-gradient(135deg, #6a2cff, #ff2fa4);
+  border: none;
+  padding: 10px 16px;
+  color: white;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 6px 0;
+  box-shadow: 0 0 12px rgba(255,47,164,0.4);
+}
+
+button:hover {
+  box-shadow: 0 0 20px rgba(255,47,164,0.8);
+}
+
+/* ===== READ-ONLY ===== */
+.readonly {
+  background: rgba(27,16,38,0.9);
+  border-left: 4px solid #ff2fa4;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+
+/* ===== RESULTS ===== */
+.risk-box {
+  background: rgba(27,16,38,0.85);
+  padding: 15px;
+  margin-top: 15px;
+  border-radius: 8px;
+}
+
+/* ===== CONFIDENCE BAR ===== */
+.conf-bar {
+  height: 18px;
+  background: #222;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.conf-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+.conf-fill.green { background: #00ff99; }
+.conf-fill.yellow { background: #ffd166; }
+.conf-fill.red { background: #ff4c4c; }

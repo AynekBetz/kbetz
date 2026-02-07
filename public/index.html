@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>KBetz™</title>
+</head>
+<body>
+
+<h1>KBetz™</h1>
+
+<h2>Login</h2>
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<button type="button" onclick="register()">Register</button>
+<button type="button" onclick="login()">Login</button>
+
+<hr>
+
+<h2>Add Slip</h2>
+<input id="game" placeholder="Game">
+<input id="odds" placeholder="Odds">
+<input id="prob" placeholder="Win %">
+<button type="button" onclick="addLeg()">Add Leg</button>
+
+<div id="legs"></div>
+
+<button type="button" onclick="analyze()">Analyze</button>
+<div id="results"></div>
+
+<hr>
+
+<h2>Leaderboard</h2>
+<button type="button" onclick="loadLeaderboard()">Load Leaderboard</button>
+<div id="leaderboard"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

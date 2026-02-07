@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Betting App</title>
+  <style>
+    body{font-family:Arial;max-width:900px;margin:20px auto;padding:0 12px}
+    input,textarea,button{width:100%;padding:10px;margin:6px 0;font-size:16px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    pre{background:#f5f5f5;padding:12px;overflow:auto}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#eee;margin-right:8px}
+  </style>
+</head>
+<body>
+  <h2>Betting App ✅</h2>
+
+  <div class="row">
+    <div>
+      <label>Stake</label>
+      <input id="stake" type="number" value="40" />
+    </div>
+    <div>
+      <label>Sportsbook</label>
+      <input id="sportsbook" value="Test" />
+    </div>
+  </div>
+
+  <label>Notes</label>
+  <input id="notes" value="from web" />
+
+  <label>Legs (one per line) — format:</label>
+  <pre>market | selection | odds | game | category</pre>
+
+  <textarea id="legs" rows="6">Spread | OKC +6.5 | -110 | OKC@MIN | spread
+Total | Under 231.5 | -110 | OKC@MIN | total</textarea>
+
+  <button onclick="submitSlip()">Save + Analyze</button>
+
+  <h3>Result</h3>
+  <div id="summary"></div>
+  <pre id="out"></pre>
+
+<script>
+async function submitSlip(){
+  const stake = Number(document.getElementById('stake').value);
+  const sportsbook = document.getElementById('sportsbook').value;
+  const notes = document.getElementById('notes').value;
+
+  const lines = document.getElementById('legs').value.split('\n').filter(Boolean);
+  const legs = lines.map(line=>{
+    const [market, selection, odds, game, category] = line.split('|').map(s=>s.trim());
+    return { market, selection, odds: Number(odds), game, category };
+  });
+
+  const res = await fetch('/slip', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ stake, sportsbook, notes, legs })
+  });
+  const saved = await res.json();
+
+  const res2 = await fetch(`/slip/${saved.id}`);
+  const data = await res2.json();
+
+  const a = data.analysis || {};
+  document.getElementById('summary').innerHTML =
+    `<span class="pill">Slip #${saved.id}</span>
+     <span class="pill">Est return: ${Number(data.estReturn).toFixed(2)}</span>
+     <span class="pill">Green-line: ${a.greenLineSlip ?? a.greenLine}</span>`;
+
+  document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+}
+</script>
+</body>
+</html>
