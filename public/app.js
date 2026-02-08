@@ -1,78 +1,160 @@
-let token = null;
+/********************************
+ * GLOBAL STATE
+ ********************************/
+let token = localStorage.getItem("token");
 let legs = [];
 
-const el = id => document.getElementById(id);
+/********************************
+ * ELEMENT HELPERS
+ ********************************/
+const el = (id) => document.getElementById(id);
 
-// ---------- AUTH ----------
-function register() {
-  fetch("/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: el("email").value,
-      password: el("password").value
-    })
-  }).then(r => r.json()).then(console.log);
+function emailEl() {
+  return el("email");
+}
+function passwordEl() {
+  return el("password");
 }
 
-function login() {
-  fetch("/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: el("email").value,
-      password: el("password").value
-    })
-  }).then(r => r.json()).then(d => {
-    token = d.token;
-    alert("Logged in");
+/********************************
+ * AUTH UI CONTROL
+ ********************************/
+function setAuthUI(loggedIn) {
+  document.querySelectorAll(".card").forEach((card) => {
+    if (
+      card.innerText.includes("Add Leg") ||
+      card.innerText.includes("Analyze")
+    ) {
+      card.style.display = loggedIn ? "block" : "none";
+    }
   });
 }
 
-// ---------- SLIP ----------
+setAuthUI(!!token);
+
+/********************************
+ * AUTH FUNCTIONS
+ ********************************/
+async function register() {
+  const email = emailEl().value;
+  const password = passwordEl().value;
+
+  const res = await fetch("/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (res.ok) {
+    alert("Registered successfully. Please log in.");
+  } else {
+    alert("Registration failed.");
+  }
+}
+
+async function login() {
+  const email = emailEl().value;
+  const password = passwordEl().value;
+
+  const res = await fetch("/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await res.json();
+
+  if (data.token) {
+    token = data.token;
+    localStorage.setItem("token", token);
+    setAuthUI(true);
+    alert("Logged in successfully.");
+  } else {
+    alert("Invalid login.");
+  }
+}
+
+/********************************
+ * SLIP LOGIC
+ ********************************/
 function addLeg() {
-  legs.push({
-    game: el("game").value,
-    odds: Number(el("odds").value),
-    prob: Number(el("prob").value) / 100
+  const game = el("game").value;
+  const odds = el("odds").value;
+  const prob = el("prob").value;
+
+  if (!game || !odds || !prob) return alert("Fill all fields");
+
+  legs.push({ game, odds, prob });
+  renderLegs();
+}
+
+function renderLegs() {
+  el("legs").innerHTML = legs
+    .map(
+      (l, i) =>
+        `<div>Leg ${i + 1}: ${l.game} | Odds: ${l.odds} | Win%: ${l.prob}</div>`
+    )
+    .join("");
+}
+
+async function analyzeSlip() {
+  if (!token) return alert("Login required.");
+
+  const bankroll = el("bankroll").value || 0;
+
+  const payload = { legs, bankroll };
+
+  await fetch("/api/slips", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
   });
 
-  el("legs").innerHTML = legs.map(l =>
-    `${l.game} (${l.odds}, ${l.prob * 100}%)`
-  ).join("<br>");
+  el("results").innerText = "Slip saved & analyzed.";
 }
 
-function analyze() {
-  fetch("/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ slip: legs })
-  })
-    .then(r => r.json())
-    .then(d => {
-      el("results").innerHTML = `EV: $${d.ev}`;
+/********************************
+ * SAVED SLIPS
+ ********************************/
+async function loadSlips() {
+  if (!token) return alert("Login required.");
 
-      fetch("/save", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ analysis: d })
-      });
-    });
+  const res = await fetch("/api/slips", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const slips = await res.json();
+
+  el("savedSlips").innerHTML = slips
+    .map(
+      (s) =>
+        `<div>Slip ${new Date(
+          s.createdAt
+        ).toLocaleString()} — ${s.data.legs.length} legs</div>`
+    )
+    .join("");
 }
 
-// ---------- LEADERBOARD ----------
-function loadLeaderboard() {
-  fetch("/leaderboard")
-    .then(r => r.json())
-    .then(data => {
-      el("leaderboard").innerHTML =
-        data.length === 0
-          ? "No data yet"
-          : data.map(
-              (x, i) => `${i + 1}. ${x.user} — EV: $${x.avgEV}`
-            ).join("<br>");
-    });
+/********************************
+ * LEADERBOARD
+ ********************************/
+async function loadLeaderboard() {
+  const res = await fetch("/api/leaderboard");
+  const data = await res.json();
+
+  el("leaderboard").innerHTML = Object.entries(data)
+    .map(([user, count]) => `<div>User ${user}: ${count} slips</div>`)
+    .join("");
+}
+
+/********************************
+ * SHARE LINK
+ ********************************/
+function shareSlip() {
+  const encoded = btoa(JSON.stringify(legs));
+  const link = `${window.location.origin}?slip=${encoded}`;
+  el("shareLink").innerText = link;
 }
