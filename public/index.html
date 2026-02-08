@@ -1,37 +1,58 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>KBetz™</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
+  <!-- Read Only Banner -->
+  <div class="banner">
+    🔒 Read-Only Mode: KBetz™ is an analysis tool only. No bets are placed.
+  </div>
 
-<h1>KBetz™</h1>
+  <div class="overlay"></div>
 
-<h2>Login</h2>
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Password">
-<button type="button" onclick="register()">Register</button>
-<button type="button" onclick="login()">Login</button>
+  <main class="container">
+    <h1 class="logo">KBetz™</h1>
 
-<hr>
+    <!-- LOGIN -->
+    <section class="card">
+      <h2>Login</h2>
+      <div class="row">
+        <input id="email" placeholder="Email" />
+        <input id="password" type="password" placeholder="Password" />
+      </div>
+      <div class="row">
+        <button onclick="register()">Register</button>
+        <button onclick="login()">Login</button>
+      </div>
+    </section>
 
-<h2>Add Slip</h2>
-<input id="game" placeholder="Game">
-<input id="odds" placeholder="Odds">
-<input id="prob" placeholder="Win %">
-<button type="button" onclick="addLeg()">Add Leg</button>
+    <!-- SLIP -->
+    <section class="card">
+      <h2>Add Slip</h2>
+      <div class="row">
+        <input id="game" placeholder="Game" />
+        <input id="odds" placeholder="Odds" />
+        <input id="win" placeholder="Win %" />
+      </div>
+      <div class="row">
+        <button onclick="addLeg()">Add Leg</button>
+        <button class="primary" onclick="analyze()">Analyze</button>
+      </div>
+    </section>
 
-<div id="legs"></div>
+    <!-- LEADERBOARD -->
+    <section class="card">
+      <h2>Leaderboard</h2>
+      <button onclick="loadLeaderboard()">Load Leaderboard</button>
+      <div id="leaderboard"></div>
+    </section>
+  </main>
 
-<button type="button" onclick="analyze()">Analyze</button>
-<div id="results"></div>
-
-<hr>
-
-<h2>Leaderboard</h2>
-<button type="button" onclick="loadLeaderboard()">Load Leaderboard</button>
-<div id="leaderboard"></div>
-
-<script src="app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
