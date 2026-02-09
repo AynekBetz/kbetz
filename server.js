@@ -1,7 +1,8 @@
-// server.js — Phase A: Odds + Hedge Alerts
-import express from "express";
-import fetch from "node-fetch";
-import cors from "cors";
+// server.js — Phase A (Render-safe)
+
+const express = require("express");
+const fetch = require("node-fetch");
+const cors = require("cors");
 
 const app = express();
 app.use(cors());
@@ -11,10 +12,9 @@ app.use(express.static("public"));
 const PORT = process.env.PORT || 5000;
 const ODDS_API_KEY = process.env.ODDS_API_KEY;
 
-// --- UTILITIES ---
+// ---- UTIL ----
 function americanToDecimal(odds) {
-  if (odds > 0) return 1 + odds / 100;
-  return 1 + 100 / Math.abs(odds);
+  return odds > 0 ? 1 + odds / 100 : 1 + 100 / Math.abs(odds);
 }
 
 function impliedProbability(odds) {
@@ -28,35 +28,23 @@ function expectedValue(prob, odds) {
   return prob * (dec - 1) - (1 - prob);
 }
 
-// --- ODDS FETCH ---
-async function fetchOdds() {
-  const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?regions=us&markets=h2h&oddsFormat=american&apiKey=${ODDS_API_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Odds API failed");
-  return res.json();
-}
-
-// --- ANALYZE + HEDGE LOGIC ---
-app.post("/api/analyze", async (req, res) => {
+// ---- ANALYZE ----
+app.post("/api/analyze", (req, res) => {
   try {
     const { odds, userProb, hedgeThreshold = 0.03 } = req.body;
 
     const ev = expectedValue(userProb, odds);
     const implied = impliedProbability(odds);
 
-    let hedgeAlert = false;
-    let message = "No hedge needed";
-
-    if (ev < -hedgeThreshold) {
-      hedgeAlert = true;
-      message = "⚠️ Hedge recommended — EV dropped below threshold";
-    }
+    const hedgeAlert = ev < -hedgeThreshold;
 
     res.json({
       ev: Number(ev.toFixed(4)),
       impliedProb: Number(implied.toFixed(4)),
       hedgeAlert,
-      message,
+      message: hedgeAlert
+        ? "⚠️ Hedge recommended — EV dropped"
+        : "✅ No hedge needed",
     });
   } catch (err) {
     console.error(err);
@@ -64,16 +52,24 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
-// --- LIVE ODDS TEST ENDPOINT ---
+// ---- ODDS TEST ----
 app.get("/api/odds", async (req, res) => {
   try {
-    const odds = await fetchOdds();
-    res.json(odds.slice(0, 3)); // return sample
+    if (!ODDS_API_KEY) {
+      return res.status(500).json({ error: "Missing ODDS_API_KEY" });
+    }
+
+    const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?regions=us&markets=h2h&oddsFormat=american&apiKey=${ODDS_API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    res.json(data.slice(0, 2));
   } catch (e) {
+    console.error(e);
     res.status(500).json({ error: "Odds fetch failed" });
   }
 });
 
-app.listen(PORT, () =>
-  console.log(`✅ KBetz™ running on port ${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`✅ KBetz™ running on port ${PORT}`);
+});
