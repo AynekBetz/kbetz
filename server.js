@@ -1,7 +1,6 @@
-// server.js — Phase A (Render-safe)
+// server.js — Phase A (Node 22 / Render SAFE)
 
 const express = require("express");
-const fetch = require("node-fetch");
 const cors = require("cors");
 
 const app = express();
@@ -52,7 +51,7 @@ app.post("/api/analyze", (req, res) => {
   }
 });
 
-// ---- ODDS TEST ----
+// ---- ODDS TEST (USES BUILT-IN FETCH) ----
 app.get("/api/odds", async (req, res) => {
   try {
     if (!ODDS_API_KEY) {
@@ -60,6 +59,7 @@ app.get("/api/odds", async (req, res) => {
     }
 
     const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?regions=us&markets=h2h&oddsFormat=american&apiKey=${ODDS_API_KEY}`;
+
     const response = await fetch(url);
     const data = await response.json();
 
@@ -70,6 +70,7 @@ app.get("/api/odds", async (req, res) => {
   }
 });
 
+// ---- START SERVER (THIS OPENS THE PORT) ----
 app.listen(PORT, () => {
   console.log(`✅ KBetz™ running on port ${PORT}`);
 });
