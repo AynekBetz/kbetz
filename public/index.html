@@ -5,22 +5,20 @@
   <title>KBetz™</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
-  <!-- Read Only Banner -->
   <div class="banner">
-    🔒 Read-Only Mode: KBetz™ is an analysis tool only. No bets are placed.
+    🔒 Read-Only Mode — Analysis Only. No bets placed.
   </div>
-
-  <div class="overlay"></div>
 
   <main class="container">
     <h1 class="logo">KBetz™</h1>
 
-    <!-- LOGIN -->
+    <!-- AUTH -->
     <section class="card">
-      <h2>Login</h2>
+      <h2>Login / Register</h2>
       <div class="row">
         <input id="email" placeholder="Email" />
         <input id="password" type="password" placeholder="Password" />
@@ -33,23 +31,44 @@
 
     <!-- SLIP -->
     <section class="card">
-      <h2>Add Slip</h2>
+      <h2>Add Leg</h2>
       <div class="row">
         <input id="game" placeholder="Game" />
-        <input id="odds" placeholder="Odds" />
-        <input id="win" placeholder="Win %" />
+        <input id="odds" placeholder="Odds (e.g. -110)" />
+        <input id="prob" placeholder="Win % (0–100)" />
       </div>
-      <div class="row">
-        <button onclick="addLeg()">Add Leg</button>
-        <button class="primary" onclick="analyze()">Analyze</button>
-      </div>
+      <button onclick="addLeg()">Add Leg</button>
+
+      <div id="legs"></div>
+
+      <h3>Bankroll ($)</h3>
+      <input id="bankroll" placeholder="e.g. 1000" />
+
+      <h3>Bet Size (% of bankroll)</h3>
+      <input
+        type="range"
+        id="betSlider"
+        min="0"
+        max="25"
+        step="0.5"
+        value="2"
+        oninput="updateBetSize(this.value)"
+      />
+      <div id="betSizeLabel">2%</div>
+
+      <div id="warnings"></div>
+
+      <button class="primary" onclick="analyzeSlip()">Analyze</button>
+      <div id="results"></div>
+
+      <canvas id="evChart"></canvas>
     </section>
 
-    <!-- LEADERBOARD -->
+    <!-- SAVED SLIPS -->
     <section class="card">
-      <h2>Leaderboard</h2>
-      <button onclick="loadLeaderboard()">Load Leaderboard</button>
-      <div id="leaderboard"></div>
+      <h2>Saved Slips</h2>
+      <button onclick="loadSlips()">Load My Slips</button>
+      <div id="savedSlips"></div>
     </section>
   </main>
 
