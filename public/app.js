@@ -71,18 +71,16 @@ function renderLegs() {
   el("legs").innerHTML = legs
     .map(
       (l, i) =>
-        `<div>Leg ${i + 1}: ${l.game} | Odds ${l.odds} | Win ${(l.prob * 100).toFixed(1)}%</div>`
+        `<div>Leg ${i + 1}: ${l.game} | Odds ${l.odds} | Win ${(l.prob * 100).toFixed(
+          1
+        )}%</div>`
     )
     .join("");
 }
 
 /********************************
- * KELLY + EV
+ * ODDS + KELLY MATH
  ********************************/
-function impliedProb(odds) {
-  return odds > 0 ? 100 / (odds + 100) : -odds / (-odds + 100);
-}
-
 function decimalOdds(odds) {
   return odds > 0 ? 1 + odds / 100 : 1 + 100 / -odds;
 }
@@ -91,9 +89,43 @@ function kellyFraction(p, d) {
   return (p * d - 1) / (d - 1);
 }
 
+/********************************
+ * SLIDER (LIVE WARNINGS)
+ ********************************/
 function updateBetSize(val) {
   betPercent = parseFloat(val);
   el("betSizeLabel").innerText = `${betPercent}%`;
+  updateSliderWarning();
+}
+
+function updateSliderWarning() {
+  if (legs.length === 0) {
+    el("warnings").innerText = "";
+    return;
+  }
+
+  const avgKelly =
+    legs.reduce(
+      (sum, l) => sum + kellyFraction(l.prob, decimalOdds(l.odds)),
+      0
+    ) / legs.length;
+
+  let msg = "";
+  let color = "";
+
+  if (betPercent / 100 <= avgKelly * 0.5) {
+    msg = "✅ Conservative sizing (low drawdown risk)";
+    color = "#4ade80";
+  } else if (betPercent / 100 <= avgKelly) {
+    msg = "⚠️ Aggressive sizing (higher variance)";
+    color = "#facc15";
+  } else {
+    msg = "🚨 DANGEROUS: Bet size exceeds Kelly. High ruin risk.";
+    color = "#f87171";
+  }
+
+  el("warnings").innerText = msg;
+  el("warnings").style.color = color;
 }
 
 /********************************
@@ -103,34 +135,37 @@ async function analyzeSlip() {
   if (!token) return alert("Login required");
 
   const bankroll = parseFloat(el("bankroll").value);
-  let ev = 1;
+  let evProduct = 1;
 
   legs.forEach((l) => {
-    ev *= l.prob * decimalOdds(l.odds);
+    evProduct *= l.prob * decimalOdds(l.odds);
   });
 
-  const trueEV = ev - 1;
+  const trueEV = evProduct - 1;
 
-  // Kelly suggestion (hidden helper)
   const avgKelly =
-    legs.reduce((sum, l) => sum + kellyFraction(l.prob, decimalOdds(l.odds)), 0) /
-    legs.length;
+    legs.reduce(
+      (sum, l) => sum + kellyFraction(l.prob, decimalOdds(l.odds)),
+      0
+    ) / legs.length;
 
-  // Warnings
-  let warning = "";
-  if (betPercent / 100 > avgKelly && avgKelly > 0) {
-    warning = "⚠️ Bet size exceeds Kelly suggestion. Risk of overbetting.";
-  }
+  let finalWarning = "";
   if (trueEV < 0) {
-    warning = "❌ Negative EV — long-term losing bet.";
+    finalWarning = "❌ Negative EV — long-term losing bet.";
+  } else if (betPercent / 100 > avgKelly) {
+    finalWarning = "🚨 Over-Kelly bet — bankroll at risk.";
   }
 
-  el("warnings").innerText = warning;
   el("results").innerHTML = `
     <div>EV: ${(trueEV * 100).toFixed(2)}%</div>
     <div>Kelly Suggestion: ${(avgKelly * 100).toFixed(2)}%</div>
     <div>Bet Amount: $${((betPercent / 100) * bankroll).toFixed(2)}</div>
   `;
+
+  if (finalWarning) {
+    el("warnings").innerText = finalWarning;
+    el("warnings").style.color = "#f87171";
+  }
 
   await fetch("/api/slips", {
     method: "POST",
@@ -153,7 +188,9 @@ async function loadSlips() {
   el("savedSlips").innerHTML = data
     .map(
       (s) =>
-        `<div>${new Date(s.createdAt).toLocaleString()} — EV ${(s.data.trueEV * 100).toFixed(2)}%</div>`
+        `<div>${new Date(s.createdAt).toLocaleString()} — EV ${(
+          s.data.trueEV * 100
+        ).toFixed(2)}%</div>`
     )
     .join("");
 }
