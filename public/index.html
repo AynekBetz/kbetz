@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>KBetz™</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
@@ -11,40 +13,41 @@
 <main class="container">
   <h1 class="logo">KBetz™</h1>
 
+  <!-- LOGIN -->
   <section class="card">
-    <h2>Login / Register</h2>
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-    <button onclick="register()">Register</button>
+    <h2>Login</h2>
+    <input id="email" placeholder="Email" />
     <button onclick="login()">Login</button>
+    <div id="planStatus"></div>
   </section>
 
+  <!-- ANALYSIS -->
   <section class="card">
-    <h2>Add Slip</h2>
-    <input id="game" placeholder="Game">
-    <input id="odds" placeholder="Odds (-110)">
-    <input id="prob" placeholder="Win %">
-    <button onclick="addLeg()">Add Leg</button>
+    <h2>Bet Analysis</h2>
 
-    <div id="legs"></div>
+    <input id="odds" placeholder="Odds (e.g. -110)" />
+    <input id="prob" placeholder="Your Win % (0–100)" />
 
-    <input id="bankroll" placeholder="Bankroll $">
+    <h3>Bankroll ($)</h3>
+    <input id="bankroll" placeholder="e.g. 1000" />
 
-    <h3>Bet Size</h3>
-    <input type="range" min="0" max="25" step="0.5" value="2"
-      oninput="updateBetSize(this.value)">
+    <h3>Bet Size (% of bankroll)</h3>
+    <input
+      type="range"
+      id="betSlider"
+      min="0"
+      max="25"
+      step="0.5"
+      value="2"
+      oninput="updateBetSize(this.value)"
+    />
     <div id="betSizeLabel">2%</div>
 
+    <div id="kellyInfo"></div>
     <div id="warnings"></div>
 
-    <button class="primary" onclick="analyzeSlip()">Analyze</button>
+    <button class="primary" onclick="analyze()">Analyze</button>
     <div id="results"></div>
-  </section>
-
-  <section class="card">
-    <h2>Saved Slips</h2>
-    <button onclick="loadSlips()">Load</button>
-    <div id="savedSlips"></div>
   </section>
 
 </main>

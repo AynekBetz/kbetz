@@ -1,8 +1,22 @@
 let token = null;
 let plan = "free";
+let betPercent = 2;
 
+/* ---------- HELPERS ---------- */
+const el = (id) => document.getElementById(id);
+
+function decimalOdds(o) {
+  return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o);
+}
+
+// ½-Kelly (industry standard)
+function halfKelly(p, d) {
+  return ((p * d - 1) / (d - 1)) * 0.5;
+}
+
+/* ---------- AUTH ---------- */
 async function login() {
-  const email = document.getElementById("email").value;
+  const email = el("email").value;
 
   const res = await fetch("/api/login", {
     method: "POST",
@@ -14,37 +28,53 @@ async function login() {
   token = data.token;
   plan = data.plan;
 
-  document.getElementById("results").innerText =
-    `Logged in as ${plan.toUpperCase()}`;
-}
+  el("planStatus").innerText =
+    plan === "pro"
+      ? "💎 Pro account"
+      : "🔒 Free account (Kelly locked)";
 
-async function upgrade() {
-  const res = await fetch("/api/upgrade", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  const data = await res.json();
-  if (data.success) {
-    plan = "pro";
-    alert("🎉 You are now PRO");
+  if (plan !== "pro") {
+    el("betSlider").disabled = true;
   }
 }
 
-async function checkHedge() {
-  if (!token) return alert("Login required");
+/* ---------- SLIDER ---------- */
+function updateBetSize(val) {
+  betPercent = parseFloat(val);
+  el("betSizeLabel").innerText = `${betPercent}%`;
+}
 
-  const ev = -0.05; // example
+/* ---------- ANALYSIS ---------- */
+function analyze() {
+  const odds = Number(el("odds").value);
+  const prob = Number(el("prob").value) / 100;
+  const bankroll = Number(el("bankroll").value);
 
-  const res = await fetch("/api/hedge-check", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ ev }),
-  });
+  if (!odds || !prob || !bankroll) {
+    alert("Fill all fields");
+    return;
+  }
 
-  const data = await res.json();
-  alert(data.message || data.error);
+  const d = decimalOdds(odds);
+  const kelly = halfKelly(prob, d);
+  const betAmt = (betPercent / 100) * bankroll;
+
+  el("kellyInfo").innerHTML = `
+    <strong>½-Kelly suggestion:</strong> ${(kelly * 100).toFixed(2)}%
+  `;
+
+  // Warnings
+  let warning = "";
+  if (betPercent / 100 > kelly && kelly > 0) {
+    warning = "⚠️ Bet size exceeds ½-Kelly (high variance risk)";
+  }
+  if (kelly <= 0) {
+    warning = "❌ Negative edge — Kelly suggests no bet";
+  }
+
+  el("warnings").innerText = warning;
+
+  el("results").innerHTML = `
+    Bet Amount: $${betAmt.toFixed(2)}
+  `;
 }
