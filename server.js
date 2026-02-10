@@ -1,7 +1,8 @@
-// server.js — Phase A (Node 22 / Render SAFE)
+// server.js — Phase B: Pro vs Free gating
 
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 app.use(cors());
@@ -9,68 +10,64 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET;
 const ODDS_API_KEY = process.env.ODDS_API_KEY;
 
-// ---- UTIL ----
-function americanToDecimal(odds) {
-  return odds > 0 ? 1 + odds / 100 : 1 + 100 / Math.abs(odds);
+// --- MOCK USER STORE (safe for now) ---
+const users = {}; // email -> { plan }
+
+// --- AUTH MIDDLEWARE ---
+function requireAuth(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Not logged in" });
+
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: "Invalid session" });
+  }
 }
 
-function impliedProbability(odds) {
-  return odds > 0
-    ? 100 / (odds + 100)
-    : Math.abs(odds) / (Math.abs(odds) + 100);
+function requirePro(req, res, next) {
+  const user = users[req.user.email];
+  if (!user || user.plan !== "pro") {
+    return res.status(403).json({ error: "Pro feature" });
+  }
+  next();
 }
 
-function expectedValue(prob, odds) {
-  const dec = americanToDecimal(odds);
-  return prob * (dec - 1) - (1 - prob);
-}
+// --- LOGIN / REGISTER ---
+app.post("/api/login", (req, res) => {
+  const { email } = req.body;
+  if (!users[email]) users[email] = { plan: "free" };
 
-// ---- ANALYZE ----
+  const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "7d" });
+  res.json({ token, plan: users[email].plan });
+});
+
+// --- UPGRADE TO PRO (Stripe-ready later) ---
+app.post("/api/upgrade", requireAuth, (req, res) => {
+  users[req.user.email].plan = "pro";
+  res.json({ success: true });
+});
+
+// --- BASIC ANALYSIS (FREE OK) ---
 app.post("/api/analyze", (req, res) => {
-  try {
-    const { odds, userProb, hedgeThreshold = 0.03 } = req.body;
-
-    const ev = expectedValue(userProb, odds);
-    const implied = impliedProbability(odds);
-
-    const hedgeAlert = ev < -hedgeThreshold;
-
-    res.json({
-      ev: Number(ev.toFixed(4)),
-      impliedProb: Number(implied.toFixed(4)),
-      hedgeAlert,
-      message: hedgeAlert
-        ? "⚠️ Hedge recommended — EV dropped"
-        : "✅ No hedge needed",
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Analysis failed" });
-  }
+  const { ev } = req.body;
+  res.json({ ev, message: "Basic analysis complete" });
 });
 
-// ---- ODDS TEST (USES BUILT-IN FETCH) ----
-app.get("/api/odds", async (req, res) => {
-  try {
-    if (!ODDS_API_KEY) {
-      return res.status(500).json({ error: "Missing ODDS_API_KEY" });
-    }
-
-    const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?regions=us&markets=h2h&oddsFormat=american&apiKey=${ODDS_API_KEY}`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    res.json(data.slice(0, 2));
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: "Odds fetch failed" });
-  }
+// --- PRO-ONLY: HEDGE ALERT ---
+app.post("/api/hedge-check", requireAuth, requirePro, (req, res) => {
+  const { ev } = req.body;
+  const alert = ev < -0.03;
+  res.json({
+    hedge: alert,
+    message: alert ? "⚠️ Hedge recommended" : "No hedge needed",
+  });
 });
 
-// ---- START SERVER (THIS OPENS THE PORT) ----
-app.listen(PORT, () => {
-  console.log(`✅ KBetz™ running on port ${PORT}`);
-});
+app.listen(PORT, () =>
+  console.log(`✅ KBetz™ Phase B running on port ${PORT}`)
+);

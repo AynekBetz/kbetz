@@ -1,41 +1,50 @@
-// app.js — Phase A frontend logic
+let token = null;
+let plan = "free";
 
-async function analyzeSlip() {
-  const odds = Number(document.getElementById("odds").value);
-  const probPct = Number(document.getElementById("prob").value);
+async function login() {
+  const email = document.getElementById("email").value;
 
-  if (!odds || !probPct) {
-    alert("Enter odds and win probability");
-    return;
-  }
-
-  const userProb = probPct / 100;
-
-  const res = await fetch("/api/analyze", {
+  const res = await fetch("/api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      odds,
-      userProb,
-      hedgeThreshold: 0.03, // 3% EV drop
-    }),
+    body: JSON.stringify({ email }),
   });
 
   const data = await res.json();
+  token = data.token;
+  plan = data.plan;
 
-  const results = document.getElementById("results");
-  results.innerHTML = `
-    <p><strong>EV:</strong> ${data.ev}</p>
-    <p><strong>Implied Prob:</strong> ${data.impliedProb}</p>
-    <p style="color:${data.hedgeAlert ? "red" : "lime"}">
-      ${data.message}
-    </p>
-  `;
+  document.getElementById("results").innerText =
+    `Logged in as ${plan.toUpperCase()}`;
 }
 
-// Optional: test live odds
-async function testOdds() {
-  const res = await fetch("/api/odds");
+async function upgrade() {
+  const res = await fetch("/api/upgrade", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
   const data = await res.json();
-  console.log("Live odds sample:", data);
+  if (data.success) {
+    plan = "pro";
+    alert("🎉 You are now PRO");
+  }
+}
+
+async function checkHedge() {
+  if (!token) return alert("Login required");
+
+  const ev = -0.05; // example
+
+  const res = await fetch("/api/hedge-check", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ ev }),
+  });
+
+  const data = await res.json();
+  alert(data.message || data.error);
 }
