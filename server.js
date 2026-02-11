@@ -1,73 +1,113 @@
-// server.js — Phase B: Pro vs Free gating
+// =============================
+// KBetz™ Production Server
+// =============================
 
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const jwt = require("jsonwebtoken");
 
 const app = express();
+
+// =============================
+// CONFIG
+// =============================
+const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
+
+// =============================
+// MIDDLEWARE
+// =============================
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
-const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET;
-const ODDS_API_KEY = process.env.ODDS_API_KEY;
+// =============================
+// AUTH MIDDLEWARE
+// =============================
+function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: "No token provided" });
 
-// --- MOCK USER STORE (safe for now) ---
-const users = {}; // email -> { plan }
-
-// --- AUTH MIDDLEWARE ---
-function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Not logged in" });
+  const token = authHeader.split(" ")[1];
 
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
     next();
   } catch {
-    res.status(401).json({ error: "Invalid session" });
+    res.status(401).json({ error: "Invalid token" });
   }
 }
 
-function requirePro(req, res, next) {
-  const user = users[req.user.email];
-  if (!user || user.plan !== "pro") {
-    return res.status(403).json({ error: "Pro feature" });
-  }
-  next();
-}
+// =============================
+// HEALTH CHECK
+// =============================
+app.get("/", (req, res) => {
+  res.send("KBetz™ server running");
+});
 
-// --- LOGIN / REGISTER ---
+// =============================
+// ODDS ROUTE (LIVE)
+// =============================
+app.get("/api/odds", async (req, res) => {
+  try {
+    const apiKey = process.env.ODDS_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: "Missing ODDS_API_KEY" });
+    }
+
+    const response = await fetch(
+      `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${apiKey}&regions=us&markets=h2h`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+
+    res.json(data);
+
+  } catch (err) {
+    console.error("Odds fetch error:", err);
+    res.status(500).json({ error: "Odds fetch failed" });
+  }
+});
+
+// =============================
+// SIMPLE TEST ROUTE
+// =============================
+app.get("/api/odds/test", (req, res) => {
+  res.json({ message: "Odds route is working" });
+});
+
+// =============================
+// LOGIN (Demo JWT)
+// =============================
 app.post("/api/login", (req, res) => {
   const { email } = req.body;
-  if (!users[email]) users[email] = { plan: "free" };
+
+  if (!email) {
+    return res.status(400).json({ error: "Email required" });
+  }
 
   const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "7d" });
-  res.json({ token, plan: users[email].plan });
+
+  res.json({ token });
 });
 
-// --- UPGRADE TO PRO (Stripe-ready later) ---
-app.post("/api/upgrade", requireAuth, (req, res) => {
-  users[req.user.email].plan = "pro";
-  res.json({ success: true });
+// =============================
+// PROTECTED ROUTE EXAMPLE
+// =============================
+app.get("/api/protected", authenticate, (req, res) => {
+  res.json({ message: "Protected route access granted", user: req.user });
 });
 
-// --- BASIC ANALYSIS (FREE OK) ---
-app.post("/api/analyze", (req, res) => {
-  const { ev } = req.body;
-  res.json({ ev, message: "Basic analysis complete" });
+// =============================
+// START SERVER
+// =============================
+app.listen(PORT, () => {
+  console.log(`✅ KBetz™ running on port ${PORT}`);
 });
-
-// --- PRO-ONLY: HEDGE ALERT ---
-app.post("/api/hedge-check", requireAuth, requirePro, (req, res) => {
-  const { ev } = req.body;
-  const alert = ev < -0.03;
-  res.json({
-    hedge: alert,
-    message: alert ? "⚠️ Hedge recommended" : "No hedge needed",
-  });
-});
-
-app.listen(PORT, () =>
-  console.log(`✅ KBetz™ Phase B running on port ${PORT}`)
-);
