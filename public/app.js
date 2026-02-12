@@ -1,80 +1,107 @@
-let token = null;
-let plan = "free";
-let betPercent = 2;
+const sportSelect = document.getElementById("sportSelect");
+const sportStatus = document.getElementById("sportStatus");
+const resultsDiv = document.getElementById("results");
 
-/* ---------- HELPERS ---------- */
-const el = (id) => document.getElementById(id);
+let currentSport = null;
 
-function decimalOdds(o) {
-  return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o);
+// ==============================
+// LOAD SPORTS ON START
+// ==============================
+window.addEventListener("load", loadSports);
+
+// ==============================
+// LOAD SPORTS
+// ==============================
+async function loadSports() {
+  sportStatus.innerText = "Loading sports...";
+
+  try {
+    const res = await fetch("/api/sports");
+    const sports = await res.json();
+
+    if (!Array.isArray(sports) || sports.length === 0) {
+      sportStatus.innerText = "No sports currently in season.";
+      return;
+    }
+
+    sportSelect.innerHTML = "";
+
+    sports.forEach(sport => {
+      const option = document.createElement("option");
+      option.value = sport.key;
+      option.textContent = sport.title;
+      sportSelect.appendChild(option);
+    });
+
+    currentSport = sports[0].key;
+    sportSelect.value = currentSport;
+
+    sportStatus.innerText = "";
+    loadOdds(currentSport);
+
+  } catch (err) {
+    sportStatus.innerText = "Failed to load sports.";
+  }
 }
 
-// ½-Kelly (industry standard)
-function halfKelly(p, d) {
-  return ((p * d - 1) / (d - 1)) * 0.5;
+// ==============================
+// SPORT CHANGE
+// ==============================
+sportSelect.addEventListener("change", () => {
+  currentSport = sportSelect.value;
+  loadOdds(currentSport);
+});
+
+// ==============================
+// LOAD ODDS
+// ==============================
+async function loadOdds(sportKey) {
+  resultsDiv.innerHTML = "Loading games...";
+
+  try {
+    const res = await fetch(`/api/odds?sport=${sportKey}`);
+    const games = await res.json();
+
+    if (!Array.isArray(games) || games.length === 0) {
+      resultsDiv.innerHTML = `
+        <div class="empty-message">
+          No live games right now.
+        </div>
+      `;
+      return;
+    }
+
+    renderGames(games);
+
+  } catch (err) {
+    resultsDiv.innerHTML = "Failed to load odds.";
+  }
 }
 
-/* ---------- AUTH ---------- */
-async function login() {
-  const email = el("email").value;
+// ==============================
+// RENDER GAMES
+// ==============================
+function renderGames(games) {
+  resultsDiv.innerHTML = "";
 
-  const res = await fetch("/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+  games.forEach(game => {
+    const card = document.createElement("div");
+    card.className = "game-card";
+
+    const home = game.home_team;
+    const away = game.away_team;
+
+    const odds =
+      game.bookmakers?.[0]?.markets?.[0]?.outcomes
+        ?.map(o => `${o.name}: ${o.price}`)
+        .join(" | ") || "No odds available";
+
+    card.innerHTML = `
+      <strong>${away}</strong> @ <strong>${home}</strong>
+      <br>
+      ${odds}
+    `;
+
+    resultsDiv.appendChild(card);
   });
-
-  const data = await res.json();
-  token = data.token;
-  plan = data.plan;
-
-  el("planStatus").innerText =
-    plan === "pro"
-      ? "💎 Pro account"
-      : "🔒 Free account (Kelly locked)";
-
-  if (plan !== "pro") {
-    el("betSlider").disabled = true;
-  }
-}
-
-/* ---------- SLIDER ---------- */
-function updateBetSize(val) {
-  betPercent = parseFloat(val);
-  el("betSizeLabel").innerText = `${betPercent}%`;
-}
-
-/* ---------- ANALYSIS ---------- */
-function analyze() {
-  const odds = Number(el("odds").value);
-  const prob = Number(el("prob").value) / 100;
-  const bankroll = Number(el("bankroll").value);
-
-  if (!odds || !prob || !bankroll) {
-    alert("Fill all fields");
-    return;
-  }
-
-  const d = decimalOdds(odds);
-  const kelly = halfKelly(prob, d);
-  const betAmt = (betPercent / 100) * bankroll;
-
-  el("kellyInfo").innerHTML = `
-    <strong>½-Kelly suggestion:</strong> ${(kelly * 100).toFixed(2)}%
-  `;
-
-  // Warnings
-  let warning = "";
-  if (betPercent / 100 > kelly && kelly > 0) {
-    warning = "⚠️ Bet size exceeds ½-Kelly (high variance risk)";
-  }
-  if (kelly <= 0) {
-    warning = "❌ Negative edge — Kelly suggests no bet";
-  }
-
-  el("warnings").innerText = warning;
-
-  el("results").innerHTML = `
-    Bet Amount: $${betAmt.toFixed(2)}
-  `;
 }
