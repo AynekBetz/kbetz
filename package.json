@@ -1,17 +1,19 @@
 {
   "name": "kbetz",
   "version": "1.0.0",
-  "description": "KBetz betting analysis platform",
+  "description": "KBetz™ Betting Analytics Platform",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.4",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "stripe": "^14.0.0"
+    "jsonwebtoken": "^9.0.2"
   }
 }
