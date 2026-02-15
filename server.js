@@ -1,86 +1,86 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
-import fetch from "node-fetch";
-import "./config/db.js"; // MongoDB connection
-
-dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 10000;
+
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 10000;
-
-/* ==============================
+/* ------------------------------
    HEALTH CHECK
-============================== */
+-------------------------------- */
 app.get("/api/test", (req, res) => {
   res.json({ status: "Server running" });
 });
 
-/* ==============================
-   GET AVAILABLE SPORTS
-============================== */
+/* ------------------------------
+   GET SPORTS
+-------------------------------- */
 app.get("/api/sports", async (req, res) => {
   try {
-    const response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/?apiKey=${process.env.ODDS_API_KEY}`
-    );
+    if (!process.env.ODDS_API_KEY) {
+      return res.status(500).json({ error: "Missing ODDS_API_KEY" });
+    }
+
+    const url = `https://api.the-odds-api.com/v4/sports/?apiKey=${process.env.ODDS_API_KEY}`;
+
+    console.log("Fetching sports from:", url);
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("API error:", text);
+      return res.status(response.status).json({ error: text });
+    }
 
     const data = await response.json();
 
-    if (!response.ok) {
-      return res.status(400).json(data);
-    }
+    res.json(data);
 
-    // Only return active sports
-    const activeSports = data.filter((sport) => sport.active === true);
-
-    res.json(activeSports);
-  } catch (error) {
-    console.error("Sports fetch error:", error.message);
+  } catch (err) {
+    console.error("Fetch failed:", err);
     res.status(500).json({ error: "Failed to fetch sports" });
   }
 });
 
-/* ==============================
+/* ------------------------------
    GET ODDS BY SPORT
-============================== */
+-------------------------------- */
 app.get("/api/odds", async (req, res) => {
   try {
     const { sport } = req.query;
 
     if (!sport) {
-      return res.status(400).json({ error: "Sport key required" });
+      return res.status(400).json({ error: "Sport is required" });
     }
 
-    const response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/${sport}/odds/?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey=${process.env.ODDS_API_KEY}`
-    );
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${process.env.ODDS_API_KEY}&regions=us&markets=h2h`;
+
+    console.log("Fetching odds from:", url);
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("API error:", text);
+      return res.status(response.status).json({ error: text });
+    }
 
     const data = await response.json();
 
-    if (!response.ok) {
-      return res.status(400).json(data);
-    }
-
-    if (!data.length) {
-      return res.json({ message: "No live games right now" });
-    }
-
     res.json(data);
-  } catch (error) {
-    console.error("Odds fetch error:", error.message);
+
+  } catch (err) {
+    console.error("Odds fetch failed:", err);
     res.status(500).json({ error: "Failed to fetch odds" });
   }
 });
 
-/* ==============================
+/* ------------------------------
    START SERVER
-============================== */
+-------------------------------- */
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
