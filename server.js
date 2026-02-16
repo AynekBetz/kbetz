@@ -4,10 +4,15 @@ import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import Stripe from "stripe";
+import { calculateEV } from "./utils/ev.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+/* ===========================
+   ENVIRONMENT VARIABLES
+=========================== */
 
 const PORT = process.env.PORT || 10000;
 const ODDS_API_KEY = process.env.ODDS_API_KEY;
@@ -18,19 +23,24 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 /* ===========================
-   MongoDB Connection
+   DATABASE CONNECTION
 =========================== */
+
+if (!MONGO_URI) {
+  console.error("❌ MONGO_URI missing");
+  process.exit(1);
+}
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch(err => console.error("❌ MongoDB Error:", err.message));
 
 /* ===========================
-   Schemas
+   MODELS
 =========================== */
 
 const userSchema = new mongoose.Schema({
-  email: String,
+  email: { type: String, unique: true },
   password: String,
   bankroll: { type: Number, default: 0 },
   role: { type: String, default: "free" },
@@ -49,28 +59,50 @@ const betSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+const bankrollHistorySchema = new mongoose.Schema({
+  userId: mongoose.Schema.Types.ObjectId,
+  bankroll: Number,
+  createdAt: { type: Date, default: Date.now }
+});
+
 const User = mongoose.model("User", userSchema);
 const Bet = mongoose.model("Bet", betSchema);
+const BankrollHistory = mongoose.model("BankrollHistory", bankrollHistorySchema);
 
 /* ===========================
-   Auth Middleware
+   AUTH MIDDLEWARE
 =========================== */
 
-function auth(req, res, next) {
-  const token = req.headers.authorization;
-  if (!token) return res.status(401).json({ error: "No token" });
+function auth(requiredRole = null) {
+  return async (req, res, next) => {
+    const token = req.headers.authorization;
 
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch {
-    res.status(401).json({ error: "Invalid token" });
-  }
+    if (!token) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = await User.findById(decoded.id);
+
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      if (requiredRole && user.role !== requiredRole) {
+        return res.status(403).json({ error: "Pro subscription required" });
+      }
+
+      req.user = user;
+      next();
+    } catch (err) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+  };
 }
 
 /* ===========================
-   Health
+   HEALTH CHECK
 =========================== */
 
 app.get("/api/health", (req, res) => {
@@ -78,95 +110,127 @@ app.get("/api/health", (req, res) => {
 });
 
 /* ===========================
-   Register
+   REGISTER
 =========================== */
 
 app.post("/api/register", async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const hashed = await bcrypt.hash(password, 10);
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ error: "User already exists" });
+    }
 
-  const user = await User.create({
-    email,
-    password: hashed
-  });
+    const hashed = await bcrypt.hash(password, 10);
 
-  res.json({ message: "User created" });
+    await User.create({
+      email,
+      password: hashed
+    });
+
+    res.json({ message: "User registered successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Registration failed" });
+  }
 });
 
 /* ===========================
-   Login
+   LOGIN
 =========================== */
 
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) return res.status(400).json({ error: "User not found" });
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ error: "User not found" });
+    }
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(400).json({ error: "Invalid password" });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      return res.status(400).json({ error: "Invalid password" });
+    }
 
-  const token = jwt.sign({ id: user._id }, JWT_SECRET);
+    const token = jwt.sign(
+      { id: user._id },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-  res.json({ token });
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ error: "Login failed" });
+  }
 });
 
 /* ===========================
-   Bankroll
+   BANKROLL
 =========================== */
 
-app.post("/api/bankroll", auth, async (req, res) => {
-  const { amount } = req.body;
+app.post("/api/bankroll", auth(), async (req, res) => {
+  try {
+    const { amount } = req.body;
 
-  const user = await User.findById(req.user.id);
-  user.bankroll = amount;
-  await user.save();
+    req.user.bankroll = amount;
+    await req.user.save();
 
-  res.json({ bankroll: user.bankroll });
+    await BankrollHistory.create({
+      userId: req.user._id,
+      bankroll: amount
+    });
+
+    res.json({ bankroll: amount });
+  } catch {
+    res.status(500).json({ error: "Bankroll update failed" });
+  }
+});
+
+app.get("/api/bankroll/history", auth(), async (req, res) => {
+  const history = await BankrollHistory.find({
+    userId: req.user._id
+  }).sort({ createdAt: 1 });
+
+  res.json(history);
 });
 
 /* ===========================
-   Add Bet
+   ADD BET
 =========================== */
 
-app.post("/api/bet", auth, async (req, res) => {
-  const { sport, market, odds, stake } = req.body;
+app.post("/api/bet", auth(), async (req, res) => {
+  try {
+    const { sport, market, odds, stake } = req.body;
 
-  const bet = await Bet.create({
-    userId: req.user.id,
-    sport,
-    market,
-    odds,
-    stake
-  });
+    const bet = await Bet.create({
+      userId: req.user._id,
+      sport,
+      market,
+      odds,
+      stake
+    });
 
-  res.json(bet);
+    res.json(bet);
+  } catch {
+    res.status(500).json({ error: "Bet creation failed" });
+  }
 });
 
 /* ===========================
-   Stripe Subscription
+   EV ENGINE (PRO ONLY)
 =========================== */
 
-app.post("/api/create-checkout-session", auth, async (req, res) => {
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    mode: "subscription",
-    line_items: [
-      {
-        price: "YOUR_STRIPE_PRICE_ID",
-        quantity: 1
-      }
-    ],
-    success_url: "https://kbetz.onrender.com/success",
-    cancel_url: "https://kbetz.onrender.com/cancel"
-  });
+app.post("/api/ev", auth("pro"), (req, res) => {
+  const { odds, trueProbability } = req.body;
 
-  res.json({ url: session.url });
+  const result = calculateEV(odds, trueProbability);
+
+  res.json(result);
 });
 
 /* ===========================
-   Sports Route
+   SPORTS
 =========================== */
 
 app.get("/api/sports", async (req, res) => {
@@ -175,12 +239,45 @@ app.get("/api/sports", async (req, res) => {
       `https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_API_KEY}`
     );
 
+    if (!response.ok) {
+      return res.status(500).json({ error: "Odds API error" });
+    }
+
     const data = await response.json();
     res.json(data);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: "Failed to fetch sports" });
   }
 });
+
+/* ===========================
+   STRIPE CHECKOUT
+=========================== */
+
+app.post("/api/create-checkout-session", auth(), async (req, res) => {
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "subscription",
+      line_items: [
+        {
+          price: "YOUR_STRIPE_PRICE_ID",
+          quantity: 1
+        }
+      ],
+      success_url: "https://kbetz.onrender.com/success",
+      cancel_url: "https://kbetz.onrender.com/cancel"
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: "Stripe session failed" });
+  }
+});
+
+/* ===========================
+   START SERVER
+=========================== */
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
