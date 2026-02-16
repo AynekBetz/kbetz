@@ -7,11 +7,9 @@ import Stripe from "stripe";
 import { calculateEV } from "./utils/ev.js";
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
 /* ===========================
-   ENVIRONMENT VARIABLES
+   ENV VARIABLES
 =========================== */
 
 const PORT = process.env.PORT || 10000;
@@ -19,11 +17,19 @@ const ODDS_API_KEY = process.env.ODDS_API_KEY;
 const MONGO_URI = process.env.MONGO_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 /* ===========================
-   DATABASE CONNECTION
+   MIDDLEWARE
+=========================== */
+
+app.use(cors());
+app.use(express.json());
+
+/* ===========================
+   DATABASE
 =========================== */
 
 if (!MONGO_URI) {
@@ -95,14 +101,14 @@ function auth(requiredRole = null) {
 
       req.user = user;
       next();
-    } catch (err) {
-      return res.status(401).json({ error: "Invalid token" });
+    } catch {
+      res.status(401).json({ error: "Invalid token" });
     }
   };
 }
 
 /* ===========================
-   HEALTH CHECK
+   HEALTH
 =========================== */
 
 app.get("/api/health", (req, res) => {
@@ -130,7 +136,7 @@ app.post("/api/register", async (req, res) => {
     });
 
     res.json({ message: "User registered successfully" });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Registration failed" });
   }
 });
@@ -153,14 +159,12 @@ app.post("/api/login", async (req, res) => {
       return res.status(400).json({ error: "Invalid password" });
     }
 
-    const token = jwt.sign(
-      { id: user._id },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
+      expiresIn: "7d"
+    });
 
     res.json({ token });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Login failed" });
   }
 });
@@ -196,28 +200,6 @@ app.get("/api/bankroll/history", auth(), async (req, res) => {
 });
 
 /* ===========================
-   ADD BET
-=========================== */
-
-app.post("/api/bet", auth(), async (req, res) => {
-  try {
-    const { sport, market, odds, stake } = req.body;
-
-    const bet = await Bet.create({
-      userId: req.user._id,
-      sport,
-      market,
-      odds,
-      stake
-    });
-
-    res.json(bet);
-  } catch {
-    res.status(500).json({ error: "Bet creation failed" });
-  }
-});
-
-/* ===========================
    EV ENGINE (PRO ONLY)
 =========================== */
 
@@ -230,7 +212,7 @@ app.post("/api/ev", auth("pro"), (req, res) => {
 });
 
 /* ===========================
-   SPORTS
+   SPORTS API
 =========================== */
 
 app.get("/api/sports", async (req, res) => {
@@ -256,7 +238,21 @@ app.get("/api/sports", async (req, res) => {
 
 app.post("/api/create-checkout-session", auth(), async (req, res) => {
   try {
+    let customerId = req.user.stripeCustomerId;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: req.user.email
+      });
+
+      req.user.stripeCustomerId = customer.id;
+      await req.user.save();
+
+      customerId = customer.id;
+    }
+
     const session = await stripe.checkout.sessions.create({
+      customer: customerId,
       payment_method_types: ["card"],
       mode: "subscription",
       line_items: [
@@ -270,10 +266,51 @@ app.post("/api/create-checkout-session", auth(), async (req, res) => {
     });
 
     res.json({ url: session.url });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Stripe session failed" });
   }
 });
+
+/* ===========================
+   STRIPE WEBHOOK
+   (MUST BE BEFORE app.listen)
+=========================== */
+
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+
+      const user = await User.findOne({
+        stripeCustomerId: session.customer
+      });
+
+      if (user) {
+        user.role = "pro";
+        user.subscriptionStatus = "active";
+        await user.save();
+      }
+    }
+
+    res.json({ received: true });
+  }
+);
 
 /* ===========================
    START SERVER
