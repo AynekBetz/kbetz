@@ -4,7 +4,10 @@ import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import Stripe from "stripe";
+
 import { calculateEV } from "./utils/ev.js";
+import { calculateKelly } from "./utils/kelly.js";
+import { calculateHedge } from "./utils/hedge.js";
 
 const app = express();
 
@@ -102,7 +105,7 @@ function auth(requiredRole = null) {
       req.user = user;
       next();
     } catch {
-      res.status(401).json({ error: "Invalid token" });
+      return res.status(401).json({ error: "Invalid token" });
     }
   };
 }
@@ -212,6 +215,43 @@ app.post("/api/ev", auth("pro"), (req, res) => {
 });
 
 /* ===========================
+   KELLY ENGINE
+=========================== */
+
+app.post("/api/kelly", auth(), (req, res) => {
+  const { odds, trueProbability, bankroll, fraction } = req.body;
+
+  const result = calculateKelly(
+    odds,
+    trueProbability,
+    bankroll,
+    fraction || 1
+  );
+
+  if (result.rawKelly > 0.25) {
+    result.warning = "High volatility bet. Consider fractional Kelly.";
+  }
+
+  if (result.rawKelly < 0) {
+    result.warning = "Negative EV bet. Do not place.";
+  }
+
+  res.json(result);
+});
+
+/* ===========================
+   HEDGE ENGINE
+=========================== */
+
+app.post("/api/hedge", auth(), (req, res) => {
+  const { stake1, odds1, odds2 } = req.body;
+
+  const result = calculateHedge(stake1, odds1, odds2);
+
+  res.json(result);
+});
+
+/* ===========================
    SPORTS API
 =========================== */
 
@@ -273,7 +313,6 @@ app.post("/api/create-checkout-session", auth(), async (req, res) => {
 
 /* ===========================
    STRIPE WEBHOOK
-   (MUST BE BEFORE app.listen)
 =========================== */
 
 app.post(
