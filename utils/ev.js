@@ -1,6 +1,4 @@
-// utils/ev.js
-
-export function calculateEV(probability, odds, stake = 1) {
+export function calculateEV(probability, odds, stake = 100) {
   if (!probability || !odds) {
     throw new Error("Probability and odds are required");
   }
@@ -11,11 +9,10 @@ export function calculateEV(probability, odds, stake = 1) {
 
   let decimalOdds;
 
-  // Convert American odds if needed
   if (odds > 0 && odds >= 100) {
-    decimalOdds = 1 + (odds / 100);
+    decimalOdds = 1 + odds / 100;
   } else if (odds < 0) {
-    decimalOdds = 1 + (100 / Math.abs(odds));
+    decimalOdds = 1 + 100 / Math.abs(odds);
   } else {
     decimalOdds = odds;
   }
@@ -24,8 +21,8 @@ export function calculateEV(probability, odds, stake = 1) {
   const lossAmount = stake;
 
   const expectedValue =
-    (probability * winAmount) -
-    ((1 - probability) * lossAmount);
+    probability * winAmount -
+    (1 - probability) * lossAmount;
 
   const evPercent = (expectedValue / stake) * 100;
 

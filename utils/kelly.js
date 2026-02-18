@@ -1,5 +1,3 @@
-// utils/kelly.js
-
 export function calculateKelly(probability, odds, bankroll = null) {
   if (!probability || !odds) {
     throw new Error("Probability and odds are required");
@@ -11,13 +9,12 @@ export function calculateKelly(probability, odds, bankroll = null) {
 
   let decimalOdds;
 
-  // Convert American odds if needed
   if (odds > 0 && odds >= 100) {
-    decimalOdds = 1 + (odds / 100);
+    decimalOdds = 1 + odds / 100;
   } else if (odds < 0) {
-    decimalOdds = 1 + (100 / Math.abs(odds));
+    decimalOdds = 1 + 100 / Math.abs(odds);
   } else {
-    decimalOdds = odds; // already decimal
+    decimalOdds = odds;
   }
 
   const b = decimalOdds - 1;
@@ -34,7 +31,5 @@ export function calculateKelly(probability, odds, bankroll = null) {
     };
   }
 
-  return {
-    kellyFraction: safeKelly
-  };
+  return { kellyFraction: safeKelly };
 }
