@@ -1,30 +1,32 @@
-export function calculateHedge({
-  stake1,
-  odds1,
-  odds2
-}) {
-  // Convert American odds to decimal
-  function toDecimal(odds) {
-    if (odds > 0) {
-      return (odds / 100) + 1;
-    } else {
-      return (100 / Math.abs(odds)) + 1;
-    }
+// utils/hedge.js
+
+export function calculateHedge(stake1, odds1, odds2) {
+  if (!stake1 || !odds1 || !odds2) {
+    throw new Error("stake1, odds1, and odds2 are required");
   }
 
-  const dec1 = toDecimal(odds1);
-  const dec2 = toDecimal(odds2);
+  // Convert to decimal if American
+  const convertToDecimal = (odds) => {
+    if (odds > 0 && odds >= 100) {
+      return 1 + (odds / 100);
+    } else if (odds < 0) {
+      return 1 + (100 / Math.abs(odds));
+    }
+    return odds;
+  };
 
-  const payout1 = stake1 * dec1;
+  const dec1 = convertToDecimal(odds1);
+  const dec2 = convertToDecimal(odds2);
 
-  const hedgeStake = payout1 / dec2;
+  const hedgeStake = (stake1 * dec1) / dec2;
 
-  const profitIf1Wins = payout1 - stake1 - hedgeStake;
-  const profitIf2Wins = (hedgeStake * dec2) - hedgeStake - stake1;
+  const payoutIf1Wins = stake1 * dec1 - hedgeStake;
+  const payoutIf2Wins = hedgeStake * dec2 - stake1;
 
   return {
-    hedgeStake: Number(hedgeStake.toFixed(2)),
-    profitIf1Wins: Number(profitIf1Wins.toFixed(2)),
-    profitIf2Wins: Number(profitIf2Wins.toFixed(2))
+    hedgeStake,
+    payoutIf1Wins,
+    payoutIf2Wins,
+    guaranteedProfit: Math.min(payoutIf1Wins, payoutIf2Wins)
   };
 }
