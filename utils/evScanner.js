@@ -1,7 +1,7 @@
 import { calculateEV } from "./ev.js";
-import { generateModelProbability } from "./aiModel.js";
+import { generateSmartProbability } from "./aiModelV2.js";
 
-function americanToDecimal(odds) {
+function toDecimal(odds) {
   if (odds > 0) return 1 + odds / 100;
   return 1 + 100 / Math.abs(odds);
 }
@@ -16,22 +16,25 @@ export function scanForPositiveEV(events, stake = 100) {
       for (const market of book.markets || []) {
         for (const outcome of market.outcomes || []) {
 
-          const decimalOdds = americanToDecimal(outcome.price);
-          const impliedProb = 1 / decimalOdds;
+          const decimal = toDecimal(outcome.price);
+          const implied = 1 / decimal;
 
-          const modelProb = generateModelProbability(impliedProb);
+          const smartProb = generateSmartProbability(
+            implied,
+            event.bookmakers
+          );
 
-          const evData = calculateEV(modelProb, decimalOdds, stake);
+          const evData = calculateEV(smartProb, decimal, stake);
 
           if (evData.expectedValue > 0) {
             results.push({
               sport: event.sport_title,
               matchup: `${event.home_team} vs ${event.away_team}`,
-              bookmaker: book.title,
               outcome: outcome.name,
+              bookmaker: book.title,
               odds: outcome.price,
               ev: evData.expectedValue,
-              edge: modelProb - impliedProb
+              edge: smartProb - implied
             });
           }
         }
