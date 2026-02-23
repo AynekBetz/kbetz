@@ -1,231 +1,76 @@
 import express from "express";
-import cors from "cors";
 import mongoose from "mongoose";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
-import fetch from "node-fetch";
+import dotenv from "dotenv";
+import Stripe from "stripe";
 
-import Bet from "./models/Bet.js";
-
-import { calculateKelly } from "./utils/kelly.js";
-import { calculateHedge } from "./utils/hedge.js";
-import { calculateEV } from "./utils/ev.js";
-import { scanForPositiveEV } from "./utils/evScanner.js";
-import { rankBets } from "./utils/ranking.js";
-import { detectSharpLine } from "./utils/sharpDetector.js";
+dotenv.config();
 
 const app = express();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-/* ==============================
-   ENV VARIABLES
-============================== */
-
-const PORT = process.env.PORT || 10000;
-const MONGO_URI = process.env.MONGO_URI;
-const JWT_SECRET = process.env.JWT_SECRET || "devsecret";
-const ODDS_API_KEY = process.env.ODDS_API_KEY;
-
-/* ==============================
-   MIDDLEWARE
-============================== */
-
-app.use(cors());
 app.use(express.json());
 
-/* ==============================
-   DATABASE CONNECTION
-============================== */
-
-mongoose.connect(MONGO_URI)
+// Mongo
+mongoose
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
-  .catch(err => console.log("❌ MongoDB Error:", err.message));
+  .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
-/* ==============================
-   HEALTH ROUTE
-============================== */
-
-app.get("/api/health", (req, res) => {
-  res.json({
-    status: "healthy",
-    mongo:
-      mongoose.connection.readyState === 1
-        ? "connected"
-        : "not connected"
-  });
-});
-
-/* ==============================
-   USER MODEL
-============================== */
-
-const userSchema = new mongoose.Schema({
-  email: String,
-  password: String,
-  tier: {
-    type: String,
-    enum: ["free", "pro", "elite"],
-    default: "free"
-  }
-});
-
-const User = mongoose.model("User", userSchema);
-
-/* ==============================
-   AUTH ROUTES
-============================== */
-
-app.post("/api/auth/register", async (req, res) => {
+// Checkout Route
+app.post("/api/create-checkout-session", async (req, res) => {
   try {
-    const hashed = await bcrypt.hash(req.body.password, 10);
+    const { email } = req.body;
 
-    const user = await User.create({
-      email: req.body.email,
-      password: hashed
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      payment_method_types: ["card"],
+      customer_email: email,
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      success_url: "https://kbetz.onrender.com/success",
+      cancel_url: "https://kbetz.onrender.com/cancel",
     });
 
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ error: "Registration failed" });
+    res.json({ url: session.url });
+  } catch (error) {
+    console.log("Stripe Error:", error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
-  try {
-    const user = await User.findOne({
-      email: req.body.email
-    });
+// Webhook
+app.post(
+  "/api/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"];
 
-    if (!user)
-      return res.status(400).json({ error: "User not found" });
+    let event;
 
-    const valid = await bcrypt.compare(
-      req.body.password,
-      user.password
-    );
-
-    if (!valid)
-      return res.status(400).json({ error: "Invalid credentials" });
-
-    const token = jwt.sign(
-      { id: user._id },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.json({ token });
-  } catch (err) {
-    res.status(500).json({ error: "Login failed" });
-  }
-});
-
-/* ==============================
-   EV SCANNER
-============================== */
-
-app.get("/api/scan", async (req, res) => {
-  try {
-    const response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/upcoming/odds/?regions=us&markets=h2h&apiKey=${ODDS_API_KEY}`
-    );
-
-    const data = await response.json();
-
-    const evBets = scanForPositiveEV(data);
-    const ranked = rankBets(evBets);
-
-    res.json(ranked.slice(0, 20));
-  } catch (err) {
-    res.status(500).json({ error: "Scanner failed" });
-  }
-});
-
-/* ==============================
-   BANKROLL ROUTES
-============================== */
-
-app.post("/api/bet", async (req, res) => {
-  try {
-    const bet = await Bet.create(req.body);
-    res.json(bet);
-  } catch (err) {
-    res.status(500).json({ error: "Bet save failed" });
-  }
-});
-
-app.get("/api/bankroll", async (req, res) => {
-  try {
-    const bets = await Bet.find();
-
-    let profit = 0;
-
-    for (const bet of bets) {
-      if (bet.result === "win") {
-        if (bet.odds > 0)
-          profit += bet.stake * (bet.odds / 100);
-        else
-          profit += bet.stake * (100 / Math.abs(bet.odds));
-      }
-
-      if (bet.result === "loss") {
-        profit -= bet.stake;
-      }
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.log("Webhook signature failed.");
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    res.json({
-      totalBets: bets.length,
-      profit
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Bankroll fetch failed" });
+    if (event.type === "checkout.session.completed") {
+      console.log("Subscription completed!");
+    }
+
+    res.json({ received: true });
   }
-});
+);
 
-/* ==============================
-   CALCULATORS
-============================== */
-
-app.post("/api/kelly", (req, res) => {
-  try {
-    const result = calculateKelly(
-      req.body.probability,
-      req.body.odds,
-      req.body.bankroll
-    );
-
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.post("/api/hedge", (req, res) => {
-  try {
-    const result = calculateHedge(
-      req.body.stake1,
-      req.body.odds1,
-      req.body.odds2
-    );
-
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-/* ==============================
-   ROOT ROUTE
-============================== */
-
-app.get("/", (req, res) => {
-  res.json({
-    message: "KBetz API is live 🚀",
-    version: "6.0.0"
-  });
-});
-
-/* ==============================
-   START SERVER
-============================== */
+const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
