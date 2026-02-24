@@ -8,18 +8,58 @@ dotenv.config();
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// ===============================
+// Middleware
+// ===============================
 app.use(express.json());
 
-// Mongo
+// ===============================
+// MongoDB Connection
+// ===============================
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
-// Checkout Route
+// ===============================
+// User Model
+// ===============================
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  isPro: { type: Boolean, default: false },
+  stripeCustomerId: String,
+});
+
+const User = mongoose.model("User", userSchema);
+
+// ===============================
+// Health Check Route
+// ===============================
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "healthy",
+    mongo:
+      mongoose.connection.readyState === 1 ? "connected" : "not connected",
+  });
+});
+
+// ===============================
+// Create Stripe Checkout Session
+// ===============================
 app.post("/api/create-checkout-session", async (req, res) => {
   try {
     const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email required" });
+    }
+
+    // Ensure user exists
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({ email });
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -37,12 +77,14 @@ app.post("/api/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (error) {
-    console.log("Stripe Error:", error.message);
+    console.log("❌ Stripe Checkout Error:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Webhook
+// ===============================
+// Stripe Webhook (IMPORTANT)
+// ===============================
 app.post(
   "/api/webhook",
   express.raw({ type: "application/json" }),
@@ -58,18 +100,68 @@ app.post(
         process.env.STRIPE_WEBHOOK_SECRET
       );
     } catch (err) {
-      console.log("Webhook signature failed.");
+      console.log("❌ Webhook signature verification failed.");
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
+    // Handle completed checkout
     if (event.type === "checkout.session.completed") {
-      console.log("Subscription completed!");
+      const session = event.data.object;
+
+      const email = session.customer_email;
+
+      const user = await User.findOne({ email });
+
+      if (user) {
+        user.isPro = true;
+        user.stripeCustomerId = session.customer;
+        await user.save();
+        console.log("🔥 User upgraded to PRO:", email);
+      }
     }
 
     res.json({ received: true });
   }
 );
 
+// ===============================
+// Pro Middleware
+// ===============================
+const requirePro = async (req, res, next) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email required" });
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user || !user.isPro) {
+    return res.status(403).json({ error: "Pro subscription required" });
+  }
+
+  next();
+};
+
+// ===============================
+// Example Pro Route
+// ===============================
+app.post("/api/pro/ev-scan", requirePro, (req, res) => {
+  res.json({
+    message: "Welcome to Pro EV Scanner 🚀",
+  });
+});
+
+// ===============================
+// Root Route (Prevents Cannot GET /)
+// ===============================
+app.get("/", (req, res) => {
+  res.send("KBetz API is running 🚀");
+});
+
+// ===============================
+// Start Server
+// ===============================
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
