@@ -1,7 +1,7 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const dotenv = require("dotenv");
-const Stripe = require("stripe");
+import express from "express";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import Stripe from "stripe";
 
 dotenv.config();
 
@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
-// Health route
+// Health
 app.get("/api/health", (req, res) => {
   res.json({
     status: "healthy",
@@ -34,7 +34,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Checkout route
+// Checkout Route
 app.post("/api/create-checkout-session", async (req, res) => {
   try {
     const { email } = req.body;
