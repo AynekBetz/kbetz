@@ -10,13 +10,17 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 app.use(express.json());
 
-// MongoDB
+/* ===============================
+   MongoDB Connection
+=============================== */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.log("❌ MongoDB Error:", err.message));
 
-// User Schema
+/* ===============================
+   User Schema
+=============================== */
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   isPro: { type: Boolean, default: false },
@@ -25,7 +29,9 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
-// Health
+/* ===============================
+   Health Route
+=============================== */
 app.get("/api/health", (req, res) => {
   res.json({
     status: "healthy",
@@ -34,15 +40,23 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Checkout Route
+/* ===============================
+   Stripe Checkout Route (DEBUG VERSION)
+=============================== */
 app.post("/api/create-checkout-session", async (req, res) => {
   try {
+    console.log("🔥 Checkout request received");
+    console.log("Request Body:", req.body);
+    console.log("Stripe Key Exists:", !!process.env.STRIPE_SECRET_KEY);
+    console.log("Stripe Price ID:", process.env.STRIPE_PRICE_ID);
+
     const { email } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: "Email required" });
     }
 
+    // Ensure user exists
     let user = await User.findOne({ email });
 
     if (!user) {
@@ -63,18 +77,26 @@ app.post("/api/create-checkout-session", async (req, res) => {
       cancel_url: "https://kbetz.onrender.com/cancel",
     });
 
+    console.log("✅ Stripe session created:", session.id);
+
     res.json({ url: session.url });
+
   } catch (error) {
-    console.log("❌ Stripe Checkout Error:", error.message);
+    console.log("❌ STRIPE ERROR FULL:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Root
+/* ===============================
+   Root Route
+=============================== */
 app.get("/", (req, res) => {
-  res.send("KBetz API is running 🚀");
+  res.send("🚀 KBetz API is running");
 });
 
+/* ===============================
+   Start Server
+=============================== */
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
