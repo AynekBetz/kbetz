@@ -1,62 +1,60 @@
 import express from "express";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import Stripe from "stripe";
+import dotenv from "dotenv";
 
 dotenv.config();
 
 const app = express();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
 app.use(express.json());
 
 /* ===============================
-   MongoDB Connection
+   ENV VARIABLES
 =============================== */
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.log("❌ MongoDB Error:", err.message));
+const PORT = process.env.PORT || 10000;
+const MONGO_URI = process.env.MONGO_URI;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+const CLIENT_URL = process.env.CLIENT_URL || "https://kbetz.onrender.com";
+
+const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 /* ===============================
-   User Schema
+   CONNECT TO MONGODB
+=============================== */
+mongoose
+  .connect(MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.error("Mongo Error:", err));
+
+/* ===============================
+   USER MODEL
 =============================== */
 const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
+  email: String,
   isPro: { type: Boolean, default: false },
-  stripeCustomerId: String,
 });
 
 const User = mongoose.model("User", userSchema);
 
 /* ===============================
-   Health Route
+   HEALTH ROUTE
 =============================== */
-app.get("/api/health", (req, res) => {
-  res.json({
-    status: "healthy",
-    mongo:
-      mongoose.connection.readyState === 1 ? "connected" : "not connected",
-  });
+app.get("/health", (req, res) => {
+  res.json({ status: "healthy" });
 });
 
 /* ===============================
-   Stripe Checkout Route (DEBUG VERSION)
+   CREATE CHECKOUT SESSION
 =============================== */
 app.post("/api/create-checkout-session", async (req, res) => {
   try {
-    console.log("🔥 Checkout request received");
-    console.log("Request Body:", req.body);
-    console.log("Stripe Key Exists:", !!process.env.STRIPE_SECRET_KEY);
-    console.log("Stripe Price ID:", process.env.STRIPE_PRICE_ID);
-
     const { email } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: "Email required" });
     }
 
-    // Ensure user exists
+    // Find or create user
     let user = await User.findOne({ email });
 
     if (!user) {
@@ -64,41 +62,61 @@ app.post("/api/create-checkout-session", async (req, res) => {
     }
 
     const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
       payment_method_types: ["card"],
+      mode: "subscription",
       customer_email: email,
+
+      // 🔥 THIS IS WHERE YOUR REAL PRICE ID GOES
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID,
+          price: "price_1T3faVCw81OP3G6S1jP2e8RF", // ⬅️ REPLACE WITH YOUR REAL PRICE ID
           quantity: 1,
         },
       ],
-      success_url: "https://kbetz.onrender.com/success",
-      cancel_url: "https://kbetz.onrender.com/cancel",
-    });
 
-    console.log("✅ Stripe session created:", session.id);
+      success_url: `${CLIENT_URL}/success`,
+      cancel_url: `${CLIENT_URL}/cancel`,
+    });
 
     res.json({ url: session.url });
 
   } catch (error) {
-    console.log("❌ STRIPE ERROR FULL:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Stripe Error:", error);
+    res.status(500).json({ error: "Something went wrong" });
   }
 });
 
 /* ===============================
-   Root Route
+   SUCCESS ROUTE
 =============================== */
-app.get("/", (req, res) => {
-  res.send("🚀 KBetz API is running");
+app.get("/success", (req, res) => {
+  res.send(`
+    <h1>🎉 Subscription Successful!</h1>
+    <p>Your payment was processed successfully.</p>
+    <p>You can now close this page.</p>
+  `);
 });
 
 /* ===============================
-   Start Server
+   CANCEL ROUTE
 =============================== */
-const PORT = process.env.PORT || 10000;
+app.get("/cancel", (req, res) => {
+  res.send(`
+    <h1>❌ Payment Cancelled</h1>
+    <p>Your subscription was not completed.</p>
+  `);
+});
 
+/* ===============================
+   ROOT ROUTE
+=============================== */
+app.get("/", (req, res) => {
+  res.send("🚀 KBetz API Running");
+});
+
+/* ===============================
+   START SERVER
+=============================== */
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
