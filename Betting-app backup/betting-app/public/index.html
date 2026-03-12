@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>KBetz™</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 20px auto;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+    }
+    button {
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .leg {
+      border: 1px solid #ccc;
+      padding: 8px;
+      margin-top: 5px;
+    }
+    .warn { color: #b00020; }
+    .good { color: green; }
+    .box {
+      background: #f5f5f5;
+      padding: 15px;
+      margin-top: 15px;
+    }
+    .score {
+      font-size: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🟢 KBetz™</h1>
+<p style="color:#555;">Bet smarter, not harder.</p>
+
+<p style="font-size:13px;color:#777;border-left:4px solid #4caf50;padding-left:10px;">
+<strong>Read-only notice:</strong>  
+KBetz™ is a betting analysis tool only.  
+It does not place bets, access sportsbook accounts, or move money.
+</p>
+
+<label>Stake ($)</label>
+<input id="stake" type="number" value="40" />
+
+<label>Sportsbook</label>
+<input id="sportsbook" value="Test" />
+
+<h3>Add Leg</h3>
+<input id="game" placeholder="Game (OKC vs MIN)" />
+<input id="market" placeholder="Market (Spread / Total)" />
+<input id="selection" placeholder="Selection (OKC +6.5)" />
+<input id="odds" type="number" placeholder="Odds (-110)" />
+<input id="category" placeholder="Category (spread / total / player)" />
+
+<button onclick="addLeg()">➕ Add Leg</button>
+
+<h3>Parlay Legs</h3>
+<div id="legs"></div>
+
+<button onclick="analyze()">📊 Analyze Slip</button>
+
+<div id="output" class="box"></div>
+
+<script>
+let legs = [];
+
+function addLeg() {
+  if (!game.value || !selection.value || !odds.value) {
+    alert("Fill game, selection, and odds");
+    return;
+  }
+
+  legs.push({
+    game: game.value,
+    market: market.value,
+    selection: selection.value,
+    odds: Number(odds.value),
+    category: category.value || "spread"
+  });
+
+  game.value = market.value = selection.value = odds.value = category.value = "";
+  renderLegs();
+}
+
+function renderLegs() {
+  legsDiv.innerHTML = "";
+  legs.forEach((l, i) => {
+    legsDiv.innerHTML += `
+      <div class="leg">
+        <strong>Leg ${i + 1}</strong><br>
+        ${l.game} — ${l.selection} (${l.odds})
+      </div>`;
+  });
+}
+
+async function analyze() {
+  if (!legs.length) {
+    alert("Add at least one leg");
+    return;
+  }
+
+  output.innerHTML = "Analyzing...";
+
+  const res = await fetch("/slip", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      stake: Number(stake.value),
+      sportsbook: sportsbook.value,
+      legs
+    })
+  });
+
+  const data = await res.json();
+
+  const confidence = data.analysis.confidence;
+  const color =
+    confidence >= 70 ? "green" :
+    confidence >= 40 ? "orange" :
+    "red";
+
+  output.innerHTML = `
+    <h3>Results</h3>
+
+    <div class="score" style="color:${color}">
+      Confidence Score: ${confidence}%
+    </div><br>
+
+    <strong>Estimated Return:</strong>
+    $${data.estReturn.toFixed(2)}<br><br>
+
+    <strong>Warnings:</strong>
+    <ul>
+      ${
+        data.analysis.flags.length
+          ? data.analysis.flags.map(f => `<li class="warn">${f}</li>`).join("")
+          : "<li class='good'>No major risk flags</li>"
+      }
+    </ul>
+  `;
+}
+</script>
+
+</body>
+</html>
