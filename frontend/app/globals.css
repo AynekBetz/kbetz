@@ -1,0 +1,186 @@
+/* =========================================
+   GLOBAL STYLES
+========================================= */
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* =========================================
+   TERMINAL BACKGROUND
+========================================= */
+
+body {
+  background: radial-gradient(circle at top, #0f172a, #020617);
+  color: white;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 14px;
+}
+
+/* =========================================
+   LINKS
+========================================= */
+
+a {
+  color: #94a3b8;
+  text-decoration: none;
+}
+
+a:hover {
+  color: white;
+}
+
+/* =========================================
+   DASHBOARD CARDS
+========================================= */
+
+.card {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  margin-bottom: 20px;
+}
+
+/* =========================================
+   ODDS BUTTONS
+========================================= */
+
+.odds-pill {
+  background: #1e293b;
+  border-radius: 8px;
+  padding: 6px 12px;
+  margin-right: 8px;
+  display: inline-block;
+  font-size: 13px;
+  border: 1px solid rgba(148,163,184,0.1);
+}
+
+/* =========================================
+   POSITIVE / NEGATIVE COLORS
+========================================= */
+
+.ev-positive {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+.ev-neutral {
+  color: #facc15;
+}
+
+.ev-negative {
+  color: #ef4444;
+}
+
+/* =========================================
+   MARKET TICKER
+========================================= */
+
+.ticker {
+  background: #020617;
+  border-bottom: 1px solid rgba(148,163,184,0.1);
+  padding: 10px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.ticker span {
+  margin-right: 30px;
+  color: #94a3b8;
+}
+
+/* =========================================
+   SIDEBAR
+========================================= */
+
+.sidebar {
+  width: 220px;
+  background: #020617;
+  border-right: 1px solid rgba(148,163,184,0.1);
+  padding: 20px;
+}
+
+.sidebar h2 {
+  margin-bottom: 30px;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar a {
+  padding: 6px 0;
+}
+
+/* =========================================
+   MAIN PANEL
+========================================= */
+
+.main-panel {
+  flex: 1;
+  padding: 30px;
+  overflow-y: auto;
+}
+
+/* =========================================
+   HEATMAP GRID
+========================================= */
+
+.heatmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px,1fr));
+  gap: 12px;
+}
+
+.heat-tile {
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* EV LEVEL COLORS */
+
+.heat-high {
+  background: rgba(34,197,94,0.2);
+  border: 1px solid rgba(34,197,94,0.4);
+}
+
+.heat-medium {
+  background: rgba(250,204,21,0.2);
+  border: 1px solid rgba(250,204,21,0.4);
+}
+
+.heat-low {
+  background: rgba(239,68,68,0.2);
+  border: 1px solid rgba(239,68,68,0.4);
+}
+
+/* =========================================
+   SCROLLBAR
+========================================= */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
