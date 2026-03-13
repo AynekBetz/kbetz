@@ -6,11 +6,9 @@ export default function ScannerPage() {
 
   const [scannerData, setScannerData] = useState([])
 
-  const API = process.env.NEXT_PUBLIC_API_URL
-
   useEffect(() => {
 
-    fetch(`${API}/scanner`)
+    fetch("https://kbetz-1.onrender.com/scanner")
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -24,25 +22,16 @@ export default function ScannerPage() {
   }, [])
 
   return (
-    <div style={{ padding: "30px" }}>
-
+    <div style={{ padding: 30 }}>
       <h1>Live Betting Scanner</h1>
 
-      {(Array.isArray(scannerData) ? scannerData : []).length === 0 && (
-        <p>No scanner data available yet.</p>
-      )}
+      {scannerData.length === 0 && <p>No scanner results yet.</p>}
 
-      {(Array.isArray(scannerData) ? scannerData : []).map((bet, i) => (
-        <div key={i} style={{
-          border: "1px solid #333",
-          padding: "15px",
-          marginBottom: "10px",
-          borderRadius: "8px"
-        }}>
+      {scannerData.map((bet, i) => (
+        <div key={i} style={{border:"1px solid #444",padding:15,marginBottom:10}}>
           <h3>{bet.game}</h3>
-          <p>Pick: {bet.pick}</p>
+          <p>{bet.pick}</p>
           <p>EV: {bet.ev}</p>
-          <p>Book: {bet.book}</p>
         </div>
       ))}
 
