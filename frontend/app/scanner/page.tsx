@@ -2,32 +2,50 @@
 
 import { useEffect, useState } from "react"
 
-export default function Scanner(){
+export default function ScannerPage() {
 
- const [bets,setBets] = useState<any[]>([])
+  const [scannerData, setScannerData] = useState([])
 
- useEffect(()=>{
+  const API = process.env.NEXT_PUBLIC_API_URL
 
-  fetch("http://localhost:10000/api/ev")
-  .then(res=>res.json())
-  .then(data=>setBets(data))
+  useEffect(() => {
 
- },[])
+    fetch(`${API}/scanner`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setScannerData(data)
+        } else {
+          setScannerData([])
+        }
+      })
+      .catch(() => setScannerData([]))
 
- return(
+  }, [])
 
- <div>
+  return (
+    <div style={{ padding: "30px" }}>
 
- <h1>Value Bet Scanner</h1>
+      <h1>Live Betting Scanner</h1>
 
- {bets.map((bet,i)=>(
-  <div key={i}>
-  {bet.game} — {bet.bet} — {bet.EV}
-  </div>
- ))}
+      {(Array.isArray(scannerData) ? scannerData : []).length === 0 && (
+        <p>No scanner data available yet.</p>
+      )}
 
- </div>
+      {(Array.isArray(scannerData) ? scannerData : []).map((bet, i) => (
+        <div key={i} style={{
+          border: "1px solid #333",
+          padding: "15px",
+          marginBottom: "10px",
+          borderRadius: "8px"
+        }}>
+          <h3>{bet.game}</h3>
+          <p>Pick: {bet.pick}</p>
+          <p>EV: {bet.ev}</p>
+          <p>Book: {bet.book}</p>
+        </div>
+      ))}
 
- )
-
+    </div>
+  )
 }
