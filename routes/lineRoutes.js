@@ -1,31 +1,11 @@
 import express from "express";
-import { getLineHistory } from "../utils/lineTracker.js";
+import { getCachedEvents } from "../utils/liveScanner.js";
 
 const router = express.Router();
 
-/*
-  GET LINE MOVEMENT HISTORY
-  Endpoint: /api/lines
-*/
-
 router.get("/", (req, res) => {
-
-  try {
-
-    const history = getLineHistory();
-
-    res.json(history);
-
-  } catch (error) {
-
-    console.error("Line history error:", error);
-
-    res.status(500).json({
-      error: "Failed to fetch line movement history"
-    });
-
-  }
-
+  const data = getCachedEvents();
+  res.json(data);
 });
 
 export default router;

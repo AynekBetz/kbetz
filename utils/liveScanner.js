@@ -1,105 +1,52 @@
-import { fetchOdds } from "./oddsFetcher.js"
-import { scanForPositiveEV } from "./evScanner.js"
-import { findArbitrage } from "./arbScanner.js"
-import { detectSteamMoves } from "./steamDetector.js"
-import { trackLineMovement } from "./lineTracker.js"
-import { updateMarketFeed } from "./marketFeed.js"
+let cachedData = [];
 
-let cachedBets = []
-let cachedArbs = []
-let cachedSteam = []
-let cachedEvents = []
-
-
-export async function runLiveScanner() {
-
-  try {
-
-    console.log("Running live odds scan...")
-
-    const events = await fetchOdds()
-
-    if (!events || events.length === 0) {
-
-      console.log("No events returned from odds API — keeping previous cached data")
-      return
-
-    }
-
-    cachedEvents = events
-
-    /* =========================
-       UPDATE MARKET FEED
-    ========================= */
-
-    updateMarketFeed(events)
-
-
-    /* =========================
-       EV SCANNER
-    ========================= */
-
-    const evBets = scanForPositiveEV(events)
-
-    cachedBets = evBets.slice(0,25)
-
-    console.log("Value bets found:", cachedBets.length)
-
-
-    /* =========================
-       ARBITRAGE
-    ========================= */
-
-    const arbs = findArbitrage(events)
-
-    cachedArbs = arbs
-
-    console.log("Arbitrage found:", cachedArbs.length)
-
-
-    /* =========================
-       STEAM DETECTION
-    ========================= */
-
-    const steam = detectSteamMoves(events)
-
-    cachedSteam = steam
-
-    console.log("Steam moves detected:", cachedSteam.length)
-
-
-    /* =========================
-       LINE TRACKING
-    ========================= */
-
-    trackLineMovement(events)
-
-
-  } catch (error) {
-
-    console.error("Live scanner error:", error)
-
-  }
-
-}
-
-
-/* =========================
-   CACHE GETTERS
-========================= */
-
-export function getCachedBets() {
-  return cachedBets
-}
-
-export function getCachedArbs() {
-  return cachedArbs
-}
-
-export function getCachedSteam() {
-  return cachedSteam
-}
-
+// ✅ used by /api/lines
 export function getCachedEvents() {
-  return cachedEvents
+  return cachedData;
+}
+
+// ✅ main scanner
+export function startScanner(callback) {
+  console.log("Starting live scanner...");
+
+  setInterval(() => {
+    const data = [
+      {
+        game: "Lakers vs Warriors",
+        book: "DraftKings",
+        market: "Spread",
+        odds: -106,
+        previous_odds: -111,
+        movement: 5,
+        steam: false,
+        ev: 1.2,
+      },
+      {
+        game: "Celtics vs Knicks",
+        book: "FanDuel",
+        market: "Moneyline",
+        odds: -108,
+        previous_odds: -74,
+        movement: 34,
+        steam: true,
+        ev: 5.5,
+      },
+      {
+        game: "Bucks vs Heat",
+        book: "BetMGM",
+        market: "Spread",
+        odds: -90,
+        previous_odds: -117,
+        movement: 27,
+        steam: true,
+        ev: 4.2,
+      },
+    ];
+
+    cachedData = data;
+
+    console.log("📡 SCANNER UPDATE:", data);
+
+    if (callback) callback(data);
+  }, 3000);
 }

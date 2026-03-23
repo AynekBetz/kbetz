@@ -1,16 +1,27 @@
 import express from "express"
-import { getCachedEvents } from "../utils/liveScanner.js"
-import { findBestLines } from "../utils/lineShopping.js"
+import { getCachedEvents, getCachedBets } from "../utils/liveScanner.js"
 
 const router = express.Router()
 
-router.get("/", (req,res)=>{
+router.get("/", (req, res) => {
 
- const events = getCachedEvents()
+  const events = getCachedEvents()
+  const bets = getCachedBets()
 
- const lines = findBestLines(events)
+  const lines = events.map((event) => {
 
- res.json(lines)
+    const eventBets = bets.filter((b) => b.game === event)
+
+    const bestOdds = Math.max(...eventBets.map((b) => b.odds))
+
+    return {
+      event,
+      bestOdds
+    }
+
+  })
+
+  res.json(lines)
 
 })
 

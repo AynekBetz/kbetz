@@ -4,54 +4,54 @@ import { useEffect, useState } from "react"
 
 export default function LinesPage() {
 
-  const [data, setData] = useState<any[]>([])
+  const [lines, setLines] = useState<any[]>([])
 
   useEffect(() => {
 
     const API = process.env.NEXT_PUBLIC_API_URL || ""
 
-    async function loadLines() {
+    async function fetchLines() {
 
       try {
 
         const res = await fetch(`${API}/api/feed`)
-        const json = await res.json()
+        const data = await res.json()
 
-        const rows = Array.isArray(json)
-          ? json
-          : json?.data || []
+        const rows = Array.isArray(data)
+          ? data
+          : data?.data || []
 
-        setData(rows)
+        setLines(rows)
 
       } catch (err) {
 
-        console.error("Lines feed error:", err)
+        console.error("Failed to load lines:", err)
 
       }
 
     }
 
-    loadLines()
+    fetchLines()
 
   }, [])
 
   return (
 
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
 
       <h1 className="text-2xl font-semibold">
         Line Movement
       </h1>
 
+      {lines.length === 0 && (
+        <div className="opacity-60 text-sm">
+          Waiting for line movement data...
+        </div>
+      )}
+
       <div className="space-y-3">
 
-        {data.length === 0 && (
-          <div className="text-sm opacity-60">
-            Waiting for line movement data...
-          </div>
-        )}
-
-        {data.map((row, i) => (
+        {lines.map((row, i) => (
 
           <div
             key={i}
