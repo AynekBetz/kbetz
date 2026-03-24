@@ -1,91 +1,36 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
+import { useEffect, useState } from "react";
 
 export default function LinesPage() {
-
-  const [data, setData] = useState<any[]>([])
+  const [games, setGames] = useState<any[]>([]);
 
   useEffect(() => {
-
-    const API = process.env.NEXT_PUBLIC_API_URL || ""
-
-    async function loadLines() {
-
-      try {
-
-        const res = await fetch(`${API}/api/feed`)
-        const json = await res.json()
-
-        const rows = Array.isArray(json)
-          ? json
-          : json?.data || []
-
-        setData(rows)
-
-      } catch (err) {
-
-        console.error("Lines feed error:", err)
-
-      }
-
-    }
-
-    loadLines()
-
-  }, [])
+    fetch("http://localhost:10000/odds")
+      .then((res) => res.json())
+      .then((data) => setGames(data));
+  }, []);
 
   return (
+    <div style={{ padding: "20px" }}>
+      <h1>📈 Live Lines</h1>
 
-    <div className="space-y-6">
-
-      <h1 className="text-2xl font-semibold">
-        Line Movement
-      </h1>
-
-      <div className="space-y-3">
-
-        {data.length === 0 && (
-          <div className="text-sm opacity-60">
-            Waiting for line movement data...
-          </div>
-        )}
-
-        {data.map((row, i) => (
-
-          <div
-            key={i}
-            className="p-3 rounded-lg bg-white/5 border border-white/10"
-          >
-
-            <div className="font-semibold text-sm">
-              {row.game}
-            </div>
-
-            <div className="text-xs opacity-70">
-              {row.market} — {row.book}
-            </div>
-
-            <div className="text-xs mt-1">
-
-              Odds: {row.odds}
-
-              {row.movement !== undefined && (
-                <span className="ml-3">
-                  Movement: {row.movement}
-                </span>
-              )}
-
-            </div>
-
+      {games.map((g) => (
+        <div key={g.id} style={{
+          border: "1px solid #222",
+          marginBottom: "10px"
+        }}>
+          <div style={{ padding: "6px", color: "#aaa" }}>
+            {g.away_team} @ {g.home_team}
           </div>
 
-        ))}
-
-      </div>
-
+          {g.markets[0].outcomes.map((o: any) => (
+            <div key={o.name} style={{ padding: "6px" }}>
+              {o.name}: {o.price}
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
-
-  )
-
+  );
 }

@@ -9,10 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "html-to-image": "^1.11.13",
     "next": "16.1.6",
     "react": "19.2.3",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.3",
     "recharts": "^3.8.0",
     "socket.io-client": "^4.8.3"

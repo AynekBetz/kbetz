@@ -11,7 +11,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+
+        <div className="nav">
+          <a href="/">Home</a>
+          <a href="/dashboard">Dashboard</a>
+          <a href="/analytics">Analytics</a>
+          <a href="/scanner">Scanner</a>
+          <a href="/lines">Lines</a>
+          <a href="/bets">Bets</a>
+          <a href="/settings">Settings</a>
+        </div>
+
+        {children}
+
+      </body>
     </html>
   );
 }

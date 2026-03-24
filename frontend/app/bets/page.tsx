@@ -1,33 +1,36 @@
-"use client"
+"use client";
 
-import { useEffect,useState } from "react"
+import { useEffect, useState } from "react";
+import { getToken } from "../../utils/authStore";
 
-export default function Bets(){
+export default function BetsPage() {
+  const [bets, setBets] = useState<any[]>([]);
+  const token = getToken();
 
- const [bets,setBets] = useState<any[]>([])
+  useEffect(() => {
+    if (!token) return;
 
- useEffect(()=>{
+    fetch("http://localhost:10000/bets", {
+      headers: { Authorization: token },
+    })
+      .then((res) => res.json())
+      .then((data) => setBets(data));
+  }, [token]);
 
-  fetch("http://localhost:10000/api/bets")
-  .then(res=>res.json())
-  .then(data=>setBets(data))
+  return (
+    <div style={{ padding: "20px" }}>
+      <h1>📜 Bet History</h1>
 
- },[])
-
- return(
-
- <div>
-
- <h1>Bet Tracker</h1>
-
- {bets.map((bet,i)=>(
-  <div key={i}>
-  {bet.game} — {bet.bet} — ${bet.stake}
-  </div>
- ))}
-
- </div>
-
- )
-
+      {bets.map((b, i) => (
+        <div key={i} style={{
+          background: "#111",
+          padding: "10px",
+          marginBottom: "8px",
+          border: "1px solid #222"
+        }}>
+          {b.team} ({b.odds}) — {b.result || "Pending"}
+        </div>
+      ))}
+    </div>
+  );
 }
