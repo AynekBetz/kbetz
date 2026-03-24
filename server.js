@@ -13,25 +13,28 @@ app.use(express.json());
 const PORT = process.env.PORT || 10000;
 
 /* =========================
-   🔥 DEBUG ENV (CRITICAL)
+   🔥 CLEAN STRIPE KEY (FIX BUG)
 ========================= */
-console.log("=== ENV DEBUG ===");
-console.log("STRIPE KEY RAW:", process.env.STRIPE_SECRET_KEY);
-console.log("PRICE ID:", process.env.STRIPE_PRICE_ID);
-console.log("CLIENT URL:", process.env.CLIENT_URL);
-console.log("=================");
+const rawKey = process.env.STRIPE_SECRET_KEY || "";
+const cleanKey = rawKey.replace(/\s+/g, "").trim();
+
+console.log("=== STRIPE DEBUG ===");
+console.log("RAW KEY LENGTH:", rawKey.length);
+console.log("CLEAN KEY LENGTH:", cleanKey.length);
+console.log("KEY START:", cleanKey.slice(0, 15));
+console.log("====================");
 
 /* =========================
-   🔥 STRIPE INIT (SAFE)
+   INIT STRIPE
 ========================= */
 let stripe;
 
 try {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error("Missing STRIPE_SECRET_KEY");
+  if (!cleanKey || !cleanKey.startsWith("sk_")) {
+    throw new Error("Invalid Stripe key");
   }
 
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  stripe = new Stripe(cleanKey);
   console.log("✅ Stripe initialized");
 } catch (err) {
   console.log("❌ Stripe init error:", err.message);
@@ -45,7 +48,7 @@ app.get("/", (req, res) => {
 });
 
 /* =========================
-   ODDS (WORKING)
+   ODDS ROUTE
 ========================= */
 app.get("/odds", (req, res) => {
   console.log("📊 /odds hit");
@@ -81,7 +84,7 @@ app.get("/odds", (req, res) => {
 });
 
 /* =========================
-   🔥 STRIPE CHECKOUT
+   🔥 STRIPE CHECKOUT (SAFE VERSION)
 ========================= */
 app.post("/create-checkout-session", async (req, res) => {
   try {
@@ -91,25 +94,26 @@ app.post("/create-checkout-session", async (req, res) => {
       return res.status(500).json({ error: "Stripe not initialized" });
     }
 
-    if (!process.env.STRIPE_PRICE_ID) {
-      return res.status(500).json({ error: "Missing STRIPE_PRICE_ID" });
-    }
-
-    if (!process.env.CLIENT_URL) {
-      return res.status(500).json({ error: "Missing CLIENT_URL" });
-    }
-
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      mode: "subscription",
+      mode: "payment",
+
+      // 🔥 TEMP: no price ID needed (removes another failure point)
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID,
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: "KBETZ Pro",
+            },
+            unit_amount: 500, // $5 test charge
+          },
           quantity: 1,
         },
       ],
-      success_url: `${process.env.CLIENT_URL}/dashboard?success=true`,
-      cancel_url: `${process.env.CLIENT_URL}/dashboard?canceled=true`,
+
+      success_url: `${process.env.CLIENT_URL}`,
+      cancel_url: `${process.env.CLIENT_URL}`,
     });
 
     console.log("✅ Stripe session created");
