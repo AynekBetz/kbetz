@@ -1,5 +1,3 @@
-// server.js (FINAL RENDER SAFE VERSION)
-
 import express from "express";
 import cors from "cors";
 
@@ -10,23 +8,22 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// 🔥 ROOT (THIS MUST WORK)
+// ROOT
 app.get("/", (req, res) => {
   res.send("KBETZ BACKEND LIVE ✅");
 });
 
-// 🔥 HEALTH
+// HEALTH
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    app: "KBETZ™",
-    working: true
+    route: "/health working"
   });
 });
 
-// 🔥 TEST
+// TEST
 app.get("/test", (req, res) => {
-  res.send("TEST WORKING ✅");
+  res.send("TEST ROUTE WORKING ✅");
 });
 
 // START
