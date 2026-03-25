@@ -14,6 +14,9 @@ export default function Dashboard() {
         const health = await getHealth();
         const me = await getUser();
 
+        console.log("HEALTH:", health);
+        console.log("USER:", me);
+
         setConnected(health.connected);
         setUser(me.user);
       } catch (err) {
@@ -83,26 +86,35 @@ export default function Dashboard() {
           {user.plan !== "pro" && (
             <button
               onClick={async () => {
+                console.log("🔥 BUTTON CLICKED");
+
                 try {
                   setLoading(true);
 
+                  const API = process.env.NEXT_PUBLIC_API_URL;
+                  console.log("API URL:", API);
+
                   const res = await fetch(
-                    `${process.env.NEXT_PUBLIC_API_URL}/create-checkout-session`,
+                    `${API}/create-checkout-session`,
                     {
                       method: "POST"
                     }
                   );
 
+                  console.log("RESPONSE STATUS:", res.status);
+
                   const data = await res.json();
+                  console.log("RESPONSE DATA:", data);
 
                   if (data.url) {
+                    console.log("➡️ Redirecting to Stripe...");
                     window.location.href = data.url;
                   } else {
                     alert("Stripe session failed");
                   }
 
                 } catch (err) {
-                  console.error(err);
+                  console.error("❌ FETCH ERROR:", err);
                   alert("Error connecting to Stripe");
                 } finally {
                   setLoading(false);
