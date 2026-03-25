@@ -2,139 +2,178 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import Stripe from "stripe";
+import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+import User from "./models/User.js";
 
 dotenv.config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
 /* =========================
-   🔥 CLEAN STRIPE KEY (FIX BUG)
+   DB CONNECT
 ========================= */
-const rawKey = process.env.STRIPE_SECRET_KEY || "";
-const cleanKey = rawKey.replace(/\s+/g, "").trim();
-
-console.log("=== STRIPE DEBUG ===");
-console.log("RAW KEY LENGTH:", rawKey.length);
-console.log("CLEAN KEY LENGTH:", cleanKey.length);
-console.log("KEY START:", cleanKey.slice(0, 15));
-console.log("====================");
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch(err => console.log("❌ DB error:", err));
 
 /* =========================
-   INIT STRIPE
+   STRIPE (CLEAN KEY FIX)
 ========================= */
-let stripe;
+const stripe = new Stripe((process.env.STRIPE_SECRET_KEY || "").replace(/\s+/g, "").trim());
 
-try {
-  if (!cleanKey || !cleanKey.startsWith("sk_")) {
-    throw new Error("Invalid Stripe key");
+/* =========================
+   AUTH MIDDLEWARE
+========================= */
+const auth = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+
+  if (!token) return res.status(401).json({ error: "No token" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch {
+    res.status(401).json({ error: "Invalid token" });
+  }
+};
+
+/* =========================
+   REGISTER
+========================= */
+app.post("/register", async (req, res) => {
+  const { email, password } = req.body;
+
+  const hashed = await bcrypt.hash(password, 10);
+
+  const user = await User.create({
+    email,
+    password: hashed,
+  });
+
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+
+  res.json({ token });
+});
+
+/* =========================
+   LOGIN
+========================= */
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  const user = await User.findOne({ email });
+
+  if (!user) return res.status(400).json({ error: "User not found" });
+
+  const match = await bcrypt.compare(password, user.password);
+
+  if (!match) return res.status(400).json({ error: "Wrong password" });
+
+  const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+
+  res.json({ token });
+});
+
+/* =========================
+   GET USER (CRITICAL)
+========================= */
+app.get("/me", auth, async (req, res) => {
+  const user = await User.findById(req.user.id);
+  res.json(user);
+});
+
+/* =========================
+   STRIPE CHECKOUT
+========================= */
+app.post("/create-checkout-session", auth, async (req, res) => {
+  const user = await User.findById(req.user.id);
+
+  const customer = await stripe.customers.create({
+    email: user.email,
+  });
+
+  user.stripeCustomerId = customer.id;
+  await user.save();
+
+  const session = await stripe.checkout.sessions.create({
+    customer: customer.id,
+    payment_method_types: ["card"],
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: { name: "KBETZ Pro" },
+          unit_amount: 500,
+        },
+        quantity: 1,
+      },
+    ],
+    success_url: `${process.env.CLIENT_URL}/dashboard?success=true`,
+    cancel_url: `${process.env.CLIENT_URL}/dashboard`,
+  });
+
+  res.json({ url: session.url });
+});
+
+/* =========================
+   STRIPE WEBHOOK (UNLOCK PRO)
+========================= */
+app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  stripe = new Stripe(cleanKey);
-  console.log("✅ Stripe initialized");
-} catch (err) {
-  console.log("❌ Stripe init error:", err.message);
-}
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
 
-/* =========================
-   ROOT
-========================= */
-app.get("/", (req, res) => {
-  res.send("KBETZ LIVE ✅");
-});
-
-/* =========================
-   ODDS ROUTE
-========================= */
-app.get("/odds", (req, res) => {
-  console.log("📊 /odds hit");
-
-  res.json([
-    {
-      id: "1",
-      home_team: "Lakers",
-      away_team: "Warriors",
-      markets: [
-        {
-          outcomes: [
-            { name: "Lakers", price: -120 },
-            { name: "Warriors", price: 105 },
-          ],
-        },
-      ],
-    },
-    {
-      id: "2",
-      home_team: "Celtics",
-      away_team: "Bucks",
-      markets: [
-        {
-          outcomes: [
-            { name: "Celtics", price: -140 },
-            { name: "Bucks", price: 120 },
-          ],
-        },
-      ],
-    },
-  ]);
-});
-
-/* =========================
-   🔥 STRIPE CHECKOUT (SAFE VERSION)
-========================= */
-app.post("/create-checkout-session", async (req, res) => {
-  try {
-    console.log("💳 Creating Stripe session...");
-
-    if (!stripe) {
-      return res.status(500).json({ error: "Stripe not initialized" });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "payment",
-
-      // 🔥 TEMP: no price ID needed (removes another failure point)
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "KBETZ Pro",
-            },
-            unit_amount: 500, // $5 test charge
-          },
-          quantity: 1,
-        },
-      ],
-
-      success_url: `${process.env.CLIENT_URL}`,
-      cancel_url: `${process.env.CLIENT_URL}`,
+    const user = await User.findOne({
+      stripeCustomerId: session.customer,
     });
 
-    console.log("✅ Stripe session created");
-
-    res.json({ url: session.url });
-  } catch (err) {
-    console.log("❌ STRIPE ERROR:", err.message);
-    res.status(500).json({ error: err.message });
+    if (user) {
+      user.plan = "pro";
+      await user.save();
+      console.log("🔥 USER UPGRADED TO PRO");
+    }
   }
+
+  res.json({ received: true });
 });
 
 /* =========================
-   HEALTH
+   PROTECTED ROUTE
 ========================= */
-app.get("/health", (req, res) => {
-  res.json({ status: "OK" });
+app.get("/pro-data", auth, async (req, res) => {
+  const user = await User.findById(req.user.id);
+
+  if (user.plan !== "pro") {
+    return res.status(403).json({ error: "Upgrade required" });
+  }
+
+  res.json({ message: "🔥 PRO ACCESS GRANTED" });
 });
 
 /* =========================
-   START SERVER
+   START
 ========================= */
 app.listen(PORT, () => {
-  console.log(`🚀 KBETZ running on port ${PORT}`);
+  console.log(`🚀 KBETZ running on ${PORT}`);
 });
