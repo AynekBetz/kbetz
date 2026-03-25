@@ -1,32 +1,20 @@
 import express from "express";
-import cors from "cors";
 
 const app = express();
-
-app.use(cors());
-app.use(express.json());
-
 const PORT = process.env.PORT || 10000;
 
-// ROOT
+// 🔥 UNIQUE SIGNATURE (VERY IMPORTANT)
 app.get("/", (req, res) => {
-  res.send("KBETZ BACKEND LIVE ✅");
+  res.send("KBETZ VERSION 2 — NEW SERVER ✅");
 });
 
-// HEALTH
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    route: "/health working"
+    version: "VERSION 2 ACTIVE"
   });
 });
 
-// TEST
-app.get("/test", (req, res) => {
-  res.send("TEST ROUTE WORKING ✅");
-});
-
-// START
 app.listen(PORT, () => {
-  console.log(`🔥 KBETZ running on port ${PORT}`);
+  console.log("🔥 RUNNING VERSION 2 SERVER");
 });
