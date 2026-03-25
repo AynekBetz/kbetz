@@ -1,85 +1,70 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getHealth, getUser } from "../../lib/api";
 
 export default function Dashboard() {
+  const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  const isPro = user?.plan === "pro";
-
   useEffect(() => {
-    const loadUser = async () => {
+    async function load() {
       try {
-        const token = typeof window !== "undefined"
-          ? localStorage.getItem("token")
-          : null;
+        const health = await getHealth();
+        const me = await getUser();
 
-        if (!token) return;
-
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/me`,
-          {
-            headers: {
-              Authorization: "Bearer " + token,
-            },
-          }
-        );
-
-        const data = await res.json();
-        setUser(data);
+        setConnected(health.connected);
+        setUser(me.user);
       } catch (err) {
-        console.log(err);
+        console.error("API ERROR:", err);
       }
-    };
+    }
 
-    loadUser();
+    load();
   }, []);
 
   return (
-    <div style={{ padding: 20, color: "white" }}>
-      <h1>KBETZ Terminal</h1>
+    <div style={{ padding: "20px", color: "white" }}>
+      
+      <h1 style={{ color: "#bb86fc" }}>
+        KBETZ Dashboard
+      </h1>
 
-      {/* PLAN */}
-      {isPro ? (
-        <p style={{ color: "lime" }}>💎 PRO</p>
-      ) : (
-        <p style={{ color: "gray" }}>Free</p>
-      )}
-
-      {/* UPGRADE */}
-      {!isPro && (
-        <button
-          onClick={async () => {
-            const res = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL}/create-checkout-session`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization:
-                    "Bearer " + localStorage.getItem("token"),
-                },
-              }
-            );
-
-            const data = await res.json();
-            window.location.href = data.url;
-          }}
-        >
-          Upgrade to Pro
-        </button>
-      )}
-
-      {/* FEATURES */}
+      {/* BACKEND STATUS */}
       <div style={{ marginTop: 20 }}>
-        <p>🔥 Daily AI Bet</p>
-
-        <div style={!isPro ? { opacity: 0.3 } : {}}>
-          <p>EV Heatmap</p>
-          <p>Arbitrage Opportunities</p>
-          <p>Steam Moves</p>
-          <p>Sportsbook Comparison</p>
-        </div>
+        <h2>
+          Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
+        </h2>
       </div>
+
+      {/* USER INFO */}
+      {user && (
+        <div style={{ marginTop: 20 }}>
+          <p>Email: {user.email}</p>
+
+          <p>
+            Plan:{" "}
+            <strong style={{
+              color: user.plan === "pro" ? "#00ffcc" : "#ff4d6d"
+            }}>
+              {user.plan.toUpperCase()}
+            </strong>
+          </p>
+
+          {user.plan !== "pro" && (
+            <button style={{
+              marginTop: "10px",
+              padding: "10px 15px",
+              background: "#bb86fc",
+              border: "none",
+              borderRadius: "6px"
+            }}>
+              Upgrade to Pro 🚀
+            </button>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
