@@ -5,7 +5,9 @@ import Stripe from "stripe";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+
 import User from "./models/User.js";
+import Bet from "./models/Bet.js";
 
 dotenv.config();
 
@@ -25,7 +27,9 @@ mongoose.connect(process.env.MONGO_URI)
 /* =========================
    STRIPE (CLEAN KEY FIX)
 ========================= */
-const stripe = new Stripe((process.env.STRIPE_SECRET_KEY || "").replace(/\s+/g, "").trim());
+const stripe = new Stripe(
+  (process.env.STRIPE_SECRET_KEY || "").replace(/\s+/g, "").trim()
+);
 
 /* =========================
    AUTH MIDDLEWARE
@@ -43,6 +47,13 @@ const auth = (req, res, next) => {
     res.status(401).json({ error: "Invalid token" });
   }
 };
+
+/* =========================
+   ROOT
+========================= */
+app.get("/", (req, res) => {
+  res.send("KBETZ LIVE ✅");
+});
 
 /* =========================
    REGISTER
@@ -82,11 +93,29 @@ app.post("/login", async (req, res) => {
 });
 
 /* =========================
-   GET USER (CRITICAL)
+   GET USER
 ========================= */
 app.get("/me", auth, async (req, res) => {
   const user = await User.findById(req.user.id);
   res.json(user);
+});
+
+/* =========================
+   ODDS
+========================= */
+app.get("/odds", (req, res) => {
+  res.json([
+    {
+      home_team: "Lakers",
+      away_team: "Warriors",
+      odds: [-120, 105],
+    },
+    {
+      home_team: "Celtics",
+      away_team: "Bucks",
+      odds: [-140, 120],
+    },
+  ]);
 });
 
 /* =========================
@@ -124,7 +153,7 @@ app.post("/create-checkout-session", auth, async (req, res) => {
 });
 
 /* =========================
-   STRIPE WEBHOOK (UNLOCK PRO)
+   STRIPE WEBHOOK
 ========================= */
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
@@ -159,16 +188,56 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 });
 
 /* =========================
-   PROTECTED ROUTE
+   ADD BET
 ========================= */
-app.get("/pro-data", auth, async (req, res) => {
-  const user = await User.findById(req.user.id);
+app.post("/add-bet", auth, async (req, res) => {
+  const { stake, odds, result } = req.body;
 
-  if (user.plan !== "pro") {
-    return res.status(403).json({ error: "Upgrade required" });
-  }
+  let profit = result === "win"
+    ? stake * (odds / 100)
+    : -stake;
 
-  res.json({ message: "🔥 PRO ACCESS GRANTED" });
+  const bet = await Bet.create({
+    userId: req.user.id,
+    stake,
+    odds,
+    result,
+    profit,
+  });
+
+  res.json(bet);
+});
+
+/* =========================
+   STATS
+========================= */
+app.get("/stats", auth, async (req, res) => {
+  const bets = await Bet.find({ userId: req.user.id });
+
+  const totalBets = bets.length;
+  const wins = bets.filter(b => b.result === "win").length;
+  const losses = bets.filter(b => b.result === "loss").length;
+
+  const totalProfit = bets.reduce((sum, b) => sum + b.profit, 0);
+  const totalStaked = bets.reduce((sum, b) => sum + b.stake, 0);
+
+  const roi = totalStaked ? (totalProfit / totalStaked) * 100 : 0;
+
+  res.json({
+    totalBets,
+    wins,
+    losses,
+    totalProfit,
+    roi,
+  });
+});
+
+/* =========================
+   BET HISTORY
+========================= */
+app.get("/bets", auth, async (req, res) => {
+  const bets = await Bet.find({ userId: req.user.id }).sort({ createdAt: -1 });
+  res.json(bets);
 });
 
 /* =========================
