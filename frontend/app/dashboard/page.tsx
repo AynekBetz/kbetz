@@ -11,23 +11,17 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        // ✅ Call proxy (this is working)
         const res = await fetch("/api/health");
-        const data = await res.json();
+        await res.json();
 
-        console.log("API RESPONSE:", data);
-
-        // ✅ FORCE CONNECTED
         setConnected(true);
 
-        // ✅ Load user
         const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
 
         setUser(userData.user);
-
       } catch (err) {
-        console.error("❌ ERROR:", err);
+        console.error(err);
         setConnected(false);
       }
     }
@@ -42,48 +36,47 @@ export default function Dashboard() {
         color: "white",
         minHeight: "100vh",
         background: "#0b0b0f",
-        fontFamily: "Arial"
+        fontFamily: "Arial",
+        position: "relative",
+        zIndex: 1
       }}
     >
       <h1 style={{ color: "#bb86fc" }}>
         KBETZ™ Dashboard
       </h1>
 
-      {/* STATUS */}
-      <div style={{ marginTop: "20px" }}>
-        <h2>
-          Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
-        </h2>
-      </div>
+      <h2>
+        Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
+      </h2>
 
-      {/* USER */}
       {user && (
         <div style={{ marginTop: "20px" }}>
           <p>Email: {user.email}</p>
           <p>Plan: {user.plan}</p>
 
-          {/* 🔥 BUTTON DEBUG */}
-          <button
+          {/* 🔥 CLICK-PROOF BUTTON */}
+          <div
             onClick={() => {
               alert("CLICK WORKING");
-
               window.location.href =
                 "https://kbetz-2.onrender.com/create-checkout-session";
             }}
             style={{
-              marginTop: "20px",
-              padding: "15px 20px",
+              marginTop: "30px",
+              padding: "20px 25px",
               background: "#bb86fc",
-              border: "none",
-              borderRadius: "8px",
+              borderRadius: "10px",
               cursor: "pointer",
+              display: "inline-block",
               fontSize: "18px",
+              fontWeight: "bold",
               position: "relative",
-              zIndex: 9999
+              zIndex: 999999,         // 🔥 MAX PRIORITY
+              pointerEvents: "auto"   // 🔥 FORCE CLICK
             }}
           >
             Upgrade to Pro 🚀
-          </button>
+          </div>
         </div>
       )}
     </div>
