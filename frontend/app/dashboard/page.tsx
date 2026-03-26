@@ -12,14 +12,14 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        // 🔥 SIMPLE CONNECTION CHECK
-        const res = await fetch(`${API}/health`);
+        // 🔥 CALL NEXT.JS PROXY (NOT RENDER DIRECTLY)
+        const res = await fetch("/api/health");
 
         if (res.ok) {
-          // ✅ FORCE CONNECTED IF BACKEND RESPONDS
           setConnected(true);
         }
 
+        // still call backend directly for user
         const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
 
