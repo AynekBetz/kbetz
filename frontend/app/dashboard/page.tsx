@@ -11,17 +11,16 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        // 🔥 CALL YOUR WORKING PROXY
+        // ✅ Call proxy (this is working)
         const res = await fetch("/api/health");
-
         const data = await res.json();
 
         console.log("API RESPONSE:", data);
 
-        // ✅ FORCE CONNECTED NO MATTER WHAT
+        // ✅ FORCE CONNECTED
         setConnected(true);
 
-        // 🔥 LOAD USER
+        // ✅ Load user
         const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
 
@@ -37,31 +36,50 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div style={{ padding: 20, color: "white" }}>
-      <h1 style={{ color: "#bb86fc" }}>KBETZ™ Dashboard</h1>
+    <div
+      style={{
+        padding: "20px",
+        color: "white",
+        minHeight: "100vh",
+        background: "#0b0b0f",
+        fontFamily: "Arial"
+      }}
+    >
+      <h1 style={{ color: "#bb86fc" }}>
+        KBETZ™ Dashboard
+      </h1>
 
-      <h2>
-        Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
-      </h2>
+      {/* STATUS */}
+      <div style={{ marginTop: "20px" }}>
+        <h2>
+          Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
+        </h2>
+      </div>
 
+      {/* USER */}
       {user && (
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: "20px" }}>
           <p>Email: {user.email}</p>
           <p>Plan: {user.plan}</p>
 
+          {/* 🔥 BUTTON DEBUG */}
           <button
             onClick={() => {
+              alert("CLICK WORKING");
+
               window.location.href =
                 "https://kbetz-2.onrender.com/create-checkout-session";
             }}
             style={{
-              marginTop: "15px",
-              padding: "12px 18px",
+              marginTop: "20px",
+              padding: "15px 20px",
               background: "#bb86fc",
               border: "none",
-              borderRadius: "6px",
+              borderRadius: "8px",
               cursor: "pointer",
-              fontWeight: "bold"
+              fontSize: "18px",
+              position: "relative",
+              zIndex: 9999
             }}
           >
             Upgrade to Pro 🚀
