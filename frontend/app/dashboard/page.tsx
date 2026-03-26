@@ -5,25 +5,36 @@ import { useEffect, useState } from "react";
 export default function Dashboard() {
   const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
 
-  // 🔥 HARDCODED BACKEND URL (FIX)
   const API = "https://kbetz-2.onrender.com";
 
   useEffect(() => {
     async function load() {
       try {
-        const healthRes = await fetch(`${API}/health`);
-        const health = await healthRes.json();
+        console.log("Calling backend...");
+
+        const res = await fetch(`${API}/health`, {
+          method: "GET"
+        });
+
+        console.log("STATUS:", res.status);
+
+        if (!res.ok) {
+          throw new Error("Bad response");
+        }
+
+        const health = await res.json();
+        console.log("HEALTH:", health);
 
         const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
 
-        setConnected(health.connected);
+        setConnected(true);
         setUser(userData.user);
 
       } catch (err) {
-        console.error("API ERROR:", err);
+        console.error("❌ CONNECTION ERROR:", err);
+        setConnected(false);
       }
     }
 
@@ -31,83 +42,41 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div
-      style={{
-        padding: "20px",
-        color: "white",
-        minHeight: "100vh",
-        background: "#0b0b0f",
-        fontFamily: "Arial"
-      }}
-    >
-      <h1 style={{ color: "#bb86fc" }}>
-        KBETZ™ Dashboard
-      </h1>
+    <div style={{ padding: 20, color: "white" }}>
+      <h1 style={{ color: "#bb86fc" }}>KBETZ™ Dashboard</h1>
 
-      {/* BACKEND STATUS */}
-      <div style={{ marginTop: "20px" }}>
-        <h2>
-          Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
-        </h2>
-      </div>
+      <h2>
+        Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
+      </h2>
 
-      {/* USER INFO */}
       {user && (
-        <div style={{ marginTop: "20px" }}>
+        <div style={{ marginTop: 20 }}>
           <p>Email: {user.email}</p>
+          <p>Plan: {user.plan}</p>
 
-          <p>
-            Plan:{" "}
-            <strong
-              style={{
-                color: user.plan === "pro" ? "#00ffcc" : "#ff4d6d"
-              }}
-            >
-              {user.plan}
-            </strong>
-          </p>
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch(`${API}/create-checkout-session`, {
+                  method: "POST"
+                });
 
-          {/* 💰 STRIPE BUTTON */}
-          {user.plan !== "pro" && (
-            <button
-              onClick={async () => {
-                try {
-                  setLoading(true);
+                const data = await res.json();
 
-                  const res = await fetch(
-                    `${API}/create-checkout-session`,
-                    {
-                      method: "POST"
-                    }
-                  );
-
-                  const data = await res.json();
-
-                  if (data.url) {
-                    window.location.href = data.url;
-                  } else {
-                    alert("Stripe session failed");
-                  }
-
-                } catch (err) {
-                  console.error(err);
-                  alert("Error connecting to Stripe");
-                } finally {
-                  setLoading(false);
+                if (data.url) {
+                  window.location.href = data.url;
+                } else {
+                  alert("Stripe failed");
                 }
-              }}
-              style={{
-                marginTop: "10px",
-                padding: "10px 15px",
-                background: "#bb86fc",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer"
-              }}
-            >
-              {loading ? "Loading..." : "Upgrade to Pro 🚀"}
-            </button>
-          )}
+
+              } catch (err) {
+                console.error(err);
+                alert("Stripe error");
+              }
+            }}
+          >
+            Upgrade to Pro 🚀
+          </button>
         </div>
       )}
     </div>
