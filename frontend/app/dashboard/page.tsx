@@ -8,6 +8,7 @@ export default function Dashboard() {
 
   const API = "https://kbetz-2.onrender.com";
 
+  // 🔥 LOAD DATA
   useEffect(() => {
     async function load() {
       try {
@@ -29,6 +30,20 @@ export default function Dashboard() {
     load();
   }, []);
 
+  // 🔥 FORCE CLICK HANDLER (BYPASS REACT)
+  useEffect(() => {
+    const btn = document.getElementById("test-btn");
+
+    if (btn) {
+      btn.addEventListener("click", () => {
+        alert("REAL CLICK WORKED");
+
+        window.location.href =
+          "https://kbetz-2.onrender.com/create-checkout-session";
+      });
+    }
+  }, []);
+
   return (
     <div
       style={{
@@ -39,7 +54,9 @@ export default function Dashboard() {
         fontFamily: "Arial"
       }}
     >
-      <h1 style={{ color: "#bb86fc" }}>KBETZ™ Dashboard</h1>
+      <h1 style={{ color: "#bb86fc" }}>
+        KBETZ™ Dashboard
+      </h1>
 
       <h2>
         Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
@@ -50,25 +67,21 @@ export default function Dashboard() {
           <p>Email: {user.email}</p>
           <p>Plan: {user.plan}</p>
 
-          <button
-            onClick={() => {
-              alert("CLICK WORKING");
-
-              window.location.href =
-                "https://kbetz-2.onrender.com/create-checkout-session";
-            }}
+          {/* 🔥 TEST BUTTON */}
+          <div
+            id="test-btn"
             style={{
               marginTop: "20px",
-              padding: "15px 20px",
-              background: "#bb86fc",
-              border: "none",
-              borderRadius: "8px",
+              padding: "20px",
+              background: "red",
+              borderRadius: "10px",
               cursor: "pointer",
-              fontSize: "18px"
+              display: "inline-block",
+              fontWeight: "bold"
             }}
           >
-            Upgrade to Pro 🚀
-          </button>
+            CLICK TEST 🚨
+          </div>
         </div>
       )}
     </div>
