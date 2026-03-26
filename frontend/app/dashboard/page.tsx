@@ -11,30 +11,20 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        console.log("Calling backend...");
+        // 🔥 SIMPLE CONNECTION CHECK
+        const res = await fetch(`${API}/health`);
 
-        // 🔥 FORCE SIMPLE REQUEST (NO BLOCKING)
-        const res = await fetch(`${API}/health`, {
-          method: "GET",
-          mode: "cors"
-        });
+        if (res.ok) {
+          setConnected(true);
+        }
 
-        console.log("STATUS:", res.status);
-
-        const health = await res.json();
-
-        const userRes = await fetch(`${API}/me`, {
-          method: "GET",
-          mode: "cors"
-        });
-
+        const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
 
-        setConnected(health.connected);
         setUser(userData.user);
 
       } catch (err) {
-        console.error("❌ FETCH FAILED:", err);
+        console.error("Connection failed:", err);
         setConnected(false);
       }
     }
@@ -59,8 +49,7 @@ export default function Dashboard() {
             onClick={async () => {
               try {
                 const res = await fetch(`${API}/create-checkout-session`, {
-                  method: "POST",
-                  mode: "cors"
+                  method: "POST"
                 });
 
                 const data = await res.json();
