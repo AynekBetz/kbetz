@@ -6,6 +6,9 @@ export async function GET() {
 
     return Response.json(data);
   } catch (err) {
-    return Response.json({ connected: false });
+    return Response.json({
+      status: "error",
+      connected: false
+    });
   }
 }
