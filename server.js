@@ -4,7 +4,17 @@ import Stripe from "stripe";
 
 const app = express();
 
-app.use(cors());
+// 🔥 CORS FIX (VERY IMPORTANT)
+app.use(cors({
+  origin: [
+    "https://kbetz.vercel.app",
+    "https://kbetz-git-main-kbetz.vercel.app",
+    "http://localhost:3000"
+  ],
+  methods: ["GET", "POST"],
+  credentials: true
+}));
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
@@ -30,7 +40,7 @@ app.get("/health", (req, res) => {
 });
 
 // =============================
-// USER (TEMP - WILL BE DB LATER)
+// USER (TEMP)
 // =============================
 app.get("/me", (req, res) => {
   res.json({
@@ -54,14 +64,12 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
-
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],
-
       success_url: "https://kbetz.vercel.app/success",
       cancel_url: "https://kbetz.vercel.app",
     });
