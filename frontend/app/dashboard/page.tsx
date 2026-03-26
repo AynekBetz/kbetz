@@ -1,24 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getHealth, getUser } from "../../lib/api";
 
 export default function Dashboard() {
   const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
+  // 🔥 HARDCODED BACKEND URL (FIX)
+  const API = "https://kbetz-2.onrender.com";
+
   useEffect(() => {
     async function load() {
       try {
-        const health = await getHealth();
-        const me = await getUser();
+        const healthRes = await fetch(`${API}/health`);
+        const health = await healthRes.json();
 
-        console.log("HEALTH:", health);
-        console.log("USER:", me);
+        const userRes = await fetch(`${API}/me`);
+        const userData = await userRes.json();
 
         setConnected(health.connected);
-        setUser(me.user);
+        setUser(userData.user);
+
       } catch (err) {
         console.error("API ERROR:", err);
       }
@@ -37,38 +40,20 @@ export default function Dashboard() {
         fontFamily: "Arial"
       }}
     >
-      {/* TITLE */}
-      <h1 style={{ color: "#bb86fc", fontSize: "28px" }}>
+      <h1 style={{ color: "#bb86fc" }}>
         KBETZ™ Dashboard
       </h1>
 
       {/* BACKEND STATUS */}
-      <div
-        style={{
-          marginTop: "20px",
-          padding: "15px",
-          background: "#1a1a22",
-          borderRadius: "10px"
-        }}
-      >
-        <h2>Backend Status</h2>
-        <p style={{ fontSize: "18px" }}>
-          {connected ? "🟢 Connected" : "🔴 Not Connected"}
-        </p>
+      <div style={{ marginTop: "20px" }}>
+        <h2>
+          Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
+        </h2>
       </div>
 
       {/* USER INFO */}
       {user && (
-        <div
-          style={{
-            marginTop: "20px",
-            padding: "15px",
-            background: "#1a1a22",
-            borderRadius: "10px"
-          }}
-        >
-          <h2>User</h2>
-
+        <div style={{ marginTop: "20px" }}>
           <p>Email: {user.email}</p>
 
           <p>
@@ -78,21 +63,16 @@ export default function Dashboard() {
                 color: user.plan === "pro" ? "#00ffcc" : "#ff4d6d"
               }}
             >
-              {user.plan.toUpperCase()}
+              {user.plan}
             </strong>
           </p>
 
-          {/* STRIPE BUTTON */}
+          {/* 💰 STRIPE BUTTON */}
           {user.plan !== "pro" && (
             <button
               onClick={async () => {
-                console.log("🔥 BUTTON CLICKED");
-
                 try {
                   setLoading(true);
-
-                  const API = process.env.NEXT_PUBLIC_API_URL;
-                  console.log("API URL:", API);
 
                   const res = await fetch(
                     `${API}/create-checkout-session`,
@@ -101,34 +81,28 @@ export default function Dashboard() {
                     }
                   );
 
-                  console.log("RESPONSE STATUS:", res.status);
-
                   const data = await res.json();
-                  console.log("RESPONSE DATA:", data);
 
                   if (data.url) {
-                    console.log("➡️ Redirecting to Stripe...");
                     window.location.href = data.url;
                   } else {
                     alert("Stripe session failed");
                   }
 
                 } catch (err) {
-                  console.error("❌ FETCH ERROR:", err);
+                  console.error(err);
                   alert("Error connecting to Stripe");
                 } finally {
                   setLoading(false);
                 }
               }}
               style={{
-                marginTop: "15px",
-                padding: "12px 18px",
+                marginTop: "10px",
+                padding: "10px 15px",
                 background: "#bb86fc",
                 border: "none",
                 borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "bold",
-                fontSize: "16px"
+                cursor: "pointer"
               }}
             >
               {loading ? "Loading..." : "Upgrade to Pro 🚀"}
