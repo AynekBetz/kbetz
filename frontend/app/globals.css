@@ -1,143 +1,62 @@
-body {
+/* RESET EVERYTHING */
+* {
   margin: 0;
-  background: #050505;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ROOT */
+html, body {
+  height: 100%;
+  width: 100%;
+  background: #0b0b0f;
   color: white;
-  font-family: Inter, Arial, sans-serif;
+  font-family: Arial, sans-serif;
+
+  /* 🔥 CRITICAL: ALLOW ALL CLICKS */
+  pointer-events: auto !important;
 }
 
-/* ===== NAVBAR ===== */
-.nav {
-  display: flex;
-  gap: 18px;
-  padding: 14px 20px;
-  border-bottom: 1px solid #1a1a1a;
-  background: #0b0b0b;
-  position: sticky;
-  top: 0;
+/* REMOVE ANY BLOCKING LAYERS */
+div, main, section {
+  pointer-events: auto;
 }
 
-.nav a {
-  color: #9ca3af;
+/* LINKS */
+a {
+  color: #bb86fc;
   text-decoration: none;
-  font-size: 13px;
 }
 
-.nav a:hover {
-  color: #22c55e;
+/* BUTTONS */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
 }
 
-/* ===== LAYOUT ===== */
-.container {
-  display: flex;
-  min-height: calc(100vh - 50px);
+/* SIDEBAR STYLE (SAFE) */
+.sidebar {
+  width: 200px;
+  background: #111;
+  height: 100vh;
+  padding: 20px;
 }
 
+/* MAIN CONTENT */
 .main {
   flex: 1;
   padding: 20px;
-  max-width: 900px;
 }
 
-.betslip {
-  width: 300px;
-  background: #0b0b0b;
-  border-left: 1px solid #1a1a1a;
-  padding: 16px;
+/* FLEX LAYOUT */
+.container {
+  display: flex;
 }
 
-/* ===== HEADINGS ===== */
-h1 {
-  font-size: 20px;
-  margin-bottom: 15px;
-}
-
-/* ===== CARD ===== */
-.card {
-  border: 1px solid #1a1a1a;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  overflow: hidden;
-  background: #0f0f0f;
-}
-
-/* ===== GAME HEADER ===== */
-.game-header {
-  font-size: 12px;
-  color: #9ca3af;
-  padding: 8px 10px;
-  border-bottom: 1px solid #1a1a1a;
-}
-
-/* ===== ODDS ===== */
-.odds-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.odds-btn {
-  padding: 14px;
-  background: #111;
-  border: none;
-  color: white;
-  cursor: pointer;
-  border-right: 1px solid #1a1a1a;
-  transition: all 0.15s ease;
-}
-
-.odds-btn:last-child {
-  border-right: none;
-}
-
-.odds-btn:hover {
-  background: #1a1a1a;
-}
-
-.odds-price {
-  color: #22c55e;
-  font-weight: bold;
-  margin-top: 4px;
-}
-
-.ev-good {
-  color: #22c55e;
-  font-size: 12px;
-}
-
-.ev-bad {
-  color: #ef4444;
-  font-size: 12px;
-}
-
-/* ===== SMART PICK ===== */
-.smart {
-  border: 1px solid #22c55e;
-  box-shadow: 0 0 10px rgba(34,197,94,0.3);
-}
-
-/* ===== BET SLIP ===== */
-.bet {
-  background: #111;
-  padding: 12px;
-  margin-bottom: 10px;
-  border: 1px solid #1a1a1a;
-  border-radius: 6px;
-}
-
-/* ===== BUTTONS ===== */
-.result-btn {
-  margin-top: 6px;
-  padding: 5px;
-  font-size: 11px;
-  cursor: pointer;
-  border: none;
-  margin-right: 4px;
-  border-radius: 4px;
-}
-
-.win {
-  background: #22c55e;
-}
-
-.loss {
-  background: #ef4444;
+/* PREVENT INVISIBLE OVERLAYS */
+.overlay,
+.modal,
+.fullscreen {
+  pointer-events: none;
 }
