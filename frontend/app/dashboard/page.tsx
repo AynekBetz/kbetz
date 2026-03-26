@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,21 +5,17 @@ import { useEffect, useState } from "react";
 export default function Dashboard() {
   const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
 
   const API = "https://kbetz-2.onrender.com";
 
   useEffect(() => {
     async function load() {
       try {
-        // ✅ call proxy
         const res = await fetch("/api/health");
         await res.json();
 
-        // ✅ force connected
         setConnected(true);
 
-        // ✅ load user
         const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
 
@@ -42,14 +36,10 @@ export default function Dashboard() {
         color: "white",
         minHeight: "100vh",
         background: "#0b0b0f",
-        fontFamily: "Arial",
-        position: "relative",
-        zIndex: 10
+        fontFamily: "Arial"
       }}
     >
-      <h1 style={{ color: "#bb86fc" }}>
-        KBETZ™ Dashboard
-      </h1>
+      <h1 style={{ color: "#bb86fc" }}>KBETZ™ Dashboard</h1>
 
       <h2>
         Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
@@ -60,7 +50,6 @@ export default function Dashboard() {
           <p>Email: {user.email}</p>
           <p>Plan: {user.plan}</p>
 
-          {/* 🔥 CLICKABLE BUTTON */}
           <button
             onClick={() => {
               alert("CLICK WORKING");
@@ -75,9 +64,7 @@ export default function Dashboard() {
               border: "none",
               borderRadius: "8px",
               cursor: "pointer",
-              fontSize: "18px",
-              position: "relative",
-              zIndex: 9999
+              fontSize: "18px"
             }}
           >
             Upgrade to Pro 🚀
