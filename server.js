@@ -1,67 +1,71 @@
-import express from "express";
-import cors from "cors";
-import Stripe from "stripe";
+require("dotenv").config();
+
+const express = require("express");
+const cors = require("cors");
+const Stripe = require("stripe");
 
 const app = express();
 
-// 🔥 STRONG CORS FIX
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  next();
-});
-
-app.use(express.json());
-
-const PORT = process.env.PORT || 10000;
-
+// 🔐 ENV
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// ROOT
-app.get("/", (req, res) => {
-  res.send("KBETZ API LIVE ✅");
-});
+// 🧱 MIDDLEWARE
+app.use(cors());
+app.use(express.json());
 
-// HEALTH
+// ===============================
+// ✅ HEALTH CHECK
+// ===============================
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", connected: true });
-});
-
-// USER
-app.get("/me", (req, res) => {
   res.json({
-    user: {
-      id: "demo-user",
-      email: "demo@kbetz.com",
-      plan: "free"
-    }
+    status: "ok",
+    connected: true,
   });
 });
 
-// STRIPE
+// ===============================
+// ✅ TEST USER (TEMP)
+// ===============================
+app.get("/me", (req, res) => {
+  res.json({
+    user: {
+      email: "test@kbetz.com",
+      plan: "free",
+    },
+  });
+});
+
+// ===============================
+// 💰 STRIPE CHECKOUT (CRITICAL)
+// ===============================
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
+
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],
-      success_url: "https://kbetz.vercel.app/success",
-      cancel_url: "https://kbetz.vercel.app",
+
+      success_url: "https://kbetz.vercel.app/dashboard",
+      cancel_url: "https://kbetz.vercel.app/dashboard",
     });
 
     res.json({ url: session.url });
-
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Stripe error" });
+    console.error("❌ Stripe error:", err);
+    res.status(500).json({ error: "Stripe failed" });
   }
 });
+
+// ===============================
+// 🚀 START SERVER
+// ===============================
+const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
   console.log(`🔥 KBETZ API running on port ${PORT}`);
