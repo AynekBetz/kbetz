@@ -13,27 +13,28 @@ export default function Dashboard() {
       try {
         console.log("Calling backend...");
 
+        // 🔥 FORCE SIMPLE REQUEST (NO BLOCKING)
         const res = await fetch(`${API}/health`, {
-          method: "GET"
+          method: "GET",
+          mode: "cors"
         });
 
         console.log("STATUS:", res.status);
 
-        if (!res.ok) {
-          throw new Error("Bad response");
-        }
-
         const health = await res.json();
-        console.log("HEALTH:", health);
 
-        const userRes = await fetch(`${API}/me`);
+        const userRes = await fetch(`${API}/me`, {
+          method: "GET",
+          mode: "cors"
+        });
+
         const userData = await userRes.json();
 
-        setConnected(true);
+        setConnected(health.connected);
         setUser(userData.user);
 
       } catch (err) {
-        console.error("❌ CONNECTION ERROR:", err);
+        console.error("❌ FETCH FAILED:", err);
         setConnected(false);
       }
     }
@@ -58,7 +59,8 @@ export default function Dashboard() {
             onClick={async () => {
               try {
                 const res = await fetch(`${API}/create-checkout-session`, {
-                  method: "POST"
+                  method: "POST",
+                  mode: "cors"
                 });
 
                 const data = await res.json();
