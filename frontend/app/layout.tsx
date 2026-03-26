@@ -1,75 +1,50 @@
-import "./globals.css"
-import Link from "next/link"
-
 export default function RootLayout({
- children,
+  children,
 }: {
- children: React.ReactNode
+  children: React.ReactNode;
 }) {
+  return (
+    <html lang="en">
+      <body
+        style={{
+          margin: 0,
+          padding: 0,
+          background: "#0b0b0f",
+          color: "white"
+        }}
+      >
+        <div style={{ display: "flex" }}>
+          
+          {/* SIDEBAR */}
+          <div
+            style={{
+              width: "200px",
+              background: "#111",
+              padding: "20px",
+              height: "100vh"
+            }}
+          >
+            <h3>KBETZ</h3>
+            <p>Dashboard</p>
+            <p>Scanner</p>
+            <p>Analytics</p>
+          </div>
 
- return (
-  <html lang="en">
-   <body>
+          {/* MAIN CONTENT (FIXED) */}
+          <div
+            style={{
+              flex: 1,
+              padding: "20px",
+              position: "relative",
+              zIndex: 1,              // ✅ FIX
+              pointerEvents: "auto"  // ✅ FIX
+            }}
+          >
+            {children}
+          </div>
 
-    <div style={{display:"flex", height:"100vh"}}>
-
-     {/* SIDEBAR */}
-
-     <div
-      style={{
-       width:220,
-       background:"#020617",
-       color:"white",
-       padding:20,
-      }}
-     >
-      <h2 style={{marginBottom:30}}>KBETZ</h2>
-
-      <nav style={{display:"flex", flexDirection:"column", gap:15}}>
-
-       <Link href="/">Dashboard</Link>
-
-       <Link href="/scanner">
-        EV Scanner
-       </Link>
-
-       <Link href="/arbitrage">
-        Arbitrage
-       </Link>
-
-       <Link href="/steam">
-        Steam Moves
-       </Link>
-
-       <Link href="/lines">
-        Line Shopping
-       </Link>
-
-       <Link href="/analytics">
-        Analytics
-       </Link>
-
-      </nav>
-     </div>
-
-
-     {/* MAIN CONTENT */}
-
-     <div
-      style={{
-       flex:1,
-       background:"#0f172a",
-       color:"white",
-       padding:30,
-       overflow:"auto",
-      }}
-     >
-      {children}
-     </div>
-
-    </div>
-
-   </body>
-  </html>
- )
+        </div>
+      </body>
+    </html>
+  );
 }
