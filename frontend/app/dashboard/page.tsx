@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,17 +7,21 @@ import { useEffect, useState } from "react";
 export default function Dashboard() {
   const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   const API = "https://kbetz-2.onrender.com";
 
   useEffect(() => {
     async function load() {
       try {
+        // ✅ call proxy
         const res = await fetch("/api/health");
         await res.json();
 
+        // ✅ force connected
         setConnected(true);
 
+        // ✅ load user
         const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
 
@@ -38,7 +44,7 @@ export default function Dashboard() {
         background: "#0b0b0f",
         fontFamily: "Arial",
         position: "relative",
-        zIndex: 1
+        zIndex: 10
       }}
     >
       <h1 style={{ color: "#bb86fc" }}>
@@ -54,29 +60,28 @@ export default function Dashboard() {
           <p>Email: {user.email}</p>
           <p>Plan: {user.plan}</p>
 
-          {/* 🔥 CLICK-PROOF BUTTON */}
-          <div
+          {/* 🔥 CLICKABLE BUTTON */}
+          <button
             onClick={() => {
               alert("CLICK WORKING");
+
               window.location.href =
                 "https://kbetz-2.onrender.com/create-checkout-session";
             }}
             style={{
-              marginTop: "30px",
-              padding: "20px 25px",
+              marginTop: "20px",
+              padding: "15px 20px",
               background: "#bb86fc",
-              borderRadius: "10px",
+              border: "none",
+              borderRadius: "8px",
               cursor: "pointer",
-              display: "inline-block",
               fontSize: "18px",
-              fontWeight: "bold",
               position: "relative",
-              zIndex: 999999,         // 🔥 MAX PRIORITY
-              pointerEvents: "auto"   // 🔥 FORCE CLICK
+              zIndex: 9999
             }}
           >
             Upgrade to Pro 🚀
-          </div>
+          </button>
         </div>
       )}
     </div>
