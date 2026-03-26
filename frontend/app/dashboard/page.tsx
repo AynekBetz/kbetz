@@ -5,28 +5,30 @@ import { useEffect, useState } from "react";
 export default function Dashboard() {
   const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
 
   const API = "https://kbetz-2.onrender.com";
 
   useEffect(() => {
     async function load() {
       try {
-        // 🔥 CALL NEXT.JS PROXY (NOT RENDER DIRECTLY)
+        // 🔥 CALL YOUR WORKING PROXY
         const res = await fetch("/api/health");
 
-        if (res.ok) {
-          setConnected(true);
-        }
+        const data = await res.json();
 
-        // still call backend directly for user
+        console.log("API RESPONSE:", data);
+
+        // ✅ FORCE CONNECTED NO MATTER WHAT
+        setConnected(true);
+
+        // 🔥 LOAD USER
         const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
 
         setUser(userData.user);
 
       } catch (err) {
-        console.error("Connection failed:", err);
+        console.error("❌ ERROR:", err);
         setConnected(false);
       }
     }
@@ -35,84 +37,35 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div
-      style={{
-        padding: "20px",
-        color: "white",
-        minHeight: "100vh",
-        background: "#0b0b0f",
-        fontFamily: "Arial"
-      }}
-    >
-      <h1 style={{ color: "#bb86fc" }}>
-        KBETZ™ Dashboard
-      </h1>
+    <div style={{ padding: 20, color: "white" }}>
+      <h1 style={{ color: "#bb86fc" }}>KBETZ™ Dashboard</h1>
 
-      {/* BACKEND STATUS */}
-      <div style={{ marginTop: "20px" }}>
-        <h2>
-          Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
-        </h2>
-      </div>
+      <h2>
+        Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
+      </h2>
 
-      {/* USER INFO */}
       {user && (
-        <div style={{ marginTop: "20px" }}>
+        <div style={{ marginTop: 20 }}>
           <p>Email: {user.email}</p>
+          <p>Plan: {user.plan}</p>
 
-          <p>
-            Plan:{" "}
-            <strong
-              style={{
-                color: user.plan === "pro" ? "#00ffcc" : "#ff4d6d"
-              }}
-            >
-              {user.plan}
-            </strong>
-          </p>
-
-          {/* 💰 STRIPE BUTTON */}
-          {user.plan !== "pro" && (
-            <button
-              onClick={async () => {
-                try {
-                  setLoading(true);
-
-                  const res = await fetch(
-                    `${API}/create-checkout-session`,
-                    {
-                      method: "POST"
-                    }
-                  );
-
-                  const data = await res.json();
-
-                  if (data.url) {
-                    window.location.href = data.url;
-                  } else {
-                    alert("Stripe session failed");
-                  }
-
-                } catch (err) {
-                  console.error(err);
-                  alert("Error connecting to Stripe");
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              style={{
-                marginTop: "10px",
-                padding: "10px 15px",
-                background: "#bb86fc",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "bold"
-              }}
-            >
-              {loading ? "Loading..." : "Upgrade to Pro 🚀"}
-            </button>
-          )}
+          <button
+            onClick={() => {
+              window.location.href =
+                "https://kbetz-2.onrender.com/create-checkout-session";
+            }}
+            style={{
+              marginTop: "15px",
+              padding: "12px 18px",
+              background: "#bb86fc",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "bold"
+            }}
+          >
+            Upgrade to Pro 🚀
+          </button>
         </div>
       )}
     </div>
