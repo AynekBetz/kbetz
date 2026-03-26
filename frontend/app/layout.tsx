@@ -13,36 +13,16 @@ export default function RootLayout({
           color: "white"
         }}
       >
-        <div style={{ display: "flex" }}>
-          
-          {/* SIDEBAR */}
-          <div
-            style={{
-              width: "200px",
-              background: "#111",
-              padding: "20px",
-              height: "100vh"
-            }}
-          >
-            <h3>KBETZ</h3>
-            <p>Dashboard</p>
-            <p>Scanner</p>
-            <p>Analytics</p>
-          </div>
-
-          {/* MAIN CONTENT (FIXED) */}
-          <div
-            style={{
-              flex: 1,
-              padding: "20px",
-              position: "relative",
-              zIndex: 1,              // ✅ FIX
-              pointerEvents: "auto"  // ✅ FIX
-            }}
-          >
-            {children}
-          </div>
-
+        {/* 🔥 NO SIDEBAR, NO FLEX, NO OVERLAYS */}
+        <div
+          style={{
+            padding: "20px",
+            position: "relative",
+            zIndex: 1,
+            pointerEvents: "auto"
+          }}
+        >
+          {children}
         </div>
       </body>
     </html>
