@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
@@ -11,15 +13,21 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
+        // ✅ CHECK BACKEND THROUGH API ROUTE
         const res = await fetch("/api/health");
-        await res.json();
-        setConnected(true);
+        const data = await res.json();
 
+        if (data.connected) {
+          setConnected(true);
+        }
+
+        // ✅ LOAD USER FROM BACKEND
         const userRes = await fetch(`${API}/me`);
         const userData = await userRes.json();
+
         setUser(userData.user);
       } catch (err) {
-        console.error(err);
+        console.error("Connection failed:", err);
         setConnected(false);
       }
     }
@@ -48,38 +56,33 @@ export default function Dashboard() {
           <p>Email: {user.email}</p>
           <p>Plan: {user.plan}</p>
 
-          {/* 🔥 FINAL BUTTON */}
+          {/* 💰 UPGRADE BUTTON */}
           <button
             onClick={async () => {
               try {
-                console.log("CLICK FIRED");
-
                 const res = await fetch("/api/checkout", {
                   method: "POST",
                 });
 
                 const data = await res.json();
 
-                console.log("CHECKOUT RESPONSE:", data);
-
                 if (data.url) {
                   window.location.href = data.url;
                 } else {
-                  alert("No URL returned");
+                  alert("Checkout failed");
                 }
               } catch (err) {
-                console.error("FRONTEND ERROR:", err);
-                alert("Frontend error");
+                console.error("Checkout error:", err);
+                alert("Error starting checkout");
               }
             }}
             style={{
               marginTop: "20px",
-              padding: "15px 20px",
+              padding: "12px 20px",
               background: "#bb86fc",
               border: "none",
-              borderRadius: "8px",
+              borderRadius: "6px",
               cursor: "pointer",
-              fontSize: "18px",
               fontWeight: "bold",
             }}
           >
