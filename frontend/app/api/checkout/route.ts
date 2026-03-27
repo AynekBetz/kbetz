@@ -1,9 +1,17 @@
-import Stripe from "stripe";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
-
 export async function POST() {
   try {
+    // 🔥 LOAD STRIPE ONLY WHEN CALLED
+    const Stripe = (await import("stripe")).default;
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return Response.json(
+        { error: "Missing STRIPE_SECRET_KEY" },
+        { status: 500 }
+      );
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
@@ -21,7 +29,7 @@ export async function POST() {
 
     return Response.json({ url: session.url });
   } catch (err: any) {
-    console.error("STRIPE ERROR:", err.message);
+    console.error("Stripe error:", err.message);
 
     return Response.json(
       { error: err.message },
