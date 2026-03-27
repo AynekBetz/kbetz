@@ -6,10 +6,14 @@ const Stripe = require("stripe");
 
 const app = express();
 
-// 🔐 ENV
+// ===============================
+// 🔐 INIT STRIPE
+// ===============================
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// ===============================
 // 🧱 MIDDLEWARE
+// ===============================
 app.use(cors());
 app.use(express.json());
 
@@ -24,7 +28,7 @@ app.get("/health", (req, res) => {
 });
 
 // ===============================
-// ✅ TEST USER (TEMP)
+// ✅ TEST USER
 // ===============================
 app.get("/me", (req, res) => {
   res.json({
@@ -40,6 +44,12 @@ app.get("/me", (req, res) => {
 // ===============================
 app.post("/create-checkout-session", async (req, res) => {
   try {
+    if (!process.env.STRIPE_PRICE_ID) {
+      return res.status(500).json({
+        error: "Missing STRIPE_PRICE_ID",
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
@@ -57,8 +67,10 @@ app.post("/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("❌ Stripe error:", err);
-    res.status(500).json({ error: "Stripe failed" });
+    console.error("❌ Stripe error:", err.message);
+    res.status(500).json({
+      error: "Stripe failed",
+    });
   }
 });
 
