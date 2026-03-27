@@ -2,33 +2,37 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const Stripe = require("stripe");
 
 const app = express();
 
-// ===============================
-// 🔐 INIT STRIPE
-// ===============================
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// SAFE STRIPE INIT (won't crash if missing key)
+let stripe = null;
 
-// ===============================
-// 🧱 MIDDLEWARE
-// ===============================
+try {
+  const Stripe = require("stripe");
+
+  if (process.env.STRIPE_SECRET_KEY) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    console.log("✅ Stripe loaded");
+  } else {
+    console.log("⚠️ Stripe key missing (safe mode)");
+  }
+} catch (err) {
+  console.log("⚠️ Stripe failed to load");
+}
+
 app.use(cors());
 app.use(express.json());
 
 // ===============================
-// ✅ HEALTH CHECK
+// HEALTH
 // ===============================
 app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    connected: true,
-  });
+  res.json({ status: "ok", connected: true });
 });
 
 // ===============================
-// ✅ TEST USER
+// USER
 // ===============================
 app.get("/me", (req, res) => {
   res.json({
@@ -40,42 +44,36 @@ app.get("/me", (req, res) => {
 });
 
 // ===============================
-// 💰 STRIPE CHECKOUT (CRITICAL)
+// STRIPE (SAFE)
 // ===============================
 app.post("/create-checkout-session", async (req, res) => {
   try {
-    if (!process.env.STRIPE_PRICE_ID) {
+    if (!stripe) {
       return res.status(500).json({
-        error: "Missing STRIPE_PRICE_ID",
+        error: "Stripe not configured",
       });
     }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
-
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],
-
       success_url: "https://kbetz.vercel.app/dashboard",
       cancel_url: "https://kbetz.vercel.app/dashboard",
     });
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("❌ Stripe error:", err.message);
-    res.status(500).json({
-      error: "Stripe failed",
-    });
+    console.error("Stripe error:", err.message);
+    res.status(500).json({ error: "Stripe failed" });
   }
 });
 
-// ===============================
-// 🚀 START SERVER
 // ===============================
 const PORT = process.env.PORT || 10000;
 
