@@ -1,26 +1,27 @@
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import Stripe from "stripe";
 
-const express = require("express");
-const cors = require("cors");
+dotenv.config();
 
 const app = express();
 
-// SAFE STRIPE INIT (won't crash if missing key)
+// ===============================
+// SAFE STRIPE INIT
+// ===============================
 let stripe = null;
 
-try {
-  const Stripe = require("stripe");
-
-  if (process.env.STRIPE_SECRET_KEY) {
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    console.log("✅ Stripe loaded");
-  } else {
-    console.log("⚠️ Stripe key missing (safe mode)");
-  }
-} catch (err) {
-  console.log("⚠️ Stripe failed to load");
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  console.log("✅ Stripe loaded");
+} else {
+  console.log("⚠️ Stripe key missing");
 }
 
+// ===============================
+// MIDDLEWARE
+// ===============================
 app.use(cors());
 app.use(express.json());
 
@@ -44,7 +45,7 @@ app.get("/me", (req, res) => {
 });
 
 // ===============================
-// STRIPE (SAFE)
+// STRIPE CHECKOUT
 // ===============================
 app.post("/create-checkout-session", async (req, res) => {
   try {
@@ -57,23 +58,27 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
+
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],
+
       success_url: "https://kbetz.vercel.app/dashboard",
       cancel_url: "https://kbetz.vercel.app/dashboard",
     });
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("Stripe error:", err.message);
+    console.error("❌ Stripe error:", err.message);
     res.status(500).json({ error: "Stripe failed" });
   }
 });
 
+// ===============================
+// START SERVER
 // ===============================
 const PORT = process.env.PORT || 10000;
 
