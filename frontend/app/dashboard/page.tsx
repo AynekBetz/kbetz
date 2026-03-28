@@ -1,40 +1,6 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { useEffect, useState } from "react";
-
 export default function Dashboard() {
-  const [connected, setConnected] = useState(false);
-  const [user, setUser] = useState<any>(null);
-
-  const API = "https://kbetz-2.onrender.com";
-
-  useEffect(() => {
-    async function load() {
-      try {
-        // ✅ CHECK BACKEND THROUGH API ROUTE
-        const res = await fetch("/api/health");
-        const data = await res.json();
-
-        if (data.connected) {
-          setConnected(true);
-        }
-
-        // ✅ LOAD USER FROM BACKEND
-        const userRes = await fetch(`${API}/me`);
-        const userData = await userRes.json();
-
-        setUser(userData.user);
-      } catch (err) {
-        console.error("Connection failed:", err);
-        setConnected(false);
-      }
-    }
-
-    load();
-  }, []);
-
   return (
     <div
       style={{
@@ -45,51 +11,24 @@ export default function Dashboard() {
         fontFamily: "Arial",
       }}
     >
-      <h1 style={{ color: "#bb86fc" }}>KBETZ™ Dashboard</h1>
+      <h1>KBETZ TEST</h1>
 
-      <h2>
-        Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
-      </h2>
-
-      {user && (
-        <div style={{ marginTop: "20px" }}>
-          <p>Email: {user.email}</p>
-          <p>Plan: {user.plan}</p>
-
-          {/* 💰 UPGRADE BUTTON */}
-          <button
-            onClick={async () => {
-              try {
-                const res = await fetch("/api/checkout", {
-                  method: "POST",
-                });
-
-                const data = await res.json();
-
-                if (data.url) {
-                  window.location.href = data.url;
-                } else {
-                  alert("Checkout failed");
-                }
-              } catch (err) {
-                console.error("Checkout error:", err);
-                alert("Error starting checkout");
-              }
-            }}
-            style={{
-              marginTop: "20px",
-              padding: "12px 20px",
-              background: "#bb86fc",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            Upgrade to Pro 🚀
-          </button>
-        </div>
-      )}
+      <button
+        onClick={() => {
+          window.location.href = "https://www.google.com";
+        }}
+        style={{
+          marginTop: "20px",
+          padding: "15px 20px",
+          background: "red",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer",
+          fontSize: "18px",
+        }}
+      >
+        TEST BUTTON
+      </button>
     </div>
   );
 }
