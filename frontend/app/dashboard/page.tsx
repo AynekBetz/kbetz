@@ -1,5 +1,8 @@
 "use client";
 
+// 🚨 THIS LINE FIXES EVERYTHING
+export const dynamic = "force-dynamic";
+
 export default function Dashboard() {
   return (
     <div
@@ -31,4 +34,4 @@ export default function Dashboard() {
       </button>
     </div>
   );
-}// force rebuild
+}
