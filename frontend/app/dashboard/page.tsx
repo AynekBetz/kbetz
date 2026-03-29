@@ -52,7 +52,6 @@ export default function Dashboard() {
           <p>Email: {user.email}</p>
           <p>Plan: {user.plan}</p>
 
-          {/* 💰 STRIPE BUTTON */}
           <button
             onClick={async () => {
               const res = await fetch("/api/checkout", {

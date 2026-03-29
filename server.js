@@ -7,81 +7,54 @@ dotenv.config();
 
 const app = express();
 
-// ===============================
-// SAFE STRIPE INIT
-// ===============================
-let stripe = null;
+// ✅ Stripe init
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+console.log("✅ Stripe loaded");
 
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  console.log("✅ Stripe loaded");
-} else {
-  console.log("⚠️ Stripe key missing");
-}
+// 🔥 WEBHOOK (FAST RESPONSE — FIXES TIMEOUT)
+app.post("/webhook", express.raw({ type: "*/*" }), (req, res) => {
+  console.log("🔥 WEBHOOK HIT");
 
-// ===============================
-// MIDDLEWARE
-// ===============================
+  // ✅ Respond instantly (Stripe needs this FAST)
+  res.status(200).send("ok");
+
+  // 🧠 Process AFTER response (no timeout)
+  setImmediate(() => {
+    try {
+      const event = JSON.parse(req.body.toString());
+
+      console.log("📦 Event type:", event.type);
+
+      if (event.type === "checkout.session.completed") {
+        global.userPlan = "pro";
+        console.log("✅ User upgraded to PRO");
+      }
+    } catch (err) {
+      console.log("❌ Webhook error:", err.message);
+    }
+  });
+});
+
+// ✅ MIDDLEWARE AFTER WEBHOOK
 app.use(cors());
 app.use(express.json());
 
-// ===============================
-// HEALTH
-// ===============================
+// ✅ HEALTH CHECK
 app.get("/health", (req, res) => {
   res.json({ status: "ok", connected: true });
 });
 
-// ===============================
-// USER
-// ===============================
+// ✅ USER ENDPOINT
 app.get("/me", (req, res) => {
   res.json({
     user: {
       email: "test@kbetz.com",
-      plan: "free",
+      plan: global.userPlan || "free",
     },
   });
 });
 
-// ===============================
-// STRIPE CHECKOUT
-// ===============================
-app.post("/create-checkout-session", async (req, res) => {
-  try {
-    if (!stripe) {
-      return res.status(500).json({
-        error: "Stripe not configured",
-      });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "subscription",
-
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-
-      success_url: "https://kbetz.vercel.app/dashboard",
-      cancel_url: "https://kbetz.vercel.app/dashboard",
-    });
-
-    res.json({ url: session.url });
-  } catch (err) {
-    console.error("❌ Stripe error:", err.message);
-    res.status(500).json({ error: "Stripe failed" });
-  }
-});
-
-// ===============================
-// START SERVER
-// ===============================
-const PORT = process.env.PORT || 10000;
-
-app.listen(PORT, () => {
-  console.log(`🔥 KBETZ API running on port ${PORT}`);
+// 🚀 START SERVER
+app.listen(10000, () => {
+  console.log("🔥 KBETZ API running on port 10000");
 });
