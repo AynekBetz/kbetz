@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "./models/User.js";
+import oddsRoutes from "./routes/oddsRoutes.js";
 
 dotenv.config();
 
@@ -20,23 +21,17 @@ mongoose.connect(process.env.MONGO_URI)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 console.log("✅ Stripe loaded");
 
-// 🔥 WEBHOOK (FAST + SAFE)
-app.post(["/webhook", "/webhook/"], express.raw({ type: "*/*" }), (req, res) => {
-  console.log("🔥 WEBHOOK HIT");
-
+// 🔥 WEBHOOK
+app.post("/webhook", express.raw({ type: "*/*" }), (req, res) => {
   res.status(200).send("ok");
 
   setImmediate(async () => {
     try {
       const event = JSON.parse(req.body.toString());
 
-      console.log("📦 Event:", event.type);
-
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
         const email = session.customer_email;
-
-        console.log("💰 Payment from:", email);
 
         let user = await User.findOne({ email });
 
@@ -44,12 +39,9 @@ app.post(["/webhook", "/webhook/"], express.raw({ type: "*/*" }), (req, res) => 
           user.plan = "pro";
           user.stripeCustomerId = session.customer;
           user.stripeSubscriptionId = session.subscription;
-
           await user.save();
 
           console.log("✅ USER UPGRADED:", email);
-        } else {
-          console.log("⚠️ No user found for email:", email);
         }
       }
     } catch (err) {
@@ -62,15 +54,15 @@ app.post(["/webhook", "/webhook/"], express.raw({ type: "*/*" }), (req, res) => 
 app.use(cors());
 app.use(express.json());
 
-// 🔐 SIGNUP (NO DUPLICATES)
+// ✅ ODDS ROUTE
+app.use("/api", oddsRoutes);
+
+// 🔐 SIGNUP
 app.post("/signup", async (req, res) => {
   const { email, password } = req.body;
 
   const existing = await User.findOne({ email });
-
-  if (existing) {
-    return res.status(400).json({ error: "User already exists" });
-  }
+  if (existing) return res.status(400).json({ error: "User exists" });
 
   const hashed = await bcrypt.hash(password, 10);
 
@@ -85,11 +77,9 @@ app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email });
-
   if (!user) return res.status(400).json({ error: "User not found" });
 
   const valid = await bcrypt.compare(password, user.password);
-
   if (!valid) return res.status(400).json({ error: "Wrong password" });
 
   const token = jwt.sign(
@@ -100,10 +90,9 @@ app.post("/login", async (req, res) => {
   res.json({ token });
 });
 
-// 🔐 AUTH MIDDLEWARE
+// 🔐 AUTH
 function auth(req, res, next) {
   const token = req.headers.authorization;
-
   if (!token) return res.status(401).json({ error: "No token" });
 
   try {
@@ -115,9 +104,9 @@ function auth(req, res, next) {
   }
 }
 
-// 🔐 GET CURRENT USER (SECURE)
+// 🔐 GET USER
 app.get("/me", auth, async (req, res) => {
-  const user = await User.findById(req.user.id).select("-password");
+  const user = await User.findById(req.user.id);
   res.json({ user });
 });
 

@@ -1,85 +1,123 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
+import { getMe, getOdds } from "../../lib/api";
 
 export default function Dashboard() {
-  const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
-
-  const API = "https://kbetz-2.onrender.com";
+  const [games, setGames] = useState<any[]>([]);
+  const [betSlip, setBetSlip] = useState<any[]>([]);
+  const [stake, setStake] = useState(10);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch("/api/health");
-        const data = await res.json();
+    const token = localStorage.getItem("token");
 
-        setConnected(data.connected);
-
-        const userRes = await fetch(`${API}/me`);
-        const userData = await userRes.json();
-
-        setUser(userData.user);
-      } catch (err) {
-        console.error(err);
-        setConnected(false);
-      }
+    if (!token) {
+      window.location.href = "/login";
+      return;
     }
 
-    load();
+    getMe(token).then((data) => {
+      if (data.user) setUser(data.user);
+    });
+
+    getOdds().then((data) => {
+      if (Array.isArray(data)) setGames(data);
+    });
   }, []);
 
+  function addToSlip(team: string, odds: string) {
+    setBetSlip([...betSlip, { team, odds }]);
+  }
+
+  function removeBet(i: number) {
+    setBetSlip(betSlip.filter((_, idx) => idx !== i));
+  }
+
+  function toDecimal(odds: string) {
+    const o = parseInt(odds);
+    return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o);
+  }
+
+  const totalOdds = betSlip.reduce((acc, bet) => acc * toDecimal(bet.odds), 1);
+  const payout = (stake * totalOdds).toFixed(2);
+
+  if (!user) return <div style={{ color: "white" }}>Loading...</div>;
+
   return (
-    <div
-      style={{
-        padding: "40px",
-        background: "#0b0b0f",
-        color: "white",
-        minHeight: "100vh",
-        fontFamily: "Arial",
-      }}
-    >
-      <h1 style={{ color: "#bb86fc" }}>KBETZ™ Dashboard</h1>
+    <div style={{ display: "flex", background: "#0b0b0f", color: "white", minHeight: "100vh" }}>
+      
+      {/* LEFT */}
+      <div style={{ flex: 3, padding: "20px" }}>
+        <h1 style={{ color: "#a78bfa" }}>KBETZ™</h1>
+        <p>{user.email} • {user.plan.toUpperCase()}</p>
 
-      <h2>
-        Backend: {connected ? "🟢 Connected" : "🔴 Not Connected"}
-      </h2>
+        <div style={{ marginTop: "20px", background: "#111827", borderRadius: "12px", padding: "15px" }}>
+          <h2>Live Games</h2>
 
-      {user && (
-        <div style={{ marginTop: "20px" }}>
-          <p>Email: {user.email}</p>
-          <p>Plan: {user.plan}</p>
+          {games.map((game, i) => {
+            const book = game.bookmakers?.[0];
+            const market = book?.markets?.[0];
+            const outcomes = market?.outcomes;
 
-          <button
-            onClick={async () => {
-              const res = await fetch("/api/checkout", {
-                method: "POST",
-              });
+            if (!outcomes) return null;
 
-              const data = await res.json();
+            return (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "12px", borderBottom: "1px solid #222" }}>
+                <div>
+                  <div>{game.away_team}</div>
+                  <div>{game.home_team}</div>
+                </div>
 
-              if (data.url) {
-                window.location.href = data.url;
-              } else {
-                alert("Checkout failed");
-              }
-            }}
-            style={{
-              marginTop: "20px",
-              padding: "12px 20px",
-              background: "#bb86fc",
-              border: "none",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            Upgrade to Pro 🚀
-          </button>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  {outcomes.map((o, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => addToSlip(o.name, o.price.toString())}
+                      style={{
+                        padding: "8px",
+                        background: "#1f2937",
+                        borderRadius: "6px",
+                        color: "#22c55e"
+                      }}
+                    >
+                      {o.price > 0 ? `+${o.price}` : o.price}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      )}
+      </div>
+
+      {/* RIGHT */}
+      <div style={{ flex: 1, background: "#111827", padding: "20px" }}>
+        <h2>Bet Slip</h2>
+
+        {betSlip.map((bet, i) => (
+          <div key={i} style={{ marginTop: "10px", background: "#1f2937", padding: "10px" }}>
+            {bet.team} ({bet.odds})
+            <button onClick={() => removeBet(i)}>X</button>
+          </div>
+        ))}
+
+        {betSlip.length > 0 && (
+          <>
+            <input
+              type="number"
+              value={stake}
+              onChange={(e) => setStake(Number(e.target.value))}
+            />
+
+            <p>Payout: ${payout}</p>
+
+            <button style={{ background: "green", width: "100%" }}>
+              Place Bet
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
