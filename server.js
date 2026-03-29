@@ -20,7 +20,7 @@ mongoose.connect(process.env.MONGO_URI)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 console.log("✅ Stripe loaded");
 
-// 🔥 WEBHOOK (FAST + DB UPDATE)
+// 🔥 WEBHOOK (FAST + SAFE)
 app.post(["/webhook", "/webhook/"], express.raw({ type: "*/*" }), (req, res) => {
   console.log("🔥 WEBHOOK HIT");
 
@@ -115,9 +115,9 @@ function auth(req, res, next) {
   }
 }
 
-// 🔐 GET CURRENT USER
+// 🔐 GET CURRENT USER (SECURE)
 app.get("/me", auth, async (req, res) => {
-  const user = await User.findById(req.user.id);
+  const user = await User.findById(req.user.id).select("-password");
   res.json({ user });
 });
 
