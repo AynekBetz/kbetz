@@ -2,60 +2,84 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import Stripe from "stripe";
+import mongoose from "mongoose";
+import User from "./models/User.js";
 
 dotenv.config();
 
 const app = express();
 
-// ✅ Stripe
+// ✅ CONNECT TO MONGO
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch(err => console.log("❌ Mongo Error:", err));
+
+// ✅ STRIPE
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 console.log("✅ Stripe loaded");
 
-// 🔥 WEBHOOK (HANDLES /webhook AND /webhook/ + FAST RESPONSE)
-app.post(
-  ["/webhook", "/webhook/"],
-  express.raw({ type: "*/*" }),
-  (req, res) => {
-    console.log("🔥 WEBHOOK HIT");
+// 🔥 WEBHOOK (REAL DB UPDATE)
+app.post(["/webhook", "/webhook/"], express.raw({ type: "*/*" }), (req, res) => {
+  console.log("🔥 WEBHOOK HIT");
 
-    // ✅ RESPOND IMMEDIATELY (prevents Stripe timeout)
-    res.status(200).send("ok");
+  // respond immediately
+  res.status(200).send("ok");
 
-    // 🧠 Process AFTER response
-    setImmediate(() => {
-      try {
-        const event = JSON.parse(req.body.toString());
+  setImmediate(async () => {
+    try {
+      const event = JSON.parse(req.body.toString());
 
-        console.log("📦 Event type:", event.type);
+      console.log("📦 Event:", event.type);
 
-        if (event.type === "checkout.session.completed") {
-          global.userPlan = "pro";
-          console.log("✅ User upgraded to PRO");
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+
+        const email = session.customer_email;
+
+        console.log("💰 Payment from:", email);
+
+        let user = await User.findOne({ email });
+
+        if (!user) {
+          user = new User({ email });
         }
-      } catch (err) {
-        console.log("❌ Webhook error:", err.message);
-      }
-    });
-  }
-);
 
-// ✅ MIDDLEWARE (AFTER webhook)
+        user.plan = "pro";
+        user.stripeCustomerId = session.customer;
+        user.stripeSubscriptionId = session.subscription;
+
+        await user.save();
+
+        console.log("✅ USER SAVED AS PRO IN DB");
+      }
+
+    } catch (err) {
+      console.log("❌ Webhook error:", err.message);
+    }
+  });
+});
+
+// ✅ NORMAL MIDDLEWARE
 app.use(cors());
 app.use(express.json());
 
-// ✅ HEALTH CHECK
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", connected: true });
+// ✅ GET USER (FROM DB)
+app.get("/me", async (req, res) => {
+  const email = "test@kbetz.com"; // temporary (we add auth next)
+
+  let user = await User.findOne({ email });
+
+  if (!user) {
+    user = new User({ email });
+    await user.save();
+  }
+
+  res.json({ user });
 });
 
-// ✅ USER STATUS
-app.get("/me", (req, res) => {
-  res.json({
-    user: {
-      email: "test@kbetz.com",
-      plan: global.userPlan || "free",
-    },
-  });
+// ✅ HEALTH
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", connected: true });
 });
 
 // 🚀 START SERVER
