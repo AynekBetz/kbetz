@@ -6,6 +6,7 @@ import { getMe, getOdds } from "../../lib/api";
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [games, setGames] = useState<any[]>([]);
+  const [prevOdds, setPrevOdds] = useState<any>({});
   const [betSlip, setBetSlip] = useState<any[]>([]);
   const [stake, setStake] = useState(10);
 
@@ -21,10 +22,50 @@ export default function Dashboard() {
       if (data.user) setUser(data.user);
     });
 
-    getOdds().then((data) => {
-      if (Array.isArray(data)) setGames(data);
-    });
+    fetchOdds();
+    const interval = setInterval(fetchOdds, 8000);
+
+    return () => clearInterval(interval);
   }, []);
+
+  async function fetchOdds() {
+    const data = await getOdds();
+
+    if (Array.isArray(data)) {
+      const newMap: any = {};
+
+      data.forEach((game: any) => {
+        const outcomes =
+          game.bookmakers?.[0]?.markets?.[0]?.outcomes || [];
+
+        outcomes.forEach((o: any) => {
+          newMap[`${game.id}-${o.name}`] = o.price;
+        });
+      });
+
+      setPrevOdds((old: any) => {
+        const updated = { ...old };
+
+        Object.keys(newMap).forEach((key) => {
+          if (old[key] && newMap[key] !== old[key]) {
+            playSound();
+          }
+          updated[key] = newMap[key];
+        });
+
+        return updated;
+      });
+
+      setGames(data);
+    }
+  }
+
+  function playSound() {
+    const audio = new Audio(
+      "https://www.soundjay.com/buttons/sounds/button-16.mp3"
+    );
+    audio.play();
+  }
 
   function addToSlip(team: string, odds: string) {
     setBetSlip([...betSlip, { team, odds }]);
@@ -39,7 +80,11 @@ export default function Dashboard() {
     return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o);
   }
 
-  const totalOdds = betSlip.reduce((acc, bet) => acc * toDecimal(bet.odds), 1);
+  const totalOdds = betSlip.reduce(
+    (acc, bet) => acc * toDecimal(bet.odds),
+    1
+  );
+
   const payout = (stake * totalOdds).toFixed(2);
 
   if (!user) return <div style={{ color: "white" }}>Loading...</div>;
@@ -47,7 +92,7 @@ export default function Dashboard() {
   return (
     <div style={{ display: "flex", background: "#0b0b0f", color: "white", minHeight: "100vh" }}>
       
-      {/* LEFT */}
+      {/* LEFT SIDE */}
       <div style={{ flex: 3, padding: "20px" }}>
         <h1 style={{ color: "#a78bfa" }}>KBETZ™</h1>
         <p>{user.email} • {user.plan.toUpperCase()}</p>
@@ -55,35 +100,75 @@ export default function Dashboard() {
         <div style={{ marginTop: "20px", background: "#111827", borderRadius: "12px", padding: "15px" }}>
           <h2>Live Games</h2>
 
-          {games.map((game, i) => {
-            const book = game.bookmakers?.[0];
-            const market = book?.markets?.[0];
-            const outcomes = market?.outcomes;
-
+          {games.map((game: any, i) => {
+            const outcomes = game.bookmakers?.[0]?.markets?.[0]?.outcomes;
             if (!outcomes) return null;
 
             return (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "12px", borderBottom: "1px solid #222" }}>
+              <div key={i} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "12px",
+                borderBottom: "1px solid #222"
+              }}>
                 <div>
                   <div>{game.away_team}</div>
                   <div>{game.home_team}</div>
                 </div>
 
                 <div style={{ display: "flex", gap: "10px" }}>
-                  {outcomes.map((o, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => addToSlip(o.name, o.price.toString())}
-                      style={{
-                        padding: "8px",
-                        background: "#1f2937",
-                        borderRadius: "6px",
-                        color: "#22c55e"
-                      }}
-                    >
-                      {o.price > 0 ? `+${o.price}` : o.price}
-                    </button>
-                  ))}
+                  {outcomes.map((o: any, idx: number) => {
+                    const key = `${game.id}-${o.name}`;
+                    const prev = prevOdds[key];
+                    const current = o.price;
+
+                    let flashColor = "#1f2937";
+                    let arrow = "";
+                    let percent = "";
+
+                    if (prev && current !== prev) {
+                      const diff = current - prev;
+                      const pct = ((diff / Math.abs(prev)) * 100).toFixed(1);
+
+                      percent = `${pct}%`;
+
+                      if (diff > 0) {
+                        flashColor = "#065f46"; // green
+                        arrow = "↑";
+                      } else {
+                        flashColor = "#7f1d1d"; // red
+                        arrow = "↓";
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => addToSlip(o.name, current.toString())}
+                        style={{
+                          padding: "8px",
+                          borderRadius: "6px",
+                          background: flashColor,
+                          color: "#22c55e",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          minWidth: "60px",
+                          transition: "0.3s"
+                        }}
+                      >
+                        <span>
+                          {current > 0 ? `+${current}` : current}
+                        </span>
+
+                        {arrow && (
+                          <span style={{ fontSize: "10px" }}>
+                            {arrow} {percent}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -91,7 +176,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* RIGHT */}
+      {/* RIGHT SIDE */}
       <div style={{ flex: 1, background: "#111827", padding: "20px" }}>
         <h2>Bet Slip</h2>
 
@@ -112,7 +197,7 @@ export default function Dashboard() {
 
             <p>Payout: ${payout}</p>
 
-            <button style={{ background: "green", width: "100%" }}>
+            <button style={{ background: "#22c55e", width: "100%" }}>
               Place Bet
             </button>
           </>
