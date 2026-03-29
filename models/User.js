@@ -1,11 +1,15 @@
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  email: String,
+  password: String,
   plan: { type: String, default: "free" },
-  stripeCustomerId: { type: String },
-  stripeSubscriptionId: { type: String },
+
+  // 📊 STATS
+  totalBets: { type: Number, default: 0 },
+  wins: { type: Number, default: 0 },
+  losses: { type: Number, default: 0 },
+  profit: { type: Number, default: 0 },
 });
 
 export default mongoose.model("User", userSchema);

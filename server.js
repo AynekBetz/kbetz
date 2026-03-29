@@ -6,11 +6,43 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "./models/User.js";
-import oddsRoutes from "./routes/oddsRoutes.js";
 
 dotenv.config();
 
 const app = express();
+
+// 🔥 IMPORTANT: webhook BEFORE json middleware
+app.post("/webhook", express.raw({ type: "*/*" }), async (req, res) => {
+  res.status(200).send("ok");
+
+  try {
+    const event = JSON.parse(req.body.toString());
+
+    console.log("📦 Stripe Event:", event.type);
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const email = session.customer_email;
+
+      let user = await User.findOne({ email });
+
+      if (user) {
+        user.plan = "pro";
+        user.stripeCustomerId = session.customer;
+        user.stripeSubscriptionId = session.subscription;
+        await user.save();
+
+        console.log("✅ USER UPGRADED TO PRO:", email);
+      }
+    }
+  } catch (err) {
+    console.log("❌ Webhook error:", err.message);
+  }
+});
+
+// ✅ NORMAL MIDDLEWARE
+app.use(cors());
+app.use(express.json());
 
 // ✅ CONNECT DB
 mongoose.connect(process.env.MONGO_URI)
@@ -21,43 +53,12 @@ mongoose.connect(process.env.MONGO_URI)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 console.log("✅ Stripe loaded");
 
-// 🔥 WEBHOOK
-app.post("/webhook", express.raw({ type: "*/*" }), (req, res) => {
-  res.status(200).send("ok");
 
-  setImmediate(async () => {
-    try {
-      const event = JSON.parse(req.body.toString());
+// 🚀 =============================
+// 🔐 AUTH ROUTES
+// 🚀 =============================
 
-      if (event.type === "checkout.session.completed") {
-        const session = event.data.object;
-        const email = session.customer_email;
-
-        let user = await User.findOne({ email });
-
-        if (user) {
-          user.plan = "pro";
-          user.stripeCustomerId = session.customer;
-          user.stripeSubscriptionId = session.subscription;
-          await user.save();
-
-          console.log("✅ USER UPGRADED:", email);
-        }
-      }
-    } catch (err) {
-      console.log("❌ Webhook error:", err.message);
-    }
-  });
-});
-
-// ✅ NORMAL MIDDLEWARE
-app.use(cors());
-app.use(express.json());
-
-// ✅ ODDS ROUTE
-app.use("/api", oddsRoutes);
-
-// 🔐 SIGNUP
+// SIGNUP
 app.post("/signup", async (req, res) => {
   const { email, password } = req.body;
 
@@ -72,7 +73,7 @@ app.post("/signup", async (req, res) => {
   res.json({ message: "User created" });
 });
 
-// 🔐 LOGIN
+// LOGIN
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -90,9 +91,10 @@ app.post("/login", async (req, res) => {
   res.json({ token });
 });
 
-// 🔐 AUTH
+// AUTH MIDDLEWARE
 function auth(req, res, next) {
   const token = req.headers.authorization;
+
   if (!token) return res.status(401).json({ error: "No token" });
 
   try {
@@ -104,18 +106,105 @@ function auth(req, res, next) {
   }
 }
 
-// 🔐 GET USER
+// GET CURRENT USER
 app.get("/me", auth, async (req, res) => {
   const user = await User.findById(req.user.id);
   res.json({ user });
 });
 
-// ✅ HEALTH
+
+// 🚀 =============================
+// 💰 STRIPE CHECKOUT
+// 🚀 =============================
+
+app.get("/api/checkout", async (req, res) => {
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    mode: "subscription",
+    line_items: [
+      {
+        price: process.env.STRIPE_PRICE_ID,
+        quantity: 1,
+      },
+    ],
+    success_url: "https://kbetz.vercel.app/dashboard",
+    cancel_url: "https://kbetz.vercel.app/dashboard",
+  });
+
+  res.redirect(session.url);
+});
+
+
+// 🚀 =============================
+// 📊 USER STATS
+// 🚀 =============================
+
+// UPDATE BET RESULT
+app.post("/api/bet-result", async (req, res) => {
+  const { email, won, profit } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  user.totalBets += 1;
+
+  if (won) {
+    user.wins += 1;
+    user.profit += profit;
+  } else {
+    user.losses += 1;
+    user.profit -= profit;
+  }
+
+  await user.save();
+
+  res.json({ message: "Stats updated" });
+});
+
+// 🏆 LEADERBOARD
+app.get("/api/leaderboard", async (req, res) => {
+  const users = await User.find()
+    .sort({ profit: -1 })
+    .limit(10)
+    .select("email profit wins losses");
+
+  res.json(users);
+});
+
+
+// 🚀 =============================
+// 📡 ODDS API
+// 🚀 =============================
+
+app.get("/api/odds", async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${process.env.ODDS_API_KEY}&regions=us&markets=h2h`
+    );
+
+    const data = await response.json();
+
+    res.json(data);
+  } catch (err) {
+    console.log("❌ Odds fetch error:", err.message);
+    res.status(500).json({ error: "Failed to fetch odds" });
+  }
+});
+
+
+// 🚀 =============================
+// ❤️ HEALTH CHECK
+// 🚀 =============================
+
 app.get("/health", (req, res) => {
   res.json({ status: "ok", connected: true });
 });
 
+
+// 🚀 =============================
 // 🚀 START SERVER
+// 🚀 =============================
+
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
