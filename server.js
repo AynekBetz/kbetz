@@ -7,35 +7,39 @@ dotenv.config();
 
 const app = express();
 
-// ✅ Stripe init
+// ✅ Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 console.log("✅ Stripe loaded");
 
-// 🔥 WEBHOOK (FAST RESPONSE — FIXES TIMEOUT)
-app.post("/webhook", express.raw({ type: "*/*" }), (req, res) => {
-  console.log("🔥 WEBHOOK HIT");
+// 🔥 WEBHOOK (HANDLES /webhook AND /webhook/ + FAST RESPONSE)
+app.post(
+  ["/webhook", "/webhook/"],
+  express.raw({ type: "*/*" }),
+  (req, res) => {
+    console.log("🔥 WEBHOOK HIT");
 
-  // ✅ Respond instantly (Stripe needs this FAST)
-  res.status(200).send("ok");
+    // ✅ RESPOND IMMEDIATELY (prevents Stripe timeout)
+    res.status(200).send("ok");
 
-  // 🧠 Process AFTER response (no timeout)
-  setImmediate(() => {
-    try {
-      const event = JSON.parse(req.body.toString());
+    // 🧠 Process AFTER response
+    setImmediate(() => {
+      try {
+        const event = JSON.parse(req.body.toString());
 
-      console.log("📦 Event type:", event.type);
+        console.log("📦 Event type:", event.type);
 
-      if (event.type === "checkout.session.completed") {
-        global.userPlan = "pro";
-        console.log("✅ User upgraded to PRO");
+        if (event.type === "checkout.session.completed") {
+          global.userPlan = "pro";
+          console.log("✅ User upgraded to PRO");
+        }
+      } catch (err) {
+        console.log("❌ Webhook error:", err.message);
       }
-    } catch (err) {
-      console.log("❌ Webhook error:", err.message);
-    }
-  });
-});
+    });
+  }
+);
 
-// ✅ MIDDLEWARE AFTER WEBHOOK
+// ✅ MIDDLEWARE (AFTER webhook)
 app.use(cors());
 app.use(express.json());
 
@@ -44,7 +48,7 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", connected: true });
 });
 
-// ✅ USER ENDPOINT
+// ✅ USER STATUS
 app.get("/me", (req, res) => {
   res.json({
     user: {
@@ -55,6 +59,8 @@ app.get("/me", (req, res) => {
 });
 
 // 🚀 START SERVER
-app.listen(10000, () => {
-  console.log("🔥 KBETZ API running on port 10000");
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT, () => {
+  console.log(`🔥 KBETZ API running on port ${PORT}`);
 });
