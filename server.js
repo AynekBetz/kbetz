@@ -20,17 +20,23 @@ mongoose.connect(process.env.MONGO_URI)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 console.log("✅ Stripe loaded");
 
-// 🔥 WEBHOOK
+// 🔥 WEBHOOK (FAST + DB UPDATE)
 app.post(["/webhook", "/webhook/"], express.raw({ type: "*/*" }), (req, res) => {
+  console.log("🔥 WEBHOOK HIT");
+
   res.status(200).send("ok");
 
   setImmediate(async () => {
     try {
       const event = JSON.parse(req.body.toString());
 
+      console.log("📦 Event:", event.type);
+
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
         const email = session.customer_email;
+
+        console.log("💰 Payment from:", email);
 
         let user = await User.findOne({ email });
 
@@ -38,9 +44,12 @@ app.post(["/webhook", "/webhook/"], express.raw({ type: "*/*" }), (req, res) => 
           user.plan = "pro";
           user.stripeCustomerId = session.customer;
           user.stripeSubscriptionId = session.subscription;
+
           await user.save();
 
           console.log("✅ USER UPGRADED:", email);
+        } else {
+          console.log("⚠️ No user found for email:", email);
         }
       }
     } catch (err) {
@@ -53,20 +62,22 @@ app.post(["/webhook", "/webhook/"], express.raw({ type: "*/*" }), (req, res) => 
 app.use(cors());
 app.use(express.json());
 
-// 🔐 SIGNUP
+// 🔐 SIGNUP (NO DUPLICATES)
 app.post("/signup", async (req, res) => {
   const { email, password } = req.body;
 
+  const existing = await User.findOne({ email });
+
+  if (existing) {
+    return res.status(400).json({ error: "User already exists" });
+  }
+
   const hashed = await bcrypt.hash(password, 10);
 
-  try {
-    const user = new User({ email, password: hashed });
-    await user.save();
+  const user = new User({ email, password: hashed });
+  await user.save();
 
-    res.json({ message: "User created" });
-  } catch {
-    res.status(400).json({ error: "User exists" });
-  }
+  res.json({ message: "User created" });
 });
 
 // 🔐 LOGIN
@@ -112,7 +123,7 @@ app.get("/me", auth, async (req, res) => {
 
 // ✅ HEALTH
 app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+  res.json({ status: "ok", connected: true });
 });
 
 // 🚀 START SERVER
@@ -120,4 +131,4 @@ const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
   console.log(`🔥 KBETZ API running on port ${PORT}`);
-});// redeploy trigger
+});
