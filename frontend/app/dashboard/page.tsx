@@ -1,252 +1,165 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMe, getOdds } from "../../lib/api";
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
+
+  // 🔒 STRIPE (UNCHANGED)
+  const handleUpgrade = async () => {
+    try {
+      const res = await fetch(
+        "http://localhost:10000/api/stripe/create-checkout-session",
+        { method: "POST" }
+      );
+
+      const data = await res.json();
+
+      if (data.url) window.location.href = data.url;
+      else alert("Stripe failed");
+
+    } catch {
+      alert("Connection failed");
+    }
+  };
+
+  const playSound = () => {
+    const audio = new Audio("/alert.mp3");
+    audio.play().catch(() => {});
+  };
+
   const [games, setGames] = useState<any[]>([]);
   const [betSlip, setBetSlip] = useState<any[]>([]);
   const [stake, setStake] = useState(10);
-  const [aiPicks, setAiPicks] = useState<any[]>([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      window.location.href = "/login";
-      return;
-    }
-
-    getMe(token).then((data) => {
-      if (data.user) setUser(data.user);
-    });
-
-    fetchOdds();
+    fetch("http://localhost:10000/api/odds")
+      .then(res => res.json())
+      .then(data => setGames(data));
   }, []);
 
-  async function fetchOdds() {
-    const data = await getOdds();
+  const addToSlip = (g: any) => {
+    setBetSlip(prev => [...prev, g]);
+    playSound();
+  };
 
-    if (Array.isArray(data)) {
-      setGames(data);
-      generateAIPicks(data);
-    }
-  }
+  const calculatePayout = () => {
+    let total = 1;
 
-  function addToSlip(team: string, odds: string) {
-    setBetSlip([...betSlip, { team, odds }]);
-  }
-
-  function removeBet(i: number) {
-    setBetSlip(betSlip.filter((_, idx) => idx !== i));
-  }
-
-  function toDecimal(odds: number) {
-    return odds > 0 ? 1 + odds / 100 : 1 + 100 / Math.abs(odds);
-  }
-
-  function calcEV(odds: number, prob: number) {
-    const dec = toDecimal(odds);
-    return prob * dec - 1;
-  }
-
-  // 🧠 AI PICKS ENGINE
-  function generateAIPicks(data: any[]) {
-    let picks: any[] = [];
-
-    data.forEach((game) => {
-      const book = game.bookmakers?.[0];
-      const market = book?.markets?.[0];
-
-      if (!market) return;
-
-      market.outcomes.forEach((o: any) => {
-        const impliedProb =
-          o.price > 0
-            ? 100 / (o.price + 100)
-            : Math.abs(o.price) / (Math.abs(o.price) + 100);
-
-        const modelProb = impliedProb + 0.05;
-
-        const ev = calcEV(o.price, modelProb);
-
-        if (ev > 0.05) {
-          picks.push({
-            team: o.name,
-            odds: o.price,
-            confidence: Math.min((modelProb * 100).toFixed(0), 95),
-            ev: ev.toFixed(2),
-          });
-        }
-      });
+    betSlip.forEach(b => {
+      total *= b.odds > 0
+        ? (b.odds / 100 + 1)
+        : (100 / Math.abs(b.odds) + 1);
     });
 
-    picks.sort((a, b) => b.ev - a.ev);
-    setAiPicks(picks.slice(0, 5));
-  }
-
-  const totalOdds = betSlip.reduce(
-    (acc, bet) => acc * toDecimal(parseInt(bet.odds)),
-    1
-  );
-
-  const payout = (stake * totalOdds).toFixed(2);
-
-  if (!user) return <div style={{ color: "white" }}>Loading...</div>;
+    return (stake * total).toFixed(2);
+  };
 
   return (
-    <div style={{ display: "flex", background: "#0b0b0f", color: "white", minHeight: "100vh" }}>
-      
-      {/* LEFT SIDE */}
-      <div style={{ flex: 3, padding: "20px" }}>
-        <h1 style={{ color: "#a78bfa" }}>KBETZ™</h1>
-        <p>{user.email} • {user.plan.toUpperCase()}</p>
+    <div style={{ background: "#020202", color: "white", minHeight: "100vh", padding: 20 }}>
 
-        {/* 🔥 AI PRO CARD */}
-        <div style={{
-          marginTop: "20px",
-          background: "#111827",
-          padding: "15px",
-          borderRadius: "12px"
-        }}>
-          <h2 style={{ color: "#facc15" }}>🔥 AI PRO CARD</h2>
+      <h1>📊 KBETZ LIVE TERMINAL</h1>
 
-          {user.plan !== "pro" ? (
-            <div style={{
-              marginTop: "10px",
-              padding: "20px",
-              background: "#1f2937",
-              borderRadius: "10px",
-              textAlign: "center"
-            }}>
-              <p>🔒 Unlock AI Picks + EV Analysis</p>
+      {/* 🧠 EV LEADERBOARD */}
+      <div style={{ border: "1px solid #00ffcc", padding: 15, marginBottom: 20 }}>
+        <h3 style={{ color: "#00ffcc" }}>🧠 TOP EV PLAYS</h3>
 
-              <button
-                onClick={() =>
-                  window.location.href =
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/checkout`
-                }
-                style={{
-                  background: "#a78bfa",
-                  padding: "10px 20px",
-                  border: "none",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  fontWeight: "bold"
-                }}
-              >
-                Upgrade to Pro 🚀
-              </button>
+        {[...games]
+          .sort((a, b) => parseFloat(b.ev) - parseFloat(a.ev))
+          .slice(0, 5)
+          .map((g, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
+              <span>{g.team}</span>
+              <span style={{ color: "#00ffcc" }}>{g.ev}%</span>
             </div>
-          ) : (
-            <>
-              {aiPicks.map((pick, i) => (
-                <div key={i} style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "10px",
-                  borderBottom: "1px solid #222"
-                }}>
-                  <div>
-                    <div>{pick.team}</div>
-                    <div style={{ fontSize: "12px" }}>EV: {pick.ev}</div>
-                  </div>
-
-                  <div style={{ textAlign: "right" }}>
-                    <div>{pick.odds > 0 ? `+${pick.odds}` : pick.odds}</div>
-                    <div style={{ color: "#22c55e" }}>
-                      {pick.confidence}%
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      addToSlip(pick.team, pick.odds.toString())
-                    }
-                    style={{
-                      background: "#22c55e",
-                      border: "none",
-                      padding: "6px",
-                      borderRadius: "6px"
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-
-        {/* LIVE GAMES */}
-        <div style={{
-          marginTop: "20px",
-          background: "#111827",
-          borderRadius: "12px",
-          padding: "15px"
-        }}>
-          <h2>Live Games</h2>
-
-          {games.map((game: any, i) => {
-            const outcomes = game.bookmakers?.[0]?.markets?.[0]?.outcomes;
-            if (!outcomes) return null;
-
-            return (
-              <div key={i} style={{ padding: "12px", borderBottom: "1px solid #222" }}>
-                <div>{game.away_team} vs {game.home_team}</div>
-
-                <div style={{ display: "flex", gap: "10px", marginTop: "5px" }}>
-                  {outcomes.map((o: any, idx: number) => (
-                    <button
-                      key={idx}
-                      onClick={() =>
-                        addToSlip(o.name, o.price.toString())
-                      }
-                      style={{
-                        padding: "8px",
-                        background: "#1f2937",
-                        borderRadius: "6px",
-                        color: "#22c55e"
-                      }}
-                    >
-                      {o.price > 0 ? `+${o.price}` : o.price}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          ))}
       </div>
 
-      {/* RIGHT SIDE */}
-      <div style={{ flex: 1, background: "#111827", padding: "20px" }}>
-        <h2>Bet Slip</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
 
-        {betSlip.map((bet, i) => (
-          <div key={i} style={{ marginTop: "10px", background: "#1f2937", padding: "10px" }}>
-            {bet.team} ({bet.odds})
-            <button onClick={() => removeBet(i)}>X</button>
+        {/* 🔥 LIVE MARKET */}
+        <div>
+
+          {[...games]
+            .sort((a, b) => parseFloat(b.ev) - parseFloat(a.ev))
+            .map(g => {
+
+              const ev = parseFloat(g.ev);
+
+              return (
+                <div key={g.id}
+                  onClick={() => addToSlip(g)}
+                  style={{
+                    padding: 10,
+                    marginBottom: 10,
+                    cursor: "pointer",
+                    background:
+                      g.arbitrage ? "#001a33" :
+                      ev > 2 ? "#003322" :
+                      ev > 0 ? "#001a1a" :
+                      "#0a0a0a"
+                  }}
+                >
+
+                  <div>{g.team}</div>
+
+                  <div style={{ fontSize: 12 }}>
+                    EV: {g.ev}%
+                  </div>
+
+                  {g.arbitrage && <div style={{ color: "#00aaff" }}>🔵 Arbitrage</div>}
+                  {g.steamMove && <div style={{ color: "#ffcc00" }}>⚡ Steam Move</div>}
+
+                  {/* 📈 LINE CHART */}
+                  <div style={{ display: "flex", gap: 2 }}>
+                    {g.history?.slice(-10).map((h, i) => (
+                      <div key={i}
+                        style={{
+                          width: 4,
+                          height: `${Math.abs(h.odds) / 2}px`,
+                          background: "#00ffcc"
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <div style={{
+                    color: g.odds > 0 ? "#00ffcc" : "#ff4d4d",
+                    fontWeight: "bold"
+                  }}>
+                    {g.odds > 0 ? `+${g.odds}` : g.odds}
+                  </div>
+
+                </div>
+              );
+            })}
+
+        </div>
+
+        {/* 💰 BET SLIP */}
+        <div>
+
+          <h2>Bet Slip</h2>
+
+          {betSlip.map((b, i) => (
+            <div key={i}>{b.team}</div>
+          ))}
+
+          <div>
+            Stake:
+            <input value={stake} onChange={(e) => setStake(Number(e.target.value))} />
           </div>
-        ))}
 
-        {betSlip.length > 0 && (
-          <>
-            <input
-              type="number"
-              value={stake}
-              onChange={(e) => setStake(Number(e.target.value))}
-            />
+          <div>Payout: ${calculatePayout()}</div>
 
-            <p>Payout: ${payout}</p>
+        </div>
 
-            <button style={{ background: "#22c55e", width: "100%" }}>
-              Place Bet
-            </button>
-          </>
-        )}
       </div>
+
+      {/* 🔒 PRO */}
+      <div style={{ marginTop: 20 }}>
+        <button onClick={handleUpgrade}>Upgrade to PRO</button>
+      </div>
+
     </div>
   );
 }

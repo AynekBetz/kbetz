@@ -1,62 +1,36 @@
-/* RESET EVERYTHING */
-* {
-  margin: 0;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 🔥 KBETZ GLOBAL STYLING */
+
+html, body {
   padding: 0;
+  margin: 0;
+  background: #0a0a0a;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Smooth UI */
+* {
   box-sizing: border-box;
 }
 
-/* ROOT */
-html, body {
-  height: 100%;
-  width: 100%;
-  background: #0b0b0f;
-  color: white;
-  font-family: Arial, sans-serif;
-
-  /* 🔥 CRITICAL: ALLOW ALL CLICKS */
-  pointer-events: auto !important;
+/* Scrollbar styling (optional but clean) */
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-/* REMOVE ANY BLOCKING LAYERS */
-div, main, section {
-  pointer-events: auto;
+::-webkit-scrollbar-thumb {
+  background: #00ffcc;
+  border-radius: 10px;
 }
 
-/* LINKS */
-a {
-  color: #bb86fc;
-  text-decoration: none;
-}
-
-/* BUTTONS */
-button {
-  cursor: pointer;
-  border: none;
-  outline: none;
-}
-
-/* SIDEBAR STYLE (SAFE) */
-.sidebar {
-  width: 200px;
-  background: #111;
-  height: 100vh;
-  padding: 20px;
-}
-
-/* MAIN CONTENT */
-.main {
-  flex: 1;
-  padding: 20px;
-}
-
-/* FLEX LAYOUT */
-.container {
-  display: flex;
-}
-
-/* PREVENT INVISIBLE OVERLAYS */
-.overlay,
-.modal,
-.fullscreen {
-  pointer-events: none;
+/* Glow effect for cards */
+.kbetz-card {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #00ffcc;
+  border-radius: 12px;
+  padding: 16px;
 }

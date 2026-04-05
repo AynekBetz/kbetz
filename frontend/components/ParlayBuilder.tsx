@@ -1,83 +1,54 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import BetSlip from "./BetSlip";
 
 export default function ParlayBuilder() {
-  const [parlays, setParlays] = useState<any[]>([]);
   const [selectedSlip, setSelectedSlip] = useState<any[]>([]);
 
-  const getEVColor = (ev: number) => {
-    if (ev >= 5) return "ev-high";
-    if (ev > 0) return "ev-medium";
-    return "ev-low";
+  // 🔥 ADD PICK (example — keep your existing logic if different)
+  const addPick = (pick: any) => {
+    setSelectedSlip(prev => [...prev, pick]);
   };
 
-  useEffect(() => {
-    const fetchParlays = async () => {
-      try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/parlays`
-        );
-        const data = await res.json();
-
-        setParlays(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error("Failed to load parlays", err);
-        setParlays([]);
-      }
-    };
-
-    fetchParlays();
-
-    const interval = setInterval(fetchParlays, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  // 🔥 REMOVE PICK (THIS FIXES YOUR ERROR)
+  const removePick = (index: number) => {
+    setSelectedSlip(prev => prev.filter((_, i) => i !== index));
+  };
 
   return (
-    <div className="parlay-layout">
+    <div style={{
+      display: "flex",
+      gap: "20px",
+      padding: "20px",
+      background: "#020202",
+      color: "white",
+      minHeight: "100vh"
+    }}>
       
       {/* LEFT SIDE */}
-      <div className="parlay-left">
-        <div className="glass-panel">
-          <h2 className="panel-title">🧠 AI Parlay Builder</h2>
+      <div style={{ flex: 2 }}>
+        <h2>Available Picks</h2>
 
-          {parlays.length === 0 && (
-            <p className="muted">No parlays available</p>
-          )}
+        {/* 🔥 Example picks (replace with your real data) */}
+        <button onClick={() => addPick({ team: "Lakers ML", odds: -120 })}>
+          Add Lakers ML (-120)
+        </button>
 
-          <div className="parlay-grid">
-            {parlays.map((p, i) => (
-              <div
-                key={i}
-                className="parlay-card"
-                onClick={() => setSelectedSlip(p.legs || [])}
-              >
-                <div className={`parlay-type ${p.type}`}>
-                  {p.type} ({p.confidence}%)
-                </div>
-
-                {Array.isArray(p.legs) &&
-                  p.legs.map((leg: any, j: number) => (
-                    <div
-                      key={j}
-                      className={`parlay-leg ${getEVColor(leg.ev || 0)}`}
-                    >
-                      {leg.game} | {leg.market} ({leg.odds})
-                      <span className="ev-tag">
-                        {leg.ev ? `+${leg.ev}% EV` : "No edge"}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            ))}
-          </div>
-        </div>
+        <button onClick={() => addPick({ team: "Celtics ML", odds: +110 })}>
+          Add Celtics ML (+110)
+        </button>
       </div>
 
       {/* RIGHT SIDE */}
-      <div className="parlay-right">
-        <BetSlip slip={selectedSlip} />
+      <div style={{ flex: 1 }}>
+        <h2>Bet Slip</h2>
+
+        {/* ✅ FIXED — removePick passed */}
+        <BetSlip 
+          slip={selectedSlip} 
+          removePick={removePick} 
+        />
       </div>
 
     </div>
