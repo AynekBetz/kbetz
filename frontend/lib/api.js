@@ -1,34 +1,57 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+// 🔥 WAKE BACKEND FIRST
+async function wakeBackend() {
+  try {
+    console.log("🔁 Waking backend...");
+
+    await fetch(`${API_URL}/api/health`);
+
+    console.log("✅ Backend awake");
+  } catch (err) {
+    console.log("⚠️ Wake failed (will retry anyway)");
+  }
+}
+
 // 🔥 GET ODDS
 export async function getOdds() {
   try {
-    console.log("🔥 Fetching odds from:", `${API_URL}/api/odds`);
+    await wakeBackend();
 
     const res = await fetch(`${API_URL}/api/odds`);
-    const data = await res.json();
-
-    return data;
+    return await res.json();
   } catch (err) {
     console.log("❌ Odds error:", err.message);
     return [];
   }
 }
 
-// 🔥 STRIPE CHECKOUT (FINAL FIX)
+// 🔥 STRIPE CHECKOUT (RETRY SYSTEM)
 export async function createCheckout() {
   try {
-    console.log("🔥 Sending POST...");
+    await wakeBackend();
 
-    const res = await fetch(`${API_URL}/api/stripe/checkout`, {
+    console.log("🔥 Sending checkout request...");
+
+    let res = await fetch(`${API_URL}/api/stripe/checkout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       }
     });
 
+    // 🔥 RETRY IF FIRST FAILS
     if (!res.ok) {
-      throw new Error("Server response not OK");
+      console.log("⚠️ First attempt failed, retrying...");
+      
+      await new Promise(r => setTimeout(r, 2000));
+
+      res = await fetch(`${API_URL}/api/stripe/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
     }
 
     const data = await res.json();
@@ -38,11 +61,11 @@ export async function createCheckout() {
     if (data.url) {
       window.location.href = data.url;
     } else {
-      alert("Stripe failed: no URL returned");
+      alert("Stripe failed: no URL");
     }
 
   } catch (err) {
-    console.log("❌ FULL ERROR:", err);
-    alert("Backend connection failed — server may be waking up");
+    console.log("❌ FINAL ERROR:", err);
+    alert("Backend connection failed");
   }
 }
