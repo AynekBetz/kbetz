@@ -8,10 +8,23 @@ const router = express.Router();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// 🔥 CHECKOUT ROUTE
+// 🔥 TEST ROUTE
+router.get("/test", (req, res) => {
+  res.json({ status: "Stripe route working" });
+});
+
+// 🔥 CHECKOUT
 router.post("/checkout", async (req, res) => {
   try {
     console.log("🔥 Creating Stripe session...");
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(500).json({ error: "Missing Stripe key" });
+    }
+
+    if (!process.env.STRIPE_PRICE_ID) {
+      return res.status(500).json({ error: "Missing price ID" });
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -26,7 +39,7 @@ router.post("/checkout", async (req, res) => {
       cancel_url: "https://kbetz-frontend.vercel.app/dashboard"
     });
 
-    console.log("✅ Stripe session created");
+    console.log("✅ Stripe session created:", session.id);
 
     res.json({ url: session.url });
 
