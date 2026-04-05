@@ -8,9 +8,11 @@ const router = express.Router();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// 🔥 CREATE CHECKOUT SESSION
+// 🔥 CHECKOUT ROUTE
 router.post("/checkout", async (req, res) => {
   try {
+    console.log("🔥 Creating Stripe session...");
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
@@ -20,9 +22,11 @@ router.post("/checkout", async (req, res) => {
           quantity: 1
         }
       ],
-      success_url: "https://kbetz-frontend.vercel.app/dashboard",
+      success_url: "https://kbetz-frontend.vercel.app/dashboard?success=true",
       cancel_url: "https://kbetz-frontend.vercel.app/dashboard"
     });
+
+    console.log("✅ Stripe session created");
 
     res.json({ url: session.url });
 

@@ -10,11 +10,32 @@ const API_KEY = process.env.ODDS_API_KEY;
 
 router.get("/", async (req, res) => {
   try {
+    console.log("📡 Fetching odds...");
+
     const response = await fetch(
       `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=h2h&oddsFormat=american`
     );
 
     const data = await response.json();
+
+    // 🔥 DEBUG LOG
+    console.log("API RESPONSE:", data);
+
+    // ❌ HANDLE BAD RESPONSE
+    if (!Array.isArray(data)) {
+      console.log("⚠️ API did not return array");
+
+      return res.json([
+        {
+          id: 1,
+          team: "Demo Game",
+          home: "Lakers",
+          away: "Warriors",
+          bestHome: { odds: -120, book: "DemoBook" },
+          bestAway: { odds: +110, book: "DemoBook" }
+        }
+      ]);
+    }
 
     const formatted = data.map((game, i) => {
       const home = game.home_team;
@@ -54,7 +75,18 @@ router.get("/", async (req, res) => {
 
   } catch (err) {
     console.log("❌ Odds error:", err.message);
-    res.json([]);
+
+    // 🔥 SAFE FALLBACK
+    res.json([
+      {
+        id: 1,
+        team: "Fallback Game",
+        home: "Heat",
+        away: "Celtics",
+        bestHome: { odds: -115, book: "Fallback" },
+        bestAway: { odds: +105, book: "Fallback" }
+      }
+    ]);
   }
 });
 
