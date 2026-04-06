@@ -1,22 +1,34 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-// 🔥 REQUIRED (THIS FIXES BUILD ERROR)
+// ✅ GET ODDS
 export async function getOdds() {
   try {
     const res = await fetch(`${API_URL}/api/odds`);
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.log("❌ Odds error:", err.message);
+    return await res.json();
+  } catch {
     return [];
   }
 }
 
-// 🔥 STRIPE (GET VERSION — NO CORS ISSUES)
-export function createCheckout() {
-  const url = `${API_URL}/api/stripe/checkout`;
+// ✅ STRIPE (WORKING VERSION)
+export async function createCheckout() {
+  try {
+    const res = await fetch(`${API_URL}/api/stripe/checkout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
 
-  console.log("🔥 Redirecting to:", url);
+    const data = await res.json();
 
-  window.location.href = url;
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert("Checkout failed");
+    }
+
+  } catch (err) {
+    alert("Backend connection failed");
+  }
 }
