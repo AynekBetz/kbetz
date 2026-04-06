@@ -1,26 +1,14 @@
-// 🔐 SIMPLE PRO USER STORAGE
+export function isProUser() {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("kbetz_pro") === "true";
+}
 
 export function setProUser() {
-  try {
-    localStorage.setItem("kbetz_pro", "true");
-  } catch (err) {
-    console.log("Error setting PRO user:", err);
-  }
+  if (typeof window === "undefined") return;
+  localStorage.setItem("kbetz_pro", "true");
 }
 
-export function isProUser() {
-  try {
-    return localStorage.getItem("kbetz_pro") === "true";
-  } catch (err) {
-    console.log("Error reading PRO user:", err);
-    return false;
-  }
-}
-
-export function clearProUser() {
-  try {
-    localStorage.removeItem("kbetz_pro");
-  } catch (err) {
-    console.log("Error clearing PRO user:", err);
-  }
+export function logoutUser() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("kbetz_pro");
 }

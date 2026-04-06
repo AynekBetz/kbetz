@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { isProUser, setProUser } from "../../lib/auth";
+import LockedFeature from "../../components/LockedFeature";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
@@ -16,21 +17,24 @@ export default function Dashboard() {
 
     setIsPro(isProUser());
 
-    // TEMP DATA (so UI always shows something)
     setGames([
       {
         team: "Lakers vs Warriors",
         home: "Warriors",
         away: "Lakers",
         bestHome: { odds: -120, book: "DraftKings" },
-        bestAway: { odds: +110, book: "FanDuel" }
+        bestAway: { odds: +110, book: "FanDuel" },
+        edge: "+4.2%",
+        arb: "2.1%"
       },
       {
         team: "Celtics vs Heat",
         home: "Heat",
         away: "Celtics",
         bestHome: { odds: -115, book: "BetMGM" },
-        bestAway: { odds: +105, book: "Caesars" }
+        bestAway: { odds: +105, book: "Caesars" },
+        edge: "+3.5%",
+        arb: "1.8%"
       }
     ]);
   }, []);
@@ -41,11 +45,10 @@ export default function Dashboard() {
         🔥 KBETZ LIVE TERMINAL
       </h1>
 
-      {/* 🔥 STRIPE BUTTON (FINAL FIX) */}
+      {/* 🔥 YOUR BUTTON (UNCHANGED) */}
       {!isPro && (
         <button
           onClick={() => {
-            console.log("Redirecting to Stripe...");
             window.location.href = "/api/checkout";
           }}
           style={{
@@ -76,8 +79,9 @@ export default function Dashboard() {
             borderRadius: "10px",
             padding: "15px"
           }}>
-            <h3 style={{ marginBottom: "8px" }}>{g.team}</h3>
+            <h3>{g.team}</h3>
 
+            {/* FREE DATA */}
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>{g.away}</span>
               <span style={{ color: "#00ffc3" }}>
@@ -92,9 +96,18 @@ export default function Dashboard() {
               </span>
             </div>
 
-            {isPro && (
-              <div style={{ marginTop: "8px", color: "#00ffc3", fontSize: "14px" }}>
-                ⭐ AI Edge: +4.2%
+            {/* 🔒 LOCKED FEATURES */}
+            {!isPro ? (
+              <LockedFeature>
+                <div style={{ marginTop: "10px" }}>
+                  ⭐ EV Edge: {g.edge} <br />
+                  💰 Arbitrage: {g.arb}
+                </div>
+              </LockedFeature>
+            ) : (
+              <div style={{ marginTop: "10px", color: "#00ffc3" }}>
+                ⭐ EV Edge: {g.edge} <br />
+                💰 Arbitrage: {g.arb}
               </div>
             )}
           </div>

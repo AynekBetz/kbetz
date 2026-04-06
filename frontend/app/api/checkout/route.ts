@@ -19,19 +19,11 @@ async function createSession() {
 }
 
 export async function GET() {
-  try {
-    const session = await createSession();
-    return NextResponse.redirect(session.url!);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
+  const session = await createSession();
+  return NextResponse.redirect(session.url!);
 }
 
 export async function POST() {
-  try {
-    const session = await createSession();
-    return NextResponse.json({ url: session.url });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
+  const session = await createSession();
+  return NextResponse.json({ url: session.url });
 }
