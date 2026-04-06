@@ -40,63 +40,45 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div style={{ background: "#000", color: "#fff", minHeight: "100vh", padding: "20px" }}>
-      <h1 style={{ fontSize: "28px", marginBottom: "15px" }}>
-        🔥 KBETZ LIVE TERMINAL
-      </h1>
+    <div style={{ padding: "20px" }}>
+      <h1 className="title">🔥 KBETZ LIVE TERMINAL</h1>
 
-      {/* 🔥 YOUR BUTTON (UNCHANGED) */}
       {!isPro && (
         <button
           onClick={() => {
             window.location.href = "/api/checkout";
           }}
-          style={{
-            background: "#00ffc3",
-            color: "#000",
-            padding: "12px 18px",
-            borderRadius: "8px",
-            fontWeight: "bold",
-            marginBottom: "20px",
-            cursor: "pointer"
-          }}
+          className="pro-btn"
         >
           Upgrade to PRO
         </button>
       )}
 
       {isPro && (
-        <div style={{ color: "#00ffc3", marginBottom: "20px", fontWeight: "bold" }}>
+        <div className="highlight" style={{ marginBottom: "20px" }}>
           ✅ PRO ACTIVE
         </div>
       )}
 
-      <div style={{ display: "grid", gap: "12px" }}>
+      <div style={{ display: "grid", gap: "15px", marginTop: "20px" }}>
         {games.map((g, i) => (
-          <div key={i} style={{
-            background: "#0a0a0a",
-            border: "1px solid #00ffc3",
-            borderRadius: "10px",
-            padding: "15px"
-          }}>
-            <h3>{g.team}</h3>
+          <div key={i} className="card">
+            <h3 style={{ marginBottom: "10px" }}>{g.team}</h3>
 
-            {/* FREE DATA */}
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>{g.away}</span>
-              <span style={{ color: "#00ffc3" }}>
+              <span className="highlight">
                 {g.bestAway.odds} ({g.bestAway.book})
               </span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>{g.home}</span>
-              <span style={{ color: "#00ffc3" }}>
+              <span className="highlight">
                 {g.bestHome.odds} ({g.bestHome.book})
               </span>
             </div>
 
-            {/* 🔒 LOCKED FEATURES */}
             {!isPro ? (
               <LockedFeature>
                 <div style={{ marginTop: "10px" }}>
@@ -105,7 +87,7 @@ export default function Dashboard() {
                 </div>
               </LockedFeature>
             ) : (
-              <div style={{ marginTop: "10px", color: "#00ffc3" }}>
+              <div className="highlight" style={{ marginTop: "10px" }}>
                 ⭐ EV Edge: {g.edge} <br />
                 💰 Arbitrage: {g.arb}
               </div>
