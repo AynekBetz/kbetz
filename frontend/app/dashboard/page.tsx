@@ -43,15 +43,23 @@ export default function Dashboard() {
     <div style={{ padding: "20px" }}>
       <h1 className="title">🔥 KBETZ LIVE TERMINAL</h1>
 
+      {/* 🔒 BUTTON (UNCHANGED — DO NOT TOUCH) */}
       {!isPro && (
-        <button
-          onClick={() => {
-            window.location.href = "/api/checkout";
-          }}
-          className="pro-btn"
-        >
-          Upgrade to PRO
-        </button>
+        <>
+          <button
+            onClick={() => {
+              window.location.href = "/api/checkout";
+            }}
+            className="pro-btn"
+          >
+            Upgrade to PRO
+          </button>
+
+          {/* 🔥 PHASE 3 (Urgency — safe to include) */}
+          <div style={{ color: "#888", marginTop: "8px", fontSize: "13px" }}>
+            Limited-time pricing — lock in $19.99/month
+          </div>
+        </>
       )}
 
       {isPro && (
@@ -65,6 +73,7 @@ export default function Dashboard() {
           <div key={i} className="card">
             <h3 style={{ marginBottom: "10px" }}>{g.team}</h3>
 
+            {/* FREE DATA */}
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span>{g.away}</span>
               <span className="highlight">
@@ -79,11 +88,12 @@ export default function Dashboard() {
               </span>
             </div>
 
+            {/* 🔥 STEP 2 — VALUE TEASERS */}
             {!isPro ? (
               <LockedFeature>
                 <div style={{ marginTop: "10px" }}>
-                  ⭐ EV Edge: {g.edge} <br />
-                  💰 Arbitrage: {g.arb}
+                  ⭐ EV Edge: +4%+ <br />
+                  💰 Arbitrage: 1%+
                 </div>
               </LockedFeature>
             ) : (

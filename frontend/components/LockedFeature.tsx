@@ -3,30 +3,35 @@
 export default function LockedFeature({ children }: any) {
   return (
     <div style={{ position: "relative" }}>
-      {/* Blurred content */}
-      <div style={{ filter: "blur(6px)", opacity: 0.5 }}>
+      <div style={{ filter: "blur(6px)", opacity: 0.4 }}>
         {children}
       </div>
 
-      {/* Overlay */}
       <div
         style={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          inset: 0,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "rgba(0,0,0,0.6)",
+          background: "rgba(0,0,0,0.75)",
           color: "#00ffc3",
-          fontWeight: "bold",
-          fontSize: "16px",
-          borderRadius: "8px"
+          textAlign: "center",
+          padding: "10px"
         }}
       >
-        🔒 Upgrade to PRO
+        <div style={{ fontWeight: "bold", fontSize: "18px" }}>
+          🔒 PRO FEATURE
+        </div>
+
+        <div style={{ fontSize: "13px", marginTop: "6px" }}>
+          +EV bets, arbitrage edges, and AI signals hidden
+        </div>
+
+        <div style={{ marginTop: "10px", fontWeight: "bold" }}>
+          Unlock winning data now
+        </div>
       </div>
     </div>
   );

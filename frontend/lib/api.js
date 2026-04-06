@@ -1,3 +1,5 @@
+// ONLY ODDS — NO STRIPE ANYWHERE
+
 export async function getOdds() {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/odds`);
