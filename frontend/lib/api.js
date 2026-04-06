@@ -1,34 +1,35 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// ✅ NO MORE BACKEND CALLS FOR CHECKOUT
 
-// ✅ GET ODDS
 export async function getOdds() {
   try {
-    const res = await fetch(`${API_URL}/api/odds`);
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/odds`);
     return await res.json();
   } catch {
     return [];
   }
 }
 
-// ✅ STRIPE (WORKING VERSION)
+// 🔥 STRIPE (LOCAL API ROUTE ONLY)
 export async function createCheckout() {
   try {
-    const res = await fetch(`${API_URL}/api/stripe/checkout`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      }
+    console.log("🔥 Calling LOCAL /api/checkout");
+
+    const res = await fetch("/api/checkout", {
+      method: "POST"
     });
 
     const data = await res.json();
 
+    console.log("Stripe response:", data);
+
     if (data.url) {
       window.location.href = data.url;
     } else {
-      alert("Checkout failed");
+      alert("Checkout failed: " + JSON.stringify(data));
     }
 
   } catch (err) {
-    alert("Backend connection failed");
+    console.log("ERROR:", err);
+    alert("Checkout error");
   }
 }
