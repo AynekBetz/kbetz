@@ -16,7 +16,7 @@ export default function Dashboard() {
 
     setIsPro(isProUser());
 
-    // 🔥 TEMP DATA (so UI always shows something)
+    // TEMP DATA (so UI always shows something)
     setGames([
       {
         team: "Lakers vs Warriors",
@@ -36,23 +36,16 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div
-      style={{
-        background: "#000",
-        color: "#fff",
-        minHeight: "100vh",
-        padding: "20px"
-      }}
-    >
+    <div style={{ background: "#000", color: "#fff", minHeight: "100vh", padding: "20px" }}>
       <h1 style={{ fontSize: "28px", marginBottom: "15px" }}>
         🔥 KBETZ LIVE TERMINAL
       </h1>
 
-      {/* 🔥 FIXED STRIPE BUTTON */}
+      {/* 🔥 STRIPE BUTTON (FINAL FIX) */}
       {!isPro && (
         <button
           onClick={() => {
-            console.log("🔥 Redirecting to Stripe checkout...");
+            console.log("Redirecting to Stripe...");
             window.location.href = "/api/checkout";
           }}
           style={{
@@ -70,29 +63,19 @@ export default function Dashboard() {
       )}
 
       {isPro && (
-        <div
-          style={{
-            color: "#00ffc3",
-            marginBottom: "20px",
-            fontWeight: "bold"
-          }}
-        >
+        <div style={{ color: "#00ffc3", marginBottom: "20px", fontWeight: "bold" }}>
           ✅ PRO ACTIVE
         </div>
       )}
 
-      {/* 🔥 GAMES DISPLAY */}
       <div style={{ display: "grid", gap: "12px" }}>
         {games.map((g, i) => (
-          <div
-            key={i}
-            style={{
-              background: "#0a0a0a",
-              border: "1px solid #00ffc3",
-              borderRadius: "10px",
-              padding: "15px"
-            }}
-          >
+          <div key={i} style={{
+            background: "#0a0a0a",
+            border: "1px solid #00ffc3",
+            borderRadius: "10px",
+            padding: "15px"
+          }}>
             <h3 style={{ marginBottom: "8px" }}>{g.team}</h3>
 
             <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -110,13 +93,7 @@ export default function Dashboard() {
             </div>
 
             {isPro && (
-              <div
-                style={{
-                  marginTop: "8px",
-                  color: "#00ffc3",
-                  fontSize: "14px"
-                }}
-              >
+              <div style={{ marginTop: "8px", color: "#00ffc3", fontSize: "14px" }}>
                 ⭐ AI Edge: +4.2%
               </div>
             )}

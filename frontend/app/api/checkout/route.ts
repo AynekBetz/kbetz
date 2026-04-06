@@ -3,7 +3,6 @@ import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// 🔥 HANDLE BOTH GET + POST
 async function createSession() {
   return await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
@@ -19,7 +18,6 @@ async function createSession() {
   });
 }
 
-// ✅ GET (browser direct)
 export async function GET() {
   try {
     const session = await createSession();
@@ -29,7 +27,6 @@ export async function GET() {
   }
 }
 
-// ✅ POST (fetch)
 export async function POST() {
   try {
     const session = await createSession();
