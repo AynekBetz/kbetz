@@ -6,6 +6,7 @@ import LockedFeature from "../../components/LockedFeature";
 import BetSlip from "../../components/BetSlip";
 import { calculateEV, checkArbitrage } from "../../utils/calculations";
 import { fetchOdds } from "../../utils/oddsFetcher";
+import { buildAIParlay } from "../../utils/aiParlay";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
@@ -82,10 +83,17 @@ export default function Dashboard() {
     setSlip((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // 🤖 AI PARLAY BUILDER
+  function generateAIParlay() {
+    const picks = buildAIParlay(games);
+    setSlip(picks);
+  }
+
   return (
     <div style={{ padding: "20px", marginRight: "320px" }}>
       <h1 className="title">🔥 KBETZ LIVE TERMINAL</h1>
 
+      {/* 🔒 STRIPE BUTTON (UNCHANGED) */}
       {!isPro && (
         <>
           <button
@@ -102,6 +110,22 @@ export default function Dashboard() {
           </div>
         </>
       )}
+
+      {/* 🤖 AI BUTTON */}
+      <button
+        onClick={generateAIParlay}
+        style={{
+          marginTop: "10px",
+          background: "#ffcc00",
+          color: "#000",
+          padding: "10px",
+          borderRadius: "8px",
+          fontWeight: "bold",
+          cursor: "pointer"
+        }}
+      >
+        🤖 Generate AI Parlay
+      </button>
 
       {isPro && (
         <div className="highlight" style={{ marginBottom: "20px" }}>
@@ -127,11 +151,7 @@ export default function Dashboard() {
                     book: g.bestAway.book
                   })
                 }
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  cursor: "pointer"
-                }}
+                style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}
               >
                 <span>{g.away}</span>
                 <span className="highlight">
@@ -148,11 +168,7 @@ export default function Dashboard() {
                     book: g.bestHome.book
                   })
                 }
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  cursor: "pointer"
-                }}
+                style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}
               >
                 <span>{g.home}</span>
                 <span className="highlight">
@@ -178,7 +194,7 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* 🔥 BET SLIP */}
+      {/* 🧾 BET SLIP */}
       <BetSlip slip={slip} removePick={removePick} />
     </div>
   );
