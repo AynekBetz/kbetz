@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [isPro, setIsPro] = useState(false);
   const [slip, setSlip] = useState<any[]>([]);
+  const [aiPreview, setAiPreview] = useState<any[]>([]);
 
   const prevGamesRef = useRef<any[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -55,13 +56,11 @@ export default function Dashboard() {
         return { ...game, movement };
       });
 
-      const hasMovement = updated.some((g) => g.movement);
-      if (hasMovement && audioRef.current) {
-        audioRef.current.play().catch(() => {});
-      }
-
       prevGamesRef.current = updated;
       setGames(updated);
+
+      // 🔥 Build preview always (even if not PRO)
+      setAiPreview(buildAIParlay(updated));
     }
 
     loadOdds();
@@ -73,17 +72,14 @@ export default function Dashboard() {
     };
   }, []);
 
-  // 🔥 ADD PICK
   function addPick(pick: any) {
     setSlip((prev) => [...prev, pick]);
   }
 
-  // 🔥 REMOVE PICK
   function removePick(index: number) {
     setSlip((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // 🤖 AI PARLAY BUILDER
   function generateAIParlay() {
     const picks = buildAIParlay(games);
     setSlip(picks);
@@ -93,7 +89,7 @@ export default function Dashboard() {
     <div style={{ padding: "20px", marginRight: "320px" }}>
       <h1 className="title">🔥 KBETZ LIVE TERMINAL</h1>
 
-      {/* 🔒 STRIPE BUTTON (UNCHANGED) */}
+      {/* 🔒 STRIPE BUTTON */}
       {!isPro && (
         <>
           <button
@@ -111,29 +107,53 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* 🤖 AI BUTTON */}
-      <button
-        onClick={generateAIParlay}
-        style={{
-          marginTop: "10px",
-          background: "#ffcc00",
-          color: "#000",
-          padding: "10px",
-          borderRadius: "8px",
-          fontWeight: "bold",
-          cursor: "pointer"
-        }}
-      >
-        🤖 Generate AI Parlay
-      </button>
+      {/* 🤖 AI SECTION */}
+      <div style={{ marginTop: "20px", marginBottom: "20px" }}>
+        <h2 style={{ marginBottom: "10px" }}>🤖 AI Parlay Builder</h2>
 
-      {isPro && (
-        <div className="highlight" style={{ marginBottom: "20px" }}>
-          ✅ PRO ACTIVE
-        </div>
-      )}
+        {!isPro ? (
+          <LockedFeature>
+            <div>
+              {aiPreview.map((p, i) => (
+                <div key={i}>
+                  {p.team} ({p.odds})
+                </div>
+              ))}
+              <div style={{ marginTop: "10px", fontWeight: "bold" }}>
+                🔒 Unlock to add this parlay
+              </div>
+            </div>
+          </LockedFeature>
+        ) : (
+          <>
+            <div>
+              {aiPreview.map((p, i) => (
+                <div key={i}>
+                  {p.team} ({p.odds})
+                </div>
+              ))}
+            </div>
 
-      <div style={{ display: "grid", gap: "15px", marginTop: "20px" }}>
+            <button
+              onClick={generateAIParlay}
+              style={{
+                marginTop: "10px",
+                background: "#ffcc00",
+                color: "#000",
+                padding: "10px",
+                borderRadius: "8px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              Add AI Parlay to Bet Slip
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* 🔥 GAMES */}
+      <div style={{ display: "grid", gap: "15px" }}>
         {games.map((g, i) => {
           const ev = calculateEV(g.bestAway.odds);
           const arb = checkArbitrage(g.bestHome.odds, g.bestAway.odds);
@@ -142,7 +162,6 @@ export default function Dashboard() {
             <div key={i} className="card">
               <h3>{g.team}</h3>
 
-              {/* CLICKABLE AWAY */}
               <div
                 onClick={() =>
                   addPick({
@@ -159,7 +178,6 @@ export default function Dashboard() {
                 </span>
               </div>
 
-              {/* CLICKABLE HOME */}
               <div
                 onClick={() =>
                   addPick({
@@ -194,7 +212,6 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* 🧾 BET SLIP */}
       <BetSlip slip={slip} removePick={removePick} />
     </div>
   );
