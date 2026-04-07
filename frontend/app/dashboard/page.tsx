@@ -3,12 +3,14 @@
 import { useEffect, useState, useRef } from "react";
 import { isProUser, setProUser } from "../../lib/auth";
 import LockedFeature from "../../components/LockedFeature";
+import BetSlip from "../../components/BetSlip";
 import { calculateEV, checkArbitrage } from "../../utils/calculations";
 import { fetchOdds } from "../../utils/oddsFetcher";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [isPro, setIsPro] = useState(false);
+  const [slip, setSlip] = useState<any[]>([]);
 
   const prevGamesRef = useRef<any[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -26,13 +28,10 @@ export default function Dashboard() {
 
     const unlockAudio = () => {
       if (audioRef.current) {
-        audioRef.current
-          .play()
-          .then(() => {
-            audioRef.current?.pause();
-            audioRef.current!.currentTime = 0;
-          })
-          .catch(() => {});
+        audioRef.current.play().then(() => {
+          audioRef.current?.pause();
+          audioRef.current!.currentTime = 0;
+        }).catch(() => {});
       }
       window.removeEventListener("click", unlockAudio);
     };
@@ -45,7 +44,6 @@ export default function Dashboard() {
 
       const updated = data.map((game, index) => {
         const prev = prevGamesRef.current[index];
-
         let movement = null;
 
         if (prev) {
@@ -74,11 +72,20 @@ export default function Dashboard() {
     };
   }, []);
 
+  // 🔥 ADD PICK
+  function addPick(pick: any) {
+    setSlip((prev) => [...prev, pick]);
+  }
+
+  // 🔥 REMOVE PICK
+  function removePick(index: number) {
+    setSlip((prev) => prev.filter((_, i) => i !== index));
+  }
+
   return (
-    <div style={{ padding: "20px" }}>
+    <div style={{ padding: "20px", marginRight: "320px" }}>
       <h1 className="title">🔥 KBETZ LIVE TERMINAL</h1>
 
-      {/* 🔒 BUTTON (UNCHANGED) */}
       {!isPro && (
         <>
           <button
@@ -107,57 +114,52 @@ export default function Dashboard() {
           const ev = calculateEV(g.bestAway.odds);
           const arb = checkArbitrage(g.bestHome.odds, g.bestAway.odds);
 
-          const isArb = arb !== null;
-
           return (
-            <div
-              key={i}
-              className="card"
-              style={{
-                border: isArb ? "1px solid #00bfff" : undefined,
-                boxShadow: isArb
-                  ? "0 0 15px rgba(0,191,255,0.6)"
-                  : undefined
-              }}
-            >
+            <div key={i} className="card">
               <h3>{g.team}</h3>
 
-              {/* AWAY */}
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              {/* CLICKABLE AWAY */}
+              <div
+                onClick={() =>
+                  addPick({
+                    team: g.away,
+                    odds: g.bestAway.odds,
+                    book: g.bestAway.book
+                  })
+                }
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  cursor: "pointer"
+                }}
+              >
                 <span>{g.away}</span>
-                <span
-                  style={{
-                    color:
-                      g.movement === "up"
-                        ? "#00ff00"
-                        : g.movement === "down"
-                        ? "#ff4d4d"
-                        : "#00ffc3",
-                    fontWeight: "bold"
-                  }}
-                >
+                <span className="highlight">
                   {g.bestAway.odds} ({g.bestAway.book})
-                  {g.movement === "up" && " ↑"}
-                  {g.movement === "down" && " ↓"}
                 </span>
               </div>
 
-              {/* HOME */}
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              {/* CLICKABLE HOME */}
+              <div
+                onClick={() =>
+                  addPick({
+                    team: g.home,
+                    odds: g.bestHome.odds,
+                    book: g.bestHome.book
+                  })
+                }
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  cursor: "pointer"
+                }}
+              >
                 <span>{g.home}</span>
-                <span style={{ color: "#00ffc3", fontWeight: "bold" }}>
+                <span className="highlight">
                   {g.bestHome.odds} ({g.bestHome.book})
                 </span>
               </div>
 
-              {/* 🔵 ARBITRAGE TAG */}
-              {isArb && (
-                <div style={{ color: "#00bfff", marginTop: "6px" }}>
-                  💰 Arbitrage Opportunity
-                </div>
-              )}
-
-              {/* VALUE */}
               {!isPro ? (
                 <LockedFeature>
                   <div style={{ marginTop: "10px" }}>
@@ -166,7 +168,7 @@ export default function Dashboard() {
                   </div>
                 </LockedFeature>
               ) : (
-                <div style={{ marginTop: "10px", color: "#00ffc3" }}>
+                <div className="highlight" style={{ marginTop: "10px" }}>
                   ⭐ EV Edge: {ev}% <br />
                   💰 Arbitrage: {arb ? arb + "%" : "None"}
                 </div>
@@ -175,6 +177,9 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {/* 🔥 BET SLIP */}
+      <BetSlip slip={slip} removePick={removePick} />
     </div>
   );
 }

@@ -1,72 +1,55 @@
 "use client";
 
-function americanToDecimal(odds: number) {
-  if (odds > 0) return 1 + odds / 100;
-  return 1 + 100 / Math.abs(odds);
-}
-
-function calculateParlayOdds(slip: any[]) {
-  if (!slip || slip.length === 0) return 0;
-
-  let total = 1;
-
-  slip.forEach((leg) => {
-    total *= americanToDecimal(leg.odds);
-  });
-
-  return total;
-}
-
-export default function BetSlip({
-  slip,
-  removePick,
-}: {
-  slip: any[];
-  removePick: (index: number) => void;
-}) {
-  const totalOdds = calculateParlayOdds(slip);
-  const stake = 100;
-
-  const payout =
-    totalOdds > 0 ? (stake * totalOdds).toFixed(2) : "0.00";
-
+export default function BetSlip({ slip, removePick }: any) {
   return (
-    <div className="betslip">
-      <h2 className="betslip-title">Bet Slip</h2>
+    <div
+      style={{
+        width: "300px",
+        background: "#0a0a0a",
+        borderLeft: "1px solid #00ffc3",
+        padding: "15px",
+        position: "fixed",
+        right: 0,
+        top: 0,
+        height: "100vh"
+      }}
+    >
+      <h2 style={{ marginBottom: "10px" }}>🧾 Bet Slip</h2>
 
-      {!slip || slip.length === 0 ? (
-        <p className="muted">Click odds to add bets</p>
-      ) : (
-        <>
-          {slip.map((leg, i) => (
-            <div key={i} className="betslip-leg">
-              <div>{leg.game}</div>
-              <div>{leg.market}</div>
-              <div>{leg.odds}</div>
+      {slip.length === 0 && (
+        <div style={{ color: "#888" }}>No bets selected</div>
+      )}
 
-              <button
-                className="remove-btn"
-                onClick={() => removePick(i)}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-
-          {/* 🔥 PARLAY INFO */}
-          <div className="parlay-summary">
-            <div>Total Odds: {totalOdds.toFixed(2)}x</div>
-            <div>Stake: ${stake}</div>
-            <div className="payout">
-              Payout: ${payout}
-            </div>
+      {slip.map((pick: any, i: number) => (
+        <div
+          key={i}
+          style={{
+            border: "1px solid #00ffc3",
+            padding: "10px",
+            marginBottom: "10px",
+            borderRadius: "8px"
+          }}
+        >
+          <div>{pick.team}</div>
+          <div style={{ color: "#00ffc3" }}>
+            {pick.odds} ({pick.book})
           </div>
 
-          <button className="bet-button">
-            Place Bet
+          <button
+            onClick={() => removePick(i)}
+            style={{
+              marginTop: "5px",
+              background: "#ff4d4d",
+              border: "none",
+              padding: "5px",
+              borderRadius: "5px",
+              cursor: "pointer"
+            }}
+          >
+            Remove
           </button>
-        </>
-      )}
+        </div>
+      ))}
     </div>
   );
 }
