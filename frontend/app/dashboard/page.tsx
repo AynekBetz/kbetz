@@ -22,10 +22,8 @@ export default function Dashboard() {
 
     setIsPro(isProUser());
 
-    // 🔊 Setup audio
     audioRef.current = new Audio("/alert.mp3");
 
-    // 🔥 Unlock audio on first click (FIX)
     const unlockAudio = () => {
       if (audioRef.current) {
         audioRef.current
@@ -36,7 +34,6 @@ export default function Dashboard() {
           })
           .catch(() => {});
       }
-
       window.removeEventListener("click", unlockAudio);
     };
 
@@ -44,7 +41,6 @@ export default function Dashboard() {
 
     async function loadOdds() {
       const data = await fetchOdds();
-
       if (!Array.isArray(data)) return;
 
       const updated = data.map((game, index) => {
@@ -53,19 +49,14 @@ export default function Dashboard() {
         let movement = null;
 
         if (prev) {
-          if (game.bestAway.odds > prev.bestAway.odds) {
-            movement = "up";
-          } else if (game.bestAway.odds < prev.bestAway.odds) {
-            movement = "down";
-          }
+          if (game.bestAway.odds > prev.bestAway.odds) movement = "up";
+          else if (game.bestAway.odds < prev.bestAway.odds) movement = "down";
         }
 
         return { ...game, movement };
       });
 
-      // 🔊 Play sound if movement detected
       const hasMovement = updated.some((g) => g.movement);
-
       if (hasMovement && audioRef.current) {
         audioRef.current.play().catch(() => {});
       }
@@ -116,22 +107,33 @@ export default function Dashboard() {
           const ev = calculateEV(g.bestAway.odds);
           const arb = checkArbitrage(g.bestHome.odds, g.bestAway.odds);
 
+          const isArb = arb !== null;
+
           return (
-            <div key={i} className="card">
+            <div
+              key={i}
+              className="card"
+              style={{
+                border: isArb ? "1px solid #00bfff" : undefined,
+                boxShadow: isArb
+                  ? "0 0 15px rgba(0,191,255,0.6)"
+                  : undefined
+              }}
+            >
               <h3>{g.team}</h3>
 
               {/* AWAY */}
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>{g.away}</span>
                 <span
-                  className="highlight"
                   style={{
                     color:
                       g.movement === "up"
                         ? "#00ff00"
                         : g.movement === "down"
                         ? "#ff4d4d"
-                        : "#00ffc3"
+                        : "#00ffc3",
+                    fontWeight: "bold"
                   }}
                 >
                   {g.bestAway.odds} ({g.bestAway.book})
@@ -143,10 +145,17 @@ export default function Dashboard() {
               {/* HOME */}
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>{g.home}</span>
-                <span className="highlight">
+                <span style={{ color: "#00ffc3", fontWeight: "bold" }}>
                   {g.bestHome.odds} ({g.bestHome.book})
                 </span>
               </div>
+
+              {/* 🔵 ARBITRAGE TAG */}
+              {isArb && (
+                <div style={{ color: "#00bfff", marginTop: "6px" }}>
+                  💰 Arbitrage Opportunity
+                </div>
+              )}
 
               {/* VALUE */}
               {!isPro ? (
@@ -157,7 +166,7 @@ export default function Dashboard() {
                   </div>
                 </LockedFeature>
               ) : (
-                <div className="highlight" style={{ marginTop: "10px" }}>
+                <div style={{ marginTop: "10px", color: "#00ffc3" }}>
                   ⭐ EV Edge: {ev}% <br />
                   💰 Arbitrage: {arb ? arb + "%" : "None"}
                 </div>
