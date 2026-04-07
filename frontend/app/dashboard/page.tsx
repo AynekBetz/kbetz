@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { isProUser, setProUser } from "../../lib/auth";
 import LockedFeature from "../../components/LockedFeature";
 import { calculateEV, checkArbitrage } from "../../utils/calculations";
+import { fetchOdds } from "../../utils/oddsFetcher";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [isPro, setIsPro] = useState(false);
+
+  const prevGamesRef = useRef<any[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -18,30 +22,72 @@ export default function Dashboard() {
 
     setIsPro(isProUser());
 
-    // 🔥 LIVE-LIKE DATA (used for calculations)
-    setGames([
-      {
-        team: "Lakers vs Warriors",
-        home: "Warriors",
-        away: "Lakers",
-        bestHome: { odds: -120, book: "DraftKings" },
-        bestAway: { odds: +110, book: "FanDuel" }
-      },
-      {
-        team: "Celtics vs Heat",
-        home: "Heat",
-        away: "Celtics",
-        bestHome: { odds: -115, book: "BetMGM" },
-        bestAway: { odds: +105, book: "Caesars" }
+    // 🔊 Setup audio
+    audioRef.current = new Audio("/alert.mp3");
+
+    // 🔥 Unlock audio on first click (FIX)
+    const unlockAudio = () => {
+      if (audioRef.current) {
+        audioRef.current
+          .play()
+          .then(() => {
+            audioRef.current?.pause();
+            audioRef.current!.currentTime = 0;
+          })
+          .catch(() => {});
       }
-    ]);
+
+      window.removeEventListener("click", unlockAudio);
+    };
+
+    window.addEventListener("click", unlockAudio);
+
+    async function loadOdds() {
+      const data = await fetchOdds();
+
+      if (!Array.isArray(data)) return;
+
+      const updated = data.map((game, index) => {
+        const prev = prevGamesRef.current[index];
+
+        let movement = null;
+
+        if (prev) {
+          if (game.bestAway.odds > prev.bestAway.odds) {
+            movement = "up";
+          } else if (game.bestAway.odds < prev.bestAway.odds) {
+            movement = "down";
+          }
+        }
+
+        return { ...game, movement };
+      });
+
+      // 🔊 Play sound if movement detected
+      const hasMovement = updated.some((g) => g.movement);
+
+      if (hasMovement && audioRef.current) {
+        audioRef.current.play().catch(() => {});
+      }
+
+      prevGamesRef.current = updated;
+      setGames(updated);
+    }
+
+    loadOdds();
+    const interval = setInterval(loadOdds, 15000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("click", unlockAudio);
+    };
   }, []);
 
   return (
     <div style={{ padding: "20px" }}>
       <h1 className="title">🔥 KBETZ LIVE TERMINAL</h1>
 
-      {/* 🔒 BUTTON (DO NOT TOUCH) */}
+      {/* 🔒 BUTTON (UNCHANGED) */}
       {!isPro && (
         <>
           <button
@@ -65,7 +111,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 🔥 GAME GRID */}
       <div style={{ display: "grid", gap: "15px", marginTop: "20px" }}>
         {games.map((g, i) => {
           const ev = calculateEV(g.bestAway.odds);
@@ -73,16 +118,29 @@ export default function Dashboard() {
 
           return (
             <div key={i} className="card">
-              <h3 style={{ marginBottom: "10px" }}>{g.team}</h3>
+              <h3>{g.team}</h3>
 
-              {/* FREE DATA */}
+              {/* AWAY */}
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>{g.away}</span>
-                <span className="highlight">
+                <span
+                  className="highlight"
+                  style={{
+                    color:
+                      g.movement === "up"
+                        ? "#00ff00"
+                        : g.movement === "down"
+                        ? "#ff4d4d"
+                        : "#00ffc3"
+                  }}
+                >
                   {g.bestAway.odds} ({g.bestAway.book})
+                  {g.movement === "up" && " ↑"}
+                  {g.movement === "down" && " ↓"}
                 </span>
               </div>
 
+              {/* HOME */}
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>{g.home}</span>
                 <span className="highlight">
@@ -90,7 +148,7 @@ export default function Dashboard() {
                 </span>
               </div>
 
-              {/* 🔥 VALUE LAYER */}
+              {/* VALUE */}
               {!isPro ? (
                 <LockedFeature>
                   <div style={{ marginTop: "10px" }}>
