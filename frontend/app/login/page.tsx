@@ -1,51 +1,48 @@
 "use client";
 
 import { useState } from "react";
+import { setToken } from "../../lib/auth";
 
-export default function LoginPage() {
+export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = (e: any) => {
-    e.preventDefault();
+  async function handleLogin() {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      }
+    );
 
-    // TEMP SAFE LOGIN
-    alert("Login system coming soon");
-  };
+    const data = await res.json();
+
+    if (data.token) {
+      setToken(data.token);
+      window.location.href = "/dashboard";
+    } else {
+      alert("Login failed");
+    }
+  }
 
   return (
-    <div style={{
-      background: "#020202",
-      color: "white",
-      minHeight: "100vh",
-      padding: "20px"
-    }}>
+    <div style={{ padding: "40px" }}>
       <h1>Login</h1>
 
-      <form onSubmit={handleLogin} style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-        maxWidth: "300px"
-      }}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+      <input
+        placeholder="Email"
+        onChange={(e) => setEmail(e.target.value)}
+      />
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+      <input
+        type="password"
+        placeholder="Password"
+        onChange={(e) => setPassword(e.target.value)}
+      />
 
-        <button type="submit">
-          Login
-        </button>
-      </form>
+      <button onClick={handleLogin}>Login</button>
     </div>
   );
 }

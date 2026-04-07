@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { isProUser, setProUser } from "../../lib/auth";
+import { getUser } from "../../lib/auth";
 import LockedFeature from "../../components/LockedFeature";
 import BetSlip from "../../components/BetSlip";
 import { calculateEV, checkArbitrage } from "../../utils/calculations";
@@ -19,56 +19,56 @@ export default function Dashboard() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    const url = new URL(window.location.href);
+    async function init() {
+      // 🔐 REAL USER AUTH
+      const user = await getUser();
+      setIsPro(user?.pro || false);
 
-    if (url.searchParams.get("success")) {
-      setProUser();
-    }
+      audioRef.current = new Audio("/alert.mp3");
 
-    setIsPro(isProUser());
-
-    audioRef.current = new Audio("/alert.mp3");
-
-    const unlockAudio = () => {
-      if (audioRef.current) {
-        audioRef.current.play().then(() => {
-          audioRef.current?.pause();
-          audioRef.current!.currentTime = 0;
-        }).catch(() => {});
-      }
-      window.removeEventListener("click", unlockAudio);
-    };
-
-    window.addEventListener("click", unlockAudio);
-
-    async function loadOdds() {
-      const data = await fetchOdds();
-      if (!Array.isArray(data)) return;
-
-      const updated = data.map((game, index) => {
-        const prev = prevGamesRef.current[index];
-        let movement = null;
-
-        if (prev) {
-          if (game.bestAway.odds > prev.bestAway.odds) movement = "up";
-          else if (game.bestAway.odds < prev.bestAway.odds) movement = "down";
+      const unlockAudio = () => {
+        if (audioRef.current) {
+          audioRef.current.play().then(() => {
+            audioRef.current?.pause();
+            audioRef.current!.currentTime = 0;
+          }).catch(() => {});
         }
+        window.removeEventListener("click", unlockAudio);
+      };
 
-        return { ...game, movement };
-      });
+      window.addEventListener("click", unlockAudio);
 
-      prevGamesRef.current = updated;
-      setGames(updated);
-      setAiPreview(buildAIParlay(updated));
+      async function loadOdds() {
+        const data = await fetchOdds();
+        if (!Array.isArray(data)) return;
+
+        const updated = data.map((game, index) => {
+          const prev = prevGamesRef.current[index];
+          let movement = null;
+
+          if (prev) {
+            if (game.bestAway.odds > prev.bestAway.odds) movement = "up";
+            else if (game.bestAway.odds < prev.bestAway.odds) movement = "down";
+          }
+
+          return { ...game, movement };
+        });
+
+        prevGamesRef.current = updated;
+        setGames(updated);
+        setAiPreview(buildAIParlay(updated));
+      }
+
+      loadOdds();
+      const interval = setInterval(loadOdds, 15000);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener("click", unlockAudio);
+      };
     }
 
-    loadOdds();
-    const interval = setInterval(loadOdds, 15000);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("click", unlockAudio);
-    };
+    init();
   }, []);
 
   function addPick(pick: any) {
@@ -88,6 +88,7 @@ export default function Dashboard() {
     <div style={{ padding: "20px", marginRight: "320px" }}>
       <h1 className="title">🔥 KBETZ LIVE TERMINAL</h1>
 
+      {/* 🔒 STRIPE BUTTON (UNCHANGED) */}
       {!isPro && (
         <>
           <button
@@ -154,7 +155,69 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* GAMES + SLIP unchanged */}
+      {/* 🔥 GAME GRID */}
+      <div style={{ display: "grid", gap: "15px" }}>
+        {games.map((g, i) => {
+          const ev = calculateEV(g.bestAway.odds);
+          const arb = checkArbitrage(g.bestHome.odds, g.bestAway.odds);
+
+          return (
+            <div key={i} className="card">
+              <h3>{g.team}</h3>
+
+              {/* CLICKABLE AWAY */}
+              <div
+                onClick={() =>
+                  addPick({
+                    team: g.away,
+                    odds: g.bestAway.odds,
+                    book: g.bestAway.book
+                  })
+                }
+                style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}
+              >
+                <span>{g.away}</span>
+                <span className="highlight">
+                  {g.bestAway.odds} ({g.bestAway.book})
+                </span>
+              </div>
+
+              {/* CLICKABLE HOME */}
+              <div
+                onClick={() =>
+                  addPick({
+                    team: g.home,
+                    odds: g.bestHome.odds,
+                    book: g.bestHome.book
+                  })
+                }
+                style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}
+              >
+                <span>{g.home}</span>
+                <span className="highlight">
+                  {g.bestHome.odds} ({g.bestHome.book})
+                </span>
+              </div>
+
+              {!isPro ? (
+                <LockedFeature>
+                  <div style={{ marginTop: "10px" }}>
+                    ⭐ EV Edge: +3%+ <br />
+                    💰 Arbitrage: 1%+
+                  </div>
+                </LockedFeature>
+              ) : (
+                <div className="highlight" style={{ marginTop: "10px" }}>
+                  ⭐ EV Edge: {ev}% <br />
+                  💰 Arbitrage: {arb ? arb + "%" : "None"}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 🧾 BET SLIP */}
       <BetSlip slip={slip} removePick={removePick} />
     </div>
   );

@@ -2,48 +2,32 @@
 
 import { useState } from "react";
 
-export default function SignupPage() {
+export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSignup = (e: any) => {
-    e.preventDefault();
-    alert("Signup coming soon");
-  };
+  async function handleSignup() {
+    await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      }
+    );
+
+    alert("Account created. Now login.");
+    window.location.href = "/login";
+  }
 
   return (
-    <div style={{
-      background: "#020202",
-      color: "white",
-      minHeight: "100vh",
-      padding: "20px"
-    }}>
+    <div style={{ padding: "40px" }}>
       <h1>Signup</h1>
 
-      <form onSubmit={handleSignup} style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-        maxWidth: "300px"
-      }}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+      <input onChange={(e) => setEmail(e.target.value)} />
+      <input type="password" onChange={(e) => setPassword(e.target.value)} />
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        <button type="submit">
-          Create Account
-        </button>
-      </form>
+      <button onClick={handleSignup}>Create Account</button>
     </div>
   );
 }

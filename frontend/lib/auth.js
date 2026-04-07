@@ -1,14 +1,33 @@
-export function isProUser() {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem("kbetz_pro") === "true";
+const API = process.env.NEXT_PUBLIC_API_URL;
+
+// 🔐 SAVE TOKEN
+export function setToken(token) {
+  localStorage.setItem("kbetz_token", token);
 }
 
-export function setProUser() {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("kbetz_pro", "true");
+// 🔐 GET TOKEN
+export function getToken() {
+  return localStorage.getItem("kbetz_token");
 }
 
-export function logoutUser() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem("kbetz_pro");
+// 🔐 LOGOUT
+export function logout() {
+  localStorage.removeItem("kbetz_token");
+}
+
+// 🔐 GET USER
+export async function getUser() {
+  const token = getToken();
+
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${API}/api/auth/me`, {
+      headers: { Authorization: token }
+    });
+
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
