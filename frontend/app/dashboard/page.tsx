@@ -20,10 +20,22 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function init() {
-      // 🔐 REAL USER AUTH
-      const user = await getUser();
-      setIsPro(user?.pro || false);
+      // 🔐 USER LOAD FUNCTION
+      async function loadUser() {
+        const user = await getUser();
+        setIsPro(user?.pro || false);
+      }
 
+      // 🔥 INITIAL LOAD
+      await loadUser();
+
+      // 🔥 CHECK IF RETURNED FROM STRIPE
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("success")) {
+        setTimeout(loadUser, 2000); // wait for webhook
+      }
+
+      // 🔊 AUDIO
       audioRef.current = new Audio("/alert.mp3");
 
       const unlockAudio = () => {
@@ -38,6 +50,7 @@ export default function Dashboard() {
 
       window.addEventListener("click", unlockAudio);
 
+      // 🔥 LOAD ODDS
       async function loadOdds() {
         const data = await fetchOdds();
         if (!Array.isArray(data)) return;
@@ -71,32 +84,64 @@ export default function Dashboard() {
     init();
   }, []);
 
+  // 🔥 ADD PICK
   function addPick(pick: any) {
     setSlip((prev) => [...prev, pick]);
   }
 
+  // 🔥 REMOVE PICK
   function removePick(index: number) {
     setSlip((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // 🤖 AI PARLAY
   function generateAIParlay() {
     const picks = buildAIParlay(games);
     setSlip(picks);
+  }
+
+  // 💰 STRIPE CHECKOUT (UPDATED)
+  async function handleUpgrade() {
+    try {
+      const token = localStorage.getItem("kbetz_token");
+
+      if (!token) {
+        alert("Please login first");
+        window.location.href = "/login";
+        return;
+      }
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/stripe/create-checkout`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: token
+          }
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Checkout failed");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error starting checkout");
+    }
   }
 
   return (
     <div style={{ padding: "20px", marginRight: "320px" }}>
       <h1 className="title">🔥 KBETZ LIVE TERMINAL</h1>
 
-      {/* 🔒 STRIPE BUTTON (UNCHANGED) */}
+      {/* 🔒 UPGRADE BUTTON */}
       {!isPro && (
         <>
-          <button
-            onClick={() => {
-              window.location.href = "/api/checkout";
-            }}
-            className="pro-btn"
-          >
+          <button onClick={handleUpgrade} className="pro-btn">
             Upgrade to PRO
           </button>
 
@@ -106,7 +151,13 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* 🤖 AI SECTION */}
+      {isPro && (
+        <div className="highlight" style={{ marginBottom: "20px" }}>
+          ✅ PRO ACTIVE
+        </div>
+      )}
+
+      {/* 🤖 AI PARLAY */}
       <div style={{ marginTop: "20px", marginBottom: "20px" }}>
         <h2>🤖 AI Parlay Builder</h2>
 
@@ -155,7 +206,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* 🔥 GAME GRID */}
+      {/* 📊 GAMES */}
       <div style={{ display: "grid", gap: "15px" }}>
         {games.map((g, i) => {
           const ev = calculateEV(g.bestAway.odds);
@@ -165,7 +216,6 @@ export default function Dashboard() {
             <div key={i} className="card">
               <h3>{g.team}</h3>
 
-              {/* CLICKABLE AWAY */}
               <div
                 onClick={() =>
                   addPick({
@@ -174,7 +224,11 @@ export default function Dashboard() {
                     book: g.bestAway.book
                   })
                 }
-                style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  cursor: "pointer"
+                }}
               >
                 <span>{g.away}</span>
                 <span className="highlight">
@@ -182,7 +236,6 @@ export default function Dashboard() {
                 </span>
               </div>
 
-              {/* CLICKABLE HOME */}
               <div
                 onClick={() =>
                   addPick({
@@ -191,7 +244,11 @@ export default function Dashboard() {
                     book: g.bestHome.book
                   })
                 }
-                style={{ display: "flex", justifyContent: "space-between", cursor: "pointer" }}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  cursor: "pointer"
+                }}
               >
                 <span>{g.home}</span>
                 <span className="highlight">
