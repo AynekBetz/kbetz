@@ -14,86 +14,59 @@ app.use(express.json());
 const PORT = 10000;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-/* =========================
-   DATABASE
-========================= */
+/* DATABASE */
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log("🔥 MongoDB Connected");
 });
 
-/* =========================
-   DEBUG
-========================= */
+/* DEBUG */
 app.get("/test", (req, res) => {
   res.send("SERVER LIVE");
 });
 
-/* =========================
-   🔥 SMART ODDS (AUTO SPORT)
-========================= */
+/* 🔥 GUARANTEED ODDS ROUTE */
 app.get("/api/odds", async (req, res) => {
   try {
-    console.log("📡 Fetching active sports...");
+    console.log("📡 Fetching guaranteed odds...");
 
-    // 1️⃣ GET ALL SPORTS
-    const sportsRes = await fetch(
-      `https://api.the-odds-api.com/v4/sports/?apiKey=${process.env.ODDS_API_KEY}`
-    );
+    const url =
+      `https://api.the-odds-api.com/v4/sports/soccer_epl/odds/` +
+      `?regions=eu` +
+      `&markets=h2h` +
+      `&bookmakers=bet365` +
+      `&apiKey=${process.env.ODDS_API_KEY}`;
 
-    const sports = await sportsRes.json();
+    const response = await fetch(url);
+    const data = await response.json();
 
-    // 2️⃣ FILTER ACTIVE SPORTS
-    const activeSports = sports.filter((s) => s.active);
+    console.log("📊 EPL data:", data?.length);
 
-    console.log("✅ Active sports:", activeSports.length);
-
-    let oddsData = [];
-
-    // 3️⃣ LOOP UNTIL WE FIND DATA
-    for (const sport of activeSports) {
-      console.log("🔍 Trying:", sport.key);
-
-      const oddsRes = await fetch(
-        `https://api.the-odds-api.com/v4/sports/${sport.key}/odds/?regions=us,uk,eu&markets=h2h&apiKey=${process.env.ODDS_API_KEY}`
-      );
-
-      const data = await oddsRes.json();
-
-      if (Array.isArray(data) && data.length > 0) {
-        console.log("🔥 FOUND DATA:", sport.key);
-        oddsData = data;
-        break;
-      }
-    }
-
-    // ❌ NOTHING FOUND
-    if (!oddsData.length) {
+    // ❌ IF STILL EMPTY → API LIMIT
+    if (!Array.isArray(data) || data.length === 0) {
       return res.json([
         {
-          team: "No Active Odds Found",
-          home: "Try later",
-          away: "API returned no games",
+          team: "API LIMIT / NO DATA",
+          home: "Upgrade plan",
+          away: "or try later",
           bestHome: { odds: "-", book: "-" },
           bestAway: { odds: "-", book: "-" }
         }
       ]);
     }
 
-    // 🔥 FORMAT
-    const formatted = oddsData.map((game) => {
-      let bestHome = { odds: -999, book: "" };
-      let bestAway = { odds: -999, book: "" };
+    const formatted = data.map((game) => {
+      let bestHome = { odds: "-", book: "" };
+      let bestAway = { odds: "-", book: "" };
 
       game.bookmakers?.forEach((b) => {
         const market = b.markets?.find((m) => m.key === "h2h");
         if (!market) return;
 
         market.outcomes.forEach((o) => {
-          if (o.name === game.home_team && o.price > bestHome.odds) {
+          if (o.name === game.home_team) {
             bestHome = { odds: o.price, book: b.title };
           }
-
-          if (o.name === game.away_team && o.price > bestAway.odds) {
+          if (o.name === game.away_team) {
             bestAway = { odds: o.price, book: b.title };
           }
         });
@@ -125,9 +98,7 @@ app.get("/api/odds", async (req, res) => {
   }
 });
 
-/* =========================
-   AUTH
-========================= */
+/* AUTH */
 app.post("/api/auth/signup", async (req, res) => {
   const { email, password } = req.body;
 
@@ -136,11 +107,7 @@ app.post("/api/auth/signup", async (req, res) => {
 
   const hashed = await bcrypt.hash(password, 10);
 
-  await User.create({
-    email,
-    password: hashed,
-    pro: false
-  });
+  await User.create({ email, password: hashed, pro: false });
 
   res.json({ message: "User created" });
 });
@@ -155,11 +122,7 @@ app.post("/api/auth/login", async (req, res) => {
   if (!valid) return res.status(401).json({ error: "Invalid login" });
 
   const token = jwt.sign(
-    {
-      id: user._id,
-      email: user.email,
-      pro: user.pro
-    },
+    { id: user._id, email: user.email, pro: user.pro },
     process.env.JWT_SECRET
   );
 
@@ -175,18 +138,13 @@ app.get("/api/auth/me", async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
 
-    res.json({
-      email: user.email,
-      pro: user.pro
-    });
+    res.json({ email: user.email, pro: user.pro });
   } catch {
     res.status(401).json({ error: "Invalid token" });
   }
 });
 
-/* =========================
-   START
-========================= */
+/* START */
 app.listen(PORT, () => {
   console.log("🔥 SERVER RUNNING ON PORT " + PORT);
 });
