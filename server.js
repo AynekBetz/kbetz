@@ -4,46 +4,61 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import Stripe from "stripe";
 import bcrypt from "bcryptjs";
-import fetch from "node-fetch";
 import User from "./models/User.js";
 
 const app = express();
 
-app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
 app.use(cors());
 app.use(express.json());
 
 const PORT = 10000;
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// 🔥 CONNECT DB
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log("🔥 MongoDB Connected");
 });
 
-// 🔥 DEBUG
+/* =========================
+   🔥 DEBUG ROUTE
+========================= */
 app.get("/test", (req, res) => {
   res.send("SERVER LIVE");
 });
 
 /* =========================
-   🔥 REAL ODDS ROUTE
+   🔥 REAL ODDS ROUTE (FIXED)
 ========================= */
 app.get("/api/odds", async (req, res) => {
   try {
+    console.log("📡 Fetching odds...");
+
     const response = await fetch(
       `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?regions=us&markets=h2h&apiKey=${process.env.ODDS_API_KEY}`
     );
 
     const data = await response.json();
 
-    const formatted = data.map((game) => {
-      const bookmakers = game.bookmakers;
+    console.log("📊 Raw odds:", data?.length);
 
+    // 🔥 FALLBACK IF API FAILS
+    if (!Array.isArray(data) || data.length === 0) {
+      return res.json([
+        {
+          team: "No Live Games Available",
+          home: "N/A",
+          away: "N/A",
+          bestHome: { odds: "-", book: "-" },
+          bestAway: { odds: "-", book: "-" }
+        }
+      ]);
+    }
+
+    const formatted = data.map((game) => {
       let bestHome = { odds: -999, book: "" };
       let bestAway = { odds: -999, book: "" };
 
-      bookmakers.forEach((b) => {
-        const market = b.markets.find((m) => m.key === "h2h");
+      game.bookmakers?.forEach((b) => {
+        const market = b.markets?.find((m) => m.key === "h2h");
         if (!market) return;
 
         market.outcomes.forEach((o) => {
@@ -67,17 +82,26 @@ app.get("/api/odds", async (req, res) => {
 
     res.json(formatted);
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "Failed to fetch odds" });
+    console.log("❌ ODDS ERROR:", err);
+
+    res.json([
+      {
+        team: "API ERROR",
+        home: "Check API key",
+        away: "Check logs",
+        bestHome: { odds: "-", book: "-" },
+        bestAway: { odds: "-", book: "-" }
+      }
+    ]);
   }
 });
 
 /* =========================
-   AUTH + STRIPE (UNCHANGED)
+   AUTH
 ========================= */
-
 app.post("/api/auth/signup", async (req, res) => {
   const { email, password } = req.body;
+
   const exists = await User.findOne({ email });
   if (exists) return res.status(400).json({ error: "User exists" });
 
