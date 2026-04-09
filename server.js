@@ -2,8 +2,8 @@ import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
-import Stripe from "stripe";
 import bcrypt from "bcryptjs";
+import Stripe from "stripe";
 import User from "./models/User.js";
 
 const app = express();
@@ -12,41 +12,54 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = 10000;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// 🔥 CONNECT DB
+/* =========================
+   🔥 DATABASE
+========================= */
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log("🔥 MongoDB Connected");
 });
 
 /* =========================
-   🔥 DEBUG ROUTE
+   🔥 DEBUG
 ========================= */
 app.get("/test", (req, res) => {
   res.send("SERVER LIVE");
 });
 
 /* =========================
-   🔥 REAL ODDS ROUTE (FIXED)
+   🔥 LIVE ODDS (NBA + MLB)
 ========================= */
 app.get("/api/odds", async (req, res) => {
   try {
     console.log("📡 Fetching odds...");
 
-    const response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?regions=us&markets=h2h&apiKey=${process.env.ODDS_API_KEY}`
-    );
+    async function fetchSport(sport) {
+      const response = await fetch(
+        `https://api.the-odds-api.com/v4/sports/${sport}/odds/?regions=us&markets=h2h&apiKey=${process.env.ODDS_API_KEY}`
+      );
+      const data = await response.json();
+      console.log(`📊 ${sport}:`, data?.length);
+      return data;
+    }
 
-    const data = await response.json();
+    // 🏀 NBA first
+    let data = await fetchSport("basketball_nba");
 
-    console.log("📊 Raw odds:", data?.length);
+    // ⚾ fallback MLB
+    if (!Array.isArray(data) || data.length === 0) {
+      console.log("⚠️ NBA empty → MLB fallback");
+      data = await fetchSport("baseball_mlb");
+    }
 
-    // 🔥 FALLBACK IF API FAILS
+    // ❌ still empty
     if (!Array.isArray(data) || data.length === 0) {
       return res.json([
         {
-          team: "No Live Games Available",
-          home: "N/A",
-          away: "N/A",
+          team: "No Live Games Right Now",
+          home: "Try again later",
+          away: "Sports update daily",
           bestHome: { odds: "-", book: "-" },
           bestAway: { odds: "-", book: "-" }
         }
@@ -65,6 +78,7 @@ app.get("/api/odds", async (req, res) => {
           if (o.name === game.home_team && o.price > bestHome.odds) {
             bestHome = { odds: o.price, book: b.title };
           }
+
           if (o.name === game.away_team && o.price > bestAway.odds) {
             bestAway = { odds: o.price, book: b.title };
           }
@@ -97,7 +111,7 @@ app.get("/api/odds", async (req, res) => {
 });
 
 /* =========================
-   AUTH
+   🔐 AUTH
 ========================= */
 app.post("/api/auth/signup", async (req, res) => {
   const { email, password } = req.body;
@@ -106,7 +120,7 @@ app.post("/api/auth/signup", async (req, res) => {
   if (exists) return res.status(400).json({ error: "User exists" });
 
   const hashed = await bcrypt.hash(password, 10);
-  await User.create({ email, password: hashed });
+  await User.create({ email, password: hashed, pro: false });
 
   res.json({ message: "User created" });
 });
@@ -143,6 +157,9 @@ app.get("/api/auth/me", async (req, res) => {
   }
 });
 
+/* =========================
+   🚀 START SERVER
+========================= */
 app.listen(PORT, () => {
-  console.log("🔥 SERVER RUNNING");
+  console.log("🔥 SERVER RUNNING ON PORT " + PORT);
 });
