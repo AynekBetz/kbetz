@@ -14,12 +14,14 @@ export default function RootLayout({
         style={{
           margin: 0,
           padding: 0,
-          background: "black",
-          color: "white",
-          fontFamily: "system-ui, Arial, sans-serif",
+          background: "#000",
+          color: "#fff",
+          overflow: "hidden"
         }}
       >
-        {children}
+        <div style={{ position: "relative", zIndex: 1 }}>
+          {children}
+        </div>
       </body>
     </html>
   );

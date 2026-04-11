@@ -2,10 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* HARD RESET */
-html, body {
+/* FORCE CLEAN ENVIRONMENT */
+* {
   margin: 0;
   padding: 0;
-  background: black !important;
-  color: white !important;
+  box-sizing: border-box;
+  background-image: none !important;
+}
+
+html, body {
+  background: #000 !important;
+  color: #fff !important;
 }
