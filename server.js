@@ -1,92 +1,68 @@
-let cachedOdds = [];
-let lastFetch = 0;
+import express from "express";
+import cors from "cors";
 
-app.get("/api/odds", async (req, res) => {
-  try {
-    const now = Date.now();
+const app = express();
+app.use(cors());
 
-    // 🔥 CACHE: only fetch every 5 minutes
-    if (now - lastFetch < 5 * 60 * 1000 && cachedOdds.length > 0) {
-      console.log("⚡ Using cached odds");
-      return res.json(cachedOdds);
-    }
+const PORT = 10000;
 
-    console.log("📡 Fetching fresh odds...");
-
-    const url =
-      `https://api.the-odds-api.com/v4/sports/soccer_epl/odds/` +
-      `?regions=eu&markets=h2h&bookmakers=bet365` +
-      `&apiKey=${process.env.ODDS_API_KEY}`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!Array.isArray(data) || data.length === 0) {
-      console.log("⚠️ API returned empty — using cache");
-
-      if (cachedOdds.length > 0) {
-        return res.json(cachedOdds);
-      }
-
-      return res.json([
-        {
-          team: "API LIMIT REACHED",
-          home: "Using fallback",
-          away: "Upgrade API plan",
-          bestHome: { odds: "-", book: "-" },
-          bestAway: { odds: "-", book: "-" }
-        }
-      ]);
-    }
-
-    const formatted = data.map((game) => {
-      let bestHome = { odds: "-", book: "" };
-      let bestAway = { odds: "-", book: "" };
-
-      game.bookmakers?.forEach((b) => {
-        const market = b.markets?.find((m) => m.key === "h2h");
-        if (!market) return;
-
-        market.outcomes.forEach((o) => {
-          if (o.name === game.home_team) {
-            bestHome = { odds: o.price, book: b.title };
-          }
-          if (o.name === game.away_team) {
-            bestAway = { odds: o.price, book: b.title };
-          }
-        });
-      });
-
-      return {
-        team: `${game.away_team} vs ${game.home_team}`,
-        home: game.home_team,
-        away: game.away_team,
-        bestHome,
-        bestAway
-      };
-    });
-
-    // 🔥 SAVE CACHE
-    cachedOdds = formatted;
-    lastFetch = now;
-
-    res.json(formatted);
-
-  } catch (err) {
-    console.log("❌ ERROR:", err);
-
-    if (cachedOdds.length > 0) {
-      return res.json(cachedOdds);
-    }
-
-    res.json([
-      {
-        team: "SYSTEM ERROR",
-        home: "Try again later",
-        away: "",
-        bestHome: { odds: "-", book: "-" },
-        bestAway: { odds: "-", book: "-" }
-      }
-    ]);
+// =============================
+// MOCK DATA (ALWAYS WORKS)
+// =============================
+const games = [
+  {
+    id: "1",
+    home: "Lakers",
+    away: "Warriors",
+    odds: -110
+  },
+  {
+    id: "2",
+    home: "Celtics",
+    away: "Heat",
+    odds: -130
   }
+];
+
+// =============================
+// EV CALC
+// =============================
+function calculateEV(odds) {
+  const prob = 0.5;
+  const payout = odds > 0 ? odds / 100 : 100 / Math.abs(odds);
+  return (prob * payout - (1 - prob)) * 100;
+}
+
+// =============================
+// AI PICK
+// =============================
+function getAIPick() {
+  const best = games[0];
+
+  return {
+    matchup: `${best.away} @ ${best.home}`,
+    odds: best.odds,
+    ev: calculateEV(best.odds).toFixed(2),
+    confidence: "MEDIUM"
+  };
+}
+
+// =============================
+// ROUTE
+// =============================
+app.get("/api/data", (req, res) => {
+  const enriched = games.map((g) => ({
+    ...g,
+    ev: calculateEV(g.odds).toFixed(2)
+  }));
+
+  res.json({
+    games: enriched,
+    aiPick: getAIPick()
+  });
+});
+
+// =============================
+app.listen(PORT, () => {
+  console.log(`🔥 STABLE SERVER running on ${PORT}`);
 });

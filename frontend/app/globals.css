@@ -1,55 +1,17 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* 🔥 BACKGROUND */
-body {
-  background: radial-gradient(circle at top, #0a0a0a, #000);
-  color: white;
-  font-family: Arial, sans-serif;
+@keyframes flashGreen {
+  0% { background-color: rgba(0,255,0,0.2); }
+  100% { background-color: transparent; }
 }
 
-/* 🔥 CARD STYLE */
-.card {
-  background: rgba(20, 20, 20, 0.8);
-  border: 1px solid rgba(0, 255, 195, 0.2);
-  border-radius: 12px;
-  padding: 16px;
-  backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
+@keyframes flashRed {
+  0% { background-color: rgba(255,0,0,0.2); }
+  100% { background-color: transparent; }
 }
 
-.card:hover {
-  border: 1px solid #00ffc3;
-  box-shadow: 0 0 15px rgba(0, 255, 195, 0.4);
+.flash-green {
+  animation: flashGreen 1s ease;
 }
 
-/* 🔥 BUTTON */
-.pro-btn {
-  background: linear-gradient(135deg, #00ffc3, #00bfa6);
-  color: #000;
-  padding: 12px 18px;
-  border-radius: 8px;
-  font-weight: bold;
-  transition: all 0.2s ease;
-}
-
-.pro-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 12px #00ffc3;
-}
-
-/* 🔥 TEXT STYLES */
-.title {
-  font-size: 28px;
-  font-weight: bold;
-  margin-bottom: 15px;
-}
-
-.subtle {
-  color: #888;
-}
-
-.highlight {
-  color: #00ffc3;
+.flash-red {
+  animation: flashRed 1s ease;
 }

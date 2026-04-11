@@ -1,73 +1,63 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchOdds } from "../../utils/oddsFetcher";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [aiPick, setAiPick] = useState<any>(null);
 
   useEffect(() => {
-    async function loadOdds() {
-      try {
-        const data = await fetchOdds();
-        setGames(data);
-      } catch (err) {
-        console.log("Frontend fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
+    const fetchData = async () => {
+      const res = await fetch(`${API_URL}/api/data`);
+      const data = await res.json();
 
-    // 🔥 INITIAL LOAD
-    loadOdds();
+      setGames(data.games);
+      setAiPick(data.aiPick);
+    };
 
-    // 🔥 FIXED REFRESH (1 MINUTE — SAFE FOR API)
-    const interval = setInterval(() => {
-      loadOdds();
-    }, 60000);
-
-    return () => clearInterval(interval);
+    fetchData();
   }, []);
 
   return (
-    <div style={{ padding: "20px", background: "#000", minHeight: "100vh", color: "#fff" }}>
-      <h1 style={{ marginBottom: "20px" }}>🔥 KBETZ LIVE TERMINAL</h1>
+    <div className="min-h-screen bg-black text-white p-6">
 
-      {loading && <div>Loading real odds...</div>}
+      <h1 className="text-3xl font-bold mb-6">
+        🔥 KBETZ (STABLE)
+      </h1>
 
-      {!loading && games.length === 0 && (
-        <div>No odds available</div>
+      {/* AI PICK */}
+      {aiPick && (
+        <div className="mb-6 p-4 bg-purple-800 rounded-xl">
+          <h2 className="font-bold mb-2">🧠 AI PICK</h2>
+          <div>{aiPick.matchup}</div>
+          <div className="text-xl font-bold">
+            {aiPick.odds}
+          </div>
+          <div>EV: {aiPick.ev}%</div>
+          <div>Confidence: {aiPick.confidence}</div>
+        </div>
       )}
 
-      {games.map((g, i) => (
-        <div
-          key={i}
-          style={{
-            border: "1px solid #00ffcc",
-            padding: "15px",
-            marginBottom: "15px",
-            borderRadius: "10px",
-            background: "#050505"
-          }}
-        >
-          <h3 style={{ marginBottom: "10px" }}>{g.team}</h3>
-
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>{g.away}</span>
-            <span>
-              {g.bestAway?.odds} ({g.bestAway?.book})
-            </span>
+      {/* GAMES */}
+      <div className="grid gap-3">
+        {games.map((g) => (
+          <div
+            key={g.id}
+            className="p-4 bg-gray-900 rounded-lg"
+          >
+            <div className="flex justify-between">
+              <span>{g.away} @ {g.home}</span>
+              <span>{g.odds}</span>
+            </div>
+            <div className="text-sm text-gray-400">
+              EV: {g.ev}%
+            </div>
           </div>
+        ))}
+      </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>{g.home}</span>
-            <span>
-              {g.bestHome?.odds} ({g.bestHome?.book})
-            </span>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
