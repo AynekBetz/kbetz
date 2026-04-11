@@ -1,8 +1,6 @@
-import "./globals.css";
-
 export const metadata = {
   title: "KBETZ",
-  description: "Sports Betting Analytics Platform",
+  description: "KBETZ App",
 };
 
 export default function RootLayout({
@@ -12,7 +10,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ background: "#0a0a0a", color: "white" }}>
+      <body style={{ margin: 0, padding: 0, background: "black", color: "white" }}>
         {children}
       </body>
     </html>

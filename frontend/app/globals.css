@@ -1,17 +1,11 @@
-@keyframes flashGreen {
-  0% { background-color: rgba(0,255,0,0.2); }
-  100% { background-color: transparent; }
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@keyframes flashRed {
-  0% { background-color: rgba(255,0,0,0.2); }
-  100% { background-color: transparent; }
-}
-
-.flash-green {
-  animation: flashGreen 1s ease;
-}
-
-.flash-red {
-  animation: flashRed 1s ease;
+/* HARD RESET */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black !important;
+  color: white;
 }
