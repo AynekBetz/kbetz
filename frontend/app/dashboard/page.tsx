@@ -1,34 +1,49 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-function toDecimal(odds: number) {
-  if (odds > 0) return 1 + odds / 100;
-  return 1 + 100 / Math.abs(odds);
-}
-
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
-  const [prevGames, setPrevGames] = useState<any[]>([]);
-  const [betSlip, setBetSlip] = useState<any[]>([]);
-  const [stake, setStake] = useState(10);
-
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    audioRef.current = new Audio("/alert.mp3");
-  }, []);
+  const [history, setHistory] = useState<any>({});
+  const [selected, setSelected] = useState<any>(null);
 
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/api/data`);
       const data = await res.json();
 
-      detectChanges(prevGames, data.games || []);
-      setPrevGames(games);
       setGames(data.games || []);
+
+      // build history
+      setHistory((prev: any) => {
+        const updated = { ...prev };
+
+        data.games.forEach((g: any) => {
+          if (!updated[g.id]) updated[g.id] = [];
+
+          updated[g.id].push({
+            time: new Date().toLocaleTimeString(),
+            odds: g.odds,
+          });
+
+          // limit history length
+          if (updated[g.id].length > 20) {
+            updated[g.id].shift();
+          }
+        });
+
+        return updated;
+      });
     } catch (err) {
       console.log(err);
     }
@@ -36,118 +51,78 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000); // 60s
+    const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // detect odds movement
-  const detectChanges = (oldGames: any[], newGames: any[]) => {
-    newGames.forEach((newG) => {
-      const old = oldGames.find((g) => g.id === newG.id);
-      if (!old) return;
-
-      if (old.odds !== newG.odds) {
-        // play sound
-        audioRef.current?.play().catch(() => {});
-      }
-    });
-  };
-
-  const addToSlip = (g: any) => {
-    if (betSlip.find((b) => b.id === g.id)) return;
-    setBetSlip([...betSlip, g]);
-  };
-
-  const payout = () => {
-    let total = 1;
-    betSlip.forEach((b) => (total *= toDecimal(b.odds)));
-    return (stake * total).toFixed(2);
-  };
-
-  // determine color flash
-  const getFlashColor = (g: any) => {
-    const prev = prevGames.find((p) => p.id === g.id);
-    if (!prev) return "";
-
-    if (g.odds > prev.odds) return "#16a34a"; // green
-    if (g.odds < prev.odds) return "#dc2626"; // red
-    return "";
-  };
-
   return (
     <div style={{ padding: "30px", maxWidth: "1200px", margin: "0 auto" }}>
-      <h1>🔥 KBETZ LIVE TERMINAL</h1>
+      
+      <h1>📈 KBETZ LINE TERMINAL</h1>
 
       <div style={{ display: "flex", gap: "20px" }}>
 
         {/* GAMES */}
         <div style={{ flex: 2 }}>
-          {games.map((g) => {
-            const flash = getFlashColor(g);
-
-            return (
-              <div
-                key={g.id}
-                onClick={() => addToSlip(g)}
-                style={{
-                  padding: "15px",
-                  marginBottom: "10px",
-                  borderRadius: "10px",
-                  background: "#0a0a0a",
-                  border: `1px solid ${flash || "#222"}`,
-                  transition: "all 0.3s ease",
-                  cursor: "pointer"
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>{g.away} @ {g.home}</span>
-
-                  <span style={{
-                    fontWeight: "bold",
-                    color: flash || "#fff"
-                  }}>
-                    {g.odds > 0 ? "+" : ""}{g.odds}
-                  </span>
-                </div>
-
-                <div style={{ fontSize: "12px", color: "#888" }}>
-                  EV: {g.ev}%
-                </div>
+          {games.map((g) => (
+            <div
+              key={g.id}
+              onClick={() => setSelected(g)}
+              style={{
+                padding: "15px",
+                marginBottom: "10px",
+                background: "#0a0a0a",
+                borderRadius: "10px",
+                border: "1px solid #222",
+                cursor: "pointer"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>{g.away} @ {g.home}</span>
+                <span>{g.odds}</span>
               </div>
-            );
-          })}
-        </div>
 
-        {/* BET SLIP */}
-        <div style={{
-          flex: 1,
-          background: "#0a0a0a",
-          padding: "15px",
-          borderRadius: "10px",
-          border: "1px solid #222"
-        }}>
-          <h2>🧾 Bet Slip</h2>
-
-          {betSlip.map((b) => (
-            <div key={b.id}>
-              {b.away} @ {b.home}
-              <div>{b.odds}</div>
+              <div style={{ fontSize: "12px", color: "#888" }}>
+                EV: {g.ev}%
+              </div>
             </div>
           ))}
+        </div>
 
-          {betSlip.length > 0 && (
-            <>
-              <input
-                type="number"
-                value={stake}
-                onChange={(e) => setStake(Number(e.target.value))}
-                style={{ width: "100%", marginTop: "10px" }}
-              />
+        {/* CHART PANEL */}
+        <div
+          style={{
+            flex: 1,
+            background: "#0a0a0a",
+            borderRadius: "10px",
+            padding: "15px",
+            border: "1px solid #222",
+            height: "400px"
+          }}
+        >
+          <h2>📊 Line Movement</h2>
 
-              <div style={{ marginTop: "10px" }}>
-                ${payout()}
-              </div>
-            </>
+          {!selected && (
+            <div style={{ color: "#666" }}>
+              Click a game to view chart
+            </div>
+          )}
+
+          {selected && history[selected.id] && (
+            <ResponsiveContainer width="100%" height="80%">
+              <LineChart data={history[selected.id]}>
+                <XAxis dataKey="time" hide />
+                <YAxis domain={["auto", "auto"]} />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="odds"
+                  stroke="#22c55e"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           )}
         </div>
 
