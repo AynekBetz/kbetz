@@ -10,7 +10,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// ✅ SAFE FALLBACK (VERY IMPORTANT)
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:10000";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
@@ -19,10 +21,10 @@ export default function Dashboard() {
   const [steam, setSteam] = useState<any>({});
   const [sharp, setSharp] = useState<any>({});
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [error, setError] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // 🔔 SOUND INIT
   useEffect(() => {
     audioRef.current = new Audio("/alert.mp3");
 
@@ -38,7 +40,7 @@ export default function Dashboard() {
     window.addEventListener("click", unlock);
   }, []);
 
-  // 🚨 STEAM DETECTION
+  // 🚨 STEAM
   const detectSteam = (prev: any[], current: any[]) => {
     const s: any = {};
     const newAlerts: string[] = [];
@@ -51,9 +53,7 @@ export default function Dashboard() {
 
       if (diff >= 10) {
         s[g.id] = true;
-
         newAlerts.push(`🚨 STEAM: ${g.away} @ ${g.home}`);
-
         audioRef.current?.play().catch(() => {});
       }
     });
@@ -65,13 +65,13 @@ export default function Dashboard() {
     setSteam(s);
   };
 
-  // 🧠 SHARP DETECTION
+  // 🧠 SHARP
   const detectSharp = (hist: any) => {
     const signals: any = {};
 
     Object.keys(hist).forEach((id) => {
       const h = hist[id];
-      if (h.length < 4) return;
+      if (!h || h.length < 4) return;
 
       let up = 0;
       let down = 0;
@@ -88,19 +88,19 @@ export default function Dashboard() {
     setSharp(signals);
   };
 
-  // 📡 FETCH + SIMULATE MOVEMENT
+  // 📡 FETCH (SAFE VERSION)
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/api/data`);
+
+      if (!res.ok) throw new Error("API failed");
+
       const data = await res.json();
 
-      // 🎲 SIMULATE MARKET MOVEMENT
-      const simulated = data.games.map((g: any) => {
-        const randomMove = Math.floor(Math.random() * 15) - 7;
-        return {
-          ...g,
-          odds: g.odds + randomMove,
-        };
+      // 🎲 simulate movement
+      const simulated = (data.games || []).map((g: any) => {
+        const move = Math.floor(Math.random() * 15) - 7;
+        return { ...g, odds: g.odds + move };
       });
 
       detectSteam(games, simulated);
@@ -124,14 +124,25 @@ export default function Dashboard() {
 
         return updated;
       });
+
+      setError(false);
     } catch (err) {
-      console.log(err);
+      console.log("API ERROR:", err);
+      setError(true);
+
+      // ✅ fallback mock (NO CRASH)
+      const fallback = [
+        { id: 1, away: "Warriors", home: "Lakers", odds: -110 },
+        { id: 2, away: "Heat", home: "Celtics", odds: -130 },
+      ];
+
+      setGames(fallback);
     }
   };
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000); // FAST updates
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -139,10 +150,21 @@ export default function Dashboard() {
 
   return (
     <div style={{ padding: "25px", maxWidth: "1200px", margin: "0 auto" }}>
-
       <h1>💰 KBETZ EDGE TERMINAL</h1>
 
-      {/* 🚨 ALERT BAR */}
+      {/* ERROR STATE */}
+      {error && (
+        <div style={{
+          padding: "10px",
+          background: "#2a0a0a",
+          border: "1px solid red",
+          marginBottom: "10px"
+        }}>
+          ⚠️ API offline — using fallback data
+        </div>
+      )}
+
+      {/* ALERT BAR */}
       <div style={{
         margin: "15px 0",
         padding: "10px",
@@ -152,11 +174,11 @@ export default function Dashboard() {
       }}>
         {alerts.length === 0 && <div>No live alerts</div>}
         {alerts.map((a, i) => (
-          <div key={i} style={{ fontSize: "12px" }}>{a}</div>
+          <div key={i}>{a}</div>
         ))}
       </div>
 
-      {/* 🏆 BEST EDGE */}
+      {/* BEST EDGE */}
       {bestGame && (
         <div style={{
           background: "#1f2937",
@@ -165,14 +187,13 @@ export default function Dashboard() {
           marginBottom: "15px",
           border: "1px solid gold"
         }}>
-          <h3>🏆 BEST EDGE</h3>
-          <div>{bestGame.away} @ {bestGame.home}</div>
+          🏆 BEST EDGE: {bestGame.away} @ {bestGame.home}
         </div>
       )}
 
       <div style={{ display: "flex", gap: "20px" }}>
 
-        {/* 🎯 GAMES */}
+        {/* GAMES */}
         <div style={{ flex: 2 }}>
           {games.map((g) => {
             const isSteam = steam[g.id];
@@ -206,38 +227,21 @@ export default function Dashboard() {
               >
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <div>
-                    <div>{g.away} @ {g.home}</div>
+                    {g.away} @ {g.home}
 
-                    {isHot && (
-                      <div style={{ color: "orange", fontSize: "12px" }}>
-                        🔥 HOT GAME
-                      </div>
-                    )}
-
-                    {isSteam && (
-                      <div style={{ color: "red", fontSize: "12px" }}>
-                        🚨 STEAM MOVE
-                      </div>
-                    )}
-
-                    {isSharp && (
-                      <div style={{ color: "#22c55e", fontSize: "12px" }}>
-                        🟢 SHARP ({isSharp})
-                      </div>
-                    )}
+                    {isSteam && <div>🚨 STEAM</div>}
+                    {isSharp && <div>🟢 SHARP ({isSharp})</div>}
+                    {isHot && <div>🔥 HOT</div>}
                   </div>
 
-                  <div>
-                    {g.odds > 0 ? "+" : ""}
-                    {g.odds}
-                  </div>
+                  <div>{g.odds}</div>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* 📊 CHART */}
+        {/* CHART */}
         <div style={{
           flex: 1,
           background: "#0a0a0a",
@@ -254,15 +258,9 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="80%">
               <LineChart data={history[selected.id]}>
                 <XAxis dataKey="time" hide />
-                <YAxis domain={["auto", "auto"]} />
+                <YAxis />
                 <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="odds"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  dot={false}
-                />
+                <Line dataKey="odds" stroke="#22c55e" />
               </LineChart>
             </ResponsiveContainer>
           )}
