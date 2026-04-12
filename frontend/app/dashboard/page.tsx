@@ -16,15 +16,43 @@ export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [history, setHistory] = useState<any>({});
   const [selected, setSelected] = useState<any>(null);
+  const [steam, setSteam] = useState<any>({});
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioRef.current = new Audio("/alert.mp3");
+  }, []);
+
+  const detectSteam = (prev: any[], current: any[]) => {
+    const alerts: any = {};
+
+    current.forEach((g) => {
+      const old = prev.find((p) => p.id === g.id);
+      if (!old) return;
+
+      const diff = Math.abs(g.odds - old.odds);
+
+      if (diff >= 10) {
+        alerts[g.id] = true;
+
+        // play sound
+        audioRef.current?.play().catch(() => {});
+      }
+    });
+
+    setSteam(alerts);
+  };
 
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/api/data`);
       const data = await res.json();
 
+      detectSteam(games, data.games || []);
+
       setGames(data.games || []);
 
-      // build history
       setHistory((prev: any) => {
         const updated = { ...prev };
 
@@ -36,10 +64,7 @@ export default function Dashboard() {
             odds: g.odds,
           });
 
-          // limit history length
-          if (updated[g.id].length > 20) {
-            updated[g.id].shift();
-          }
+          if (updated[g.id].length > 20) updated[g.id].shift();
         });
 
         return updated;
@@ -58,38 +83,64 @@ export default function Dashboard() {
   return (
     <div style={{ padding: "30px", maxWidth: "1200px", margin: "0 auto" }}>
       
-      <h1>📈 KBETZ LINE TERMINAL</h1>
+      <h1>🚨 KBETZ STEAM TERMINAL</h1>
 
       <div style={{ display: "flex", gap: "20px" }}>
 
-        {/* GAMES */}
+        {/* LEFT — GAMES */}
         <div style={{ flex: 2 }}>
-          {games.map((g) => (
-            <div
-              key={g.id}
-              onClick={() => setSelected(g)}
-              style={{
-                padding: "15px",
-                marginBottom: "10px",
-                background: "#0a0a0a",
-                borderRadius: "10px",
-                border: "1px solid #222",
-                cursor: "pointer"
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>{g.away} @ {g.home}</span>
-                <span>{g.odds}</span>
-              </div>
+          {games.map((g) => {
+            const isSteam = steam[g.id];
 
-              <div style={{ fontSize: "12px", color: "#888" }}>
-                EV: {g.ev}%
+            return (
+              <div
+                key={g.id}
+                onClick={() => setSelected(g)}
+                style={{
+                  padding: "15px",
+                  marginBottom: "10px",
+                  background: isSteam ? "#2a0a0a" : "#0a0a0a",
+                  borderRadius: "10px",
+                  border: isSteam
+                    ? "1px solid red"
+                    : "1px solid #222",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease"
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div>
+                    <div>{g.away} @ {g.home}</div>
+
+                    <div style={{ fontSize: "12px", color: "#888" }}>
+                      EV: {g.ev}%
+                    </div>
+
+                    {isSteam && (
+                      <div style={{
+                        color: "red",
+                        fontSize: "12px",
+                        marginTop: "5px"
+                      }}>
+                        🚨 STEAM MOVE
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{
+                    fontWeight: "bold",
+                    color: isSteam ? "red" : "#fff"
+                  }}>
+                    {g.odds > 0 ? "+" : ""}
+                    {g.odds}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* CHART PANEL */}
+        {/* RIGHT — CHART */}
         <div
           style={{
             flex: 1,
