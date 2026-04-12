@@ -22,11 +22,23 @@ export default function Dashboard() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // 🔔 SOUND INIT
   useEffect(() => {
     audioRef.current = new Audio("/alert.mp3");
+
+    const unlock = () => {
+      audioRef.current?.play().then(() => {
+        audioRef.current?.pause();
+        audioRef.current!.currentTime = 0;
+      }).catch(() => {});
+
+      window.removeEventListener("click", unlock);
+    };
+
+    window.addEventListener("click", unlock);
   }, []);
 
-  // 🚨 STEAM
+  // 🚨 STEAM DETECTION
   const detectSteam = (prev: any[], current: any[]) => {
     const s: any = {};
     const newAlerts: string[] = [];
@@ -39,6 +51,7 @@ export default function Dashboard() {
 
       if (diff >= 10) {
         s[g.id] = true;
+
         newAlerts.push(`🚨 STEAM: ${g.away} @ ${g.home}`);
 
         audioRef.current?.play().catch(() => {});
@@ -52,7 +65,7 @@ export default function Dashboard() {
     setSteam(s);
   };
 
-  // 🧠 SHARP
+  // 🧠 SHARP DETECTION
   const detectSharp = (hist: any) => {
     const signals: any = {};
 
@@ -75,19 +88,28 @@ export default function Dashboard() {
     setSharp(signals);
   };
 
+  // 📡 FETCH + SIMULATE MOVEMENT
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/api/data`);
       const data = await res.json();
 
-      detectSteam(games, data.games || []);
+      // 🎲 SIMULATE MARKET MOVEMENT
+      const simulated = data.games.map((g: any) => {
+        const randomMove = Math.floor(Math.random() * 15) - 7;
+        return {
+          ...g,
+          odds: g.odds + randomMove,
+        };
+      });
 
-      setGames(data.games || []);
+      detectSteam(games, simulated);
+      setGames(simulated);
 
       setHistory((prev: any) => {
         const updated = { ...prev };
 
-        data.games.forEach((g: any) => {
+        simulated.forEach((g: any) => {
           if (!updated[g.id]) updated[g.id] = [];
 
           updated[g.id].push({
@@ -109,11 +131,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000); // FAST for visibility
+    const interval = setInterval(fetchData, 5000); // FAST updates
     return () => clearInterval(interval);
   }, []);
 
-  // 🏆 BEST EDGE
   const bestGame = games.find((g) => steam[g.id] || sharp[g.id]);
 
   return (
@@ -151,12 +172,11 @@ export default function Dashboard() {
 
       <div style={{ display: "flex", gap: "20px" }}>
 
-        {/* GAMES */}
+        {/* 🎯 GAMES */}
         <div style={{ flex: 2 }}>
           {games.map((g) => {
             const isSteam = steam[g.id];
             const isSharp = sharp[g.id];
-
             const isHot = isSteam && isSharp;
 
             return (
@@ -217,7 +237,7 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* CHART */}
+        {/* 📊 CHART */}
         <div style={{
           flex: 1,
           background: "#0a0a0a",
