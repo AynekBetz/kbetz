@@ -17,13 +17,32 @@ export default function Dashboard() {
   const [history, setHistory] = useState<any>({});
   const [selected, setSelected] = useState<any>(null);
   const [steam, setSteam] = useState<any>({});
+  const [audioReady, setAudioReady] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // 🔔 INIT AUDIO + UNLOCK ON CLICK
   useEffect(() => {
     audioRef.current = new Audio("/alert.mp3");
+
+    const unlockAudio = () => {
+      audioRef.current
+        ?.play()
+        .then(() => {
+          audioRef.current?.pause();
+          audioRef.current!.currentTime = 0;
+          setAudioReady(true);
+          console.log("🔊 Audio unlocked");
+        })
+        .catch(() => {});
+
+      window.removeEventListener("click", unlockAudio);
+    };
+
+    window.addEventListener("click", unlockAudio);
   }, []);
 
+  // 🚨 STEAM DETECTION
   const detectSteam = (prev: any[], current: any[]) => {
     const alerts: any = {};
 
@@ -36,14 +55,16 @@ export default function Dashboard() {
       if (diff >= 10) {
         alerts[g.id] = true;
 
-        // play sound
-        audioRef.current?.play().catch(() => {});
+        if (audioReady) {
+          audioRef.current?.play().catch(() => {});
+        }
       }
     });
 
     setSteam(alerts);
   };
 
+  // 🔄 FETCH DATA
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/api/data`);
@@ -53,6 +74,7 @@ export default function Dashboard() {
 
       setGames(data.games || []);
 
+      // 📊 BUILD HISTORY
       setHistory((prev: any) => {
         const updated = { ...prev };
 
@@ -76,14 +98,35 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
+
+    // ⏱️ CHANGE TO 5000 FOR FAST TESTING
     const interval = setInterval(fetchData, 60000);
+
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div style={{ padding: "30px", maxWidth: "1200px", margin: "0 auto" }}>
       
-      <h1>🚨 KBETZ STEAM TERMINAL</h1>
+      <h1 style={{ fontSize: "28px", marginBottom: "20px" }}>
+        🚨 KBETZ STEAM TERMINAL
+      </h1>
+
+      {/* 🔔 TEST BUTTON */}
+      <button
+        onClick={() => audioRef.current?.play()}
+        style={{
+          marginBottom: "15px",
+          padding: "8px",
+          background: "#6d28d9",
+          color: "#fff",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer"
+        }}
+      >
+        🔔 Test Sound
+      </button>
 
       <div style={{ display: "flex", gap: "20px" }}>
 
@@ -101,9 +144,7 @@ export default function Dashboard() {
                   marginBottom: "10px",
                   background: isSteam ? "#2a0a0a" : "#0a0a0a",
                   borderRadius: "10px",
-                  border: isSteam
-                    ? "1px solid red"
-                    : "1px solid #222",
+                  border: isSteam ? "1px solid red" : "1px solid #222",
                   cursor: "pointer",
                   transition: "all 0.3s ease"
                 }}
