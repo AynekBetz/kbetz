@@ -17,32 +17,28 @@ export default function Dashboard() {
   const [history, setHistory] = useState<any>({});
   const [selected, setSelected] = useState<any>(null);
   const [steam, setSteam] = useState<any>({});
+  const [sharp, setSharp] = useState<any>({});
   const [audioReady, setAudioReady] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // 🔔 INIT AUDIO + UNLOCK ON CLICK
   useEffect(() => {
     audioRef.current = new Audio("/alert.mp3");
 
-    const unlockAudio = () => {
-      audioRef.current
-        ?.play()
-        .then(() => {
-          audioRef.current?.pause();
-          audioRef.current!.currentTime = 0;
-          setAudioReady(true);
-          console.log("🔊 Audio unlocked");
-        })
-        .catch(() => {});
+    const unlock = () => {
+      audioRef.current?.play().then(() => {
+        audioRef.current?.pause();
+        audioRef.current!.currentTime = 0;
+        setAudioReady(true);
+      }).catch(() => {});
 
-      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("click", unlock);
     };
 
-    window.addEventListener("click", unlockAudio);
+    window.addEventListener("click", unlock);
   }, []);
 
-  // 🚨 STEAM DETECTION
+  // 🚨 STEAM
   const detectSteam = (prev: any[], current: any[]) => {
     const alerts: any = {};
 
@@ -50,9 +46,7 @@ export default function Dashboard() {
       const old = prev.find((p) => p.id === g.id);
       if (!old) return;
 
-      const diff = Math.abs(g.odds - old.odds);
-
-      if (diff >= 10) {
+      if (Math.abs(g.odds - old.odds) >= 10) {
         alerts[g.id] = true;
 
         if (audioReady) {
@@ -64,7 +58,29 @@ export default function Dashboard() {
     setSteam(alerts);
   };
 
-  // 🔄 FETCH DATA
+  // 🧠 SHARP MONEY
+  const detectSharp = (hist: any) => {
+    const signals: any = {};
+
+    Object.keys(hist).forEach((id) => {
+      const h = hist[id];
+      if (h.length < 4) return;
+
+      let up = 0;
+      let down = 0;
+
+      for (let i = 1; i < h.length; i++) {
+        if (h[i].odds > h[i - 1].odds) up++;
+        if (h[i].odds < h[i - 1].odds) down++;
+      }
+
+      if (up >= 3) signals[id] = "up";
+      if (down >= 3) signals[id] = "down";
+    });
+
+    setSharp(signals);
+  };
+
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/api/data`);
@@ -74,7 +90,6 @@ export default function Dashboard() {
 
       setGames(data.games || []);
 
-      // 📊 BUILD HISTORY
       setHistory((prev: any) => {
         const updated = { ...prev };
 
@@ -89,6 +104,8 @@ export default function Dashboard() {
           if (updated[g.id].length > 20) updated[g.id].shift();
         });
 
+        detectSharp(updated);
+
         return updated;
       });
     } catch (err) {
@@ -98,42 +115,22 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-
-    // ⏱️ CHANGE TO 5000 FOR FAST TESTING
     const interval = setInterval(fetchData, 60000);
-
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div style={{ padding: "30px", maxWidth: "1200px", margin: "0 auto" }}>
       
-      <h1 style={{ fontSize: "28px", marginBottom: "20px" }}>
-        🚨 KBETZ STEAM TERMINAL
-      </h1>
-
-      {/* 🔔 TEST BUTTON */}
-      <button
-        onClick={() => audioRef.current?.play()}
-        style={{
-          marginBottom: "15px",
-          padding: "8px",
-          background: "#6d28d9",
-          color: "#fff",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer"
-        }}
-      >
-        🔔 Test Sound
-      </button>
+      <h1>💰 KBETZ SMART TERMINAL</h1>
 
       <div style={{ display: "flex", gap: "20px" }}>
 
-        {/* LEFT — GAMES */}
+        {/* GAMES */}
         <div style={{ flex: 2 }}>
           {games.map((g) => {
             const isSteam = steam[g.id];
+            const isSharp = sharp[g.id];
 
             return (
               <div
@@ -142,36 +139,38 @@ export default function Dashboard() {
                 style={{
                   padding: "15px",
                   marginBottom: "10px",
-                  background: isSteam ? "#2a0a0a" : "#0a0a0a",
+                  background: isSteam
+                    ? "#2a0a0a"
+                    : isSharp
+                    ? "#0a2a0a"
+                    : "#0a0a0a",
                   borderRadius: "10px",
-                  border: isSteam ? "1px solid red" : "1px solid #222",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease"
+                  border: isSteam
+                    ? "1px solid red"
+                    : isSharp
+                    ? "1px solid #22c55e"
+                    : "1px solid #222",
+                  cursor: "pointer"
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <div>
                     <div>{g.away} @ {g.home}</div>
 
-                    <div style={{ fontSize: "12px", color: "#888" }}>
-                      EV: {g.ev}%
-                    </div>
-
                     {isSteam && (
-                      <div style={{
-                        color: "red",
-                        fontSize: "12px",
-                        marginTop: "5px"
-                      }}>
+                      <div style={{ color: "red", fontSize: "12px" }}>
                         🚨 STEAM MOVE
+                      </div>
+                    )}
+
+                    {isSharp && (
+                      <div style={{ color: "#22c55e", fontSize: "12px" }}>
+                        🟢 SHARP MONEY ({isSharp})
                       </div>
                     )}
                   </div>
 
-                  <div style={{
-                    fontWeight: "bold",
-                    color: isSteam ? "red" : "#fff"
-                  }}>
+                  <div>
                     {g.odds > 0 ? "+" : ""}
                     {g.odds}
                   </div>
@@ -181,24 +180,18 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* RIGHT — CHART */}
-        <div
-          style={{
-            flex: 1,
-            background: "#0a0a0a",
-            borderRadius: "10px",
-            padding: "15px",
-            border: "1px solid #222",
-            height: "400px"
-          }}
-        >
+        {/* CHART */}
+        <div style={{
+          flex: 1,
+          background: "#0a0a0a",
+          borderRadius: "10px",
+          padding: "15px",
+          border: "1px solid #222",
+          height: "400px"
+        }}>
           <h2>📊 Line Movement</h2>
 
-          {!selected && (
-            <div style={{ color: "#666" }}>
-              Click a game to view chart
-            </div>
-          )}
+          {!selected && <div>Click a game</div>}
 
           {selected && history[selected.id] && (
             <ResponsiveContainer width="100%" height="80%">
