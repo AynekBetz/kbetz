@@ -18,47 +18,41 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<any>(null);
   const [steam, setSteam] = useState<any>({});
   const [sharp, setSharp] = useState<any>({});
-  const [audioReady, setAudioReady] = useState(false);
+  const [alerts, setAlerts] = useState<string[]>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     audioRef.current = new Audio("/alert.mp3");
-
-    const unlock = () => {
-      audioRef.current?.play().then(() => {
-        audioRef.current?.pause();
-        audioRef.current!.currentTime = 0;
-        setAudioReady(true);
-      }).catch(() => {});
-
-      window.removeEventListener("click", unlock);
-    };
-
-    window.addEventListener("click", unlock);
   }, []);
 
   // 🚨 STEAM
   const detectSteam = (prev: any[], current: any[]) => {
-    const alerts: any = {};
+    const s: any = {};
+    const newAlerts: string[] = [];
 
     current.forEach((g) => {
       const old = prev.find((p) => p.id === g.id);
       if (!old) return;
 
-      if (Math.abs(g.odds - old.odds) >= 10) {
-        alerts[g.id] = true;
+      const diff = Math.abs(g.odds - old.odds);
 
-        if (audioReady) {
-          audioRef.current?.play().catch(() => {});
-        }
+      if (diff >= 10) {
+        s[g.id] = true;
+        newAlerts.push(`🚨 STEAM: ${g.away} @ ${g.home}`);
+
+        audioRef.current?.play().catch(() => {});
       }
     });
 
-    setSteam(alerts);
+    if (newAlerts.length) {
+      setAlerts((prev) => [...newAlerts, ...prev].slice(0, 5));
+    }
+
+    setSteam(s);
   };
 
-  // 🧠 SHARP MONEY
+  // 🧠 SHARP
   const detectSharp = (hist: any) => {
     const signals: any = {};
 
@@ -115,14 +109,45 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(fetchData, 5000); // FAST for visibility
     return () => clearInterval(interval);
   }, []);
 
+  // 🏆 BEST EDGE
+  const bestGame = games.find((g) => steam[g.id] || sharp[g.id]);
+
   return (
-    <div style={{ padding: "30px", maxWidth: "1200px", margin: "0 auto" }}>
-      
-      <h1>💰 KBETZ SMART TERMINAL</h1>
+    <div style={{ padding: "25px", maxWidth: "1200px", margin: "0 auto" }}>
+
+      <h1>💰 KBETZ EDGE TERMINAL</h1>
+
+      {/* 🚨 ALERT BAR */}
+      <div style={{
+        margin: "15px 0",
+        padding: "10px",
+        background: "#111",
+        border: "1px solid #333",
+        borderRadius: "8px"
+      }}>
+        {alerts.length === 0 && <div>No live alerts</div>}
+        {alerts.map((a, i) => (
+          <div key={i} style={{ fontSize: "12px" }}>{a}</div>
+        ))}
+      </div>
+
+      {/* 🏆 BEST EDGE */}
+      {bestGame && (
+        <div style={{
+          background: "#1f2937",
+          padding: "15px",
+          borderRadius: "10px",
+          marginBottom: "15px",
+          border: "1px solid gold"
+        }}>
+          <h3>🏆 BEST EDGE</h3>
+          <div>{bestGame.away} @ {bestGame.home}</div>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: "20px" }}>
 
@@ -132,6 +157,8 @@ export default function Dashboard() {
             const isSteam = steam[g.id];
             const isSharp = sharp[g.id];
 
+            const isHot = isSteam && isSharp;
+
             return (
               <div
                 key={g.id}
@@ -139,13 +166,17 @@ export default function Dashboard() {
                 style={{
                   padding: "15px",
                   marginBottom: "10px",
-                  background: isSteam
+                  background: isHot
+                    ? "#3f1d00"
+                    : isSteam
                     ? "#2a0a0a"
                     : isSharp
                     ? "#0a2a0a"
                     : "#0a0a0a",
                   borderRadius: "10px",
-                  border: isSteam
+                  border: isHot
+                    ? "2px solid orange"
+                    : isSteam
                     ? "1px solid red"
                     : isSharp
                     ? "1px solid #22c55e"
@@ -157,6 +188,12 @@ export default function Dashboard() {
                   <div>
                     <div>{g.away} @ {g.home}</div>
 
+                    {isHot && (
+                      <div style={{ color: "orange", fontSize: "12px" }}>
+                        🔥 HOT GAME
+                      </div>
+                    )}
+
                     {isSteam && (
                       <div style={{ color: "red", fontSize: "12px" }}>
                         🚨 STEAM MOVE
@@ -165,7 +202,7 @@ export default function Dashboard() {
 
                     {isSharp && (
                       <div style={{ color: "#22c55e", fontSize: "12px" }}>
-                        🟢 SHARP MONEY ({isSharp})
+                        🟢 SHARP ({isSharp})
                       </div>
                     )}
                   </div>
@@ -189,9 +226,9 @@ export default function Dashboard() {
           border: "1px solid #222",
           height: "400px"
         }}>
-          <h2>📊 Line Movement</h2>
+          <h2>📊 Movement</h2>
 
-          {!selected && <div>Click a game</div>}
+          {!selected && <div>Select a game</div>}
 
           {selected && history[selected.id] && (
             <ResponsiveContainer width="100%" height="80%">
