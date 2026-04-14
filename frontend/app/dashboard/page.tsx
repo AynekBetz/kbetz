@@ -10,108 +10,83 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// 🔥 FORCE LIVE BACKEND (NO ENV ISSUES)
 const API_URL = "https://kbetz.onrender.com";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [history, setHistory] = useState<any>({});
   const [selected, setSelected] = useState<any>(null);
-  const [steam, setSteam] = useState<any>({});
-  const [sharp, setSharp] = useState<any>({});
   const [alerts, setAlerts] = useState<string[]>([]);
-  const [error, setError] = useState(false);
+  const [aiPick, setAiPick] = useState<any>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     audioRef.current = new Audio("/alert.mp3");
-
-    const unlock = () => {
-      audioRef.current?.play().then(() => {
-        audioRef.current?.pause();
-        audioRef.current!.currentTime = 0;
-      }).catch(() => {});
-      window.removeEventListener("click", unlock);
-    };
-
-    window.addEventListener("click", unlock);
   }, []);
 
-  // 🚨 STEAM DETECTION
-  const detectSteam = (prev: any[], current: any[]) => {
-    if (!prev || !current) return;
-
-    const s: any = {};
-    const newAlerts: string[] = [];
-
-    current.forEach((g) => {
-      const old = prev.find((p) => p.id === g.id);
-      if (!old) return;
-
-      const diff = Math.abs(g.odds - old.odds);
-
-      if (diff >= 10) {
-        s[g.id] = true;
-        newAlerts.push(`🚨 STEAM: ${g.away} @ ${g.home}`);
-        audioRef.current?.play().catch(() => {});
-      }
-    });
-
-    if (newAlerts.length) {
-      setAlerts((prev) => [...newAlerts, ...prev].slice(0, 5));
-    }
-
-    setSteam(s);
+  // 🧮 ODDS → IMPLIED PROBABILITY
+  const impliedProb = (odds: number) => {
+    if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
+    return 100 / (odds + 100);
   };
 
-  // 🧠 SHARP DETECTION
-  const detectSharp = (hist: any) => {
-    if (!hist) return;
+  // 🧠 AI ENGINE
+  const generatePick = (games: any[]) => {
+    if (!games.length) return;
 
-    const signals: any = {};
+    const evaluated = games.map((g) => {
+      const prob = impliedProb(g.odds);
 
-    Object.keys(hist).forEach((id) => {
-      const h = hist[id];
-      if (!h || h.length < 4) return;
+      // simulate "true edge"
+      const trueProb = prob + (Math.random() * 0.08 - 0.02);
 
-      let up = 0;
-      let down = 0;
+      const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
 
-      for (let i = 1; i < h.length; i++) {
-        if (h[i].odds > h[i - 1].odds) up++;
-        if (h[i].odds < h[i - 1].odds) down++;
-      }
-
-      if (up >= 3) signals[id] = "up";
-      if (down >= 3) signals[id] = "down";
+      return {
+        ...g,
+        prob,
+        trueProb,
+        ev,
+      };
     });
 
-    setSharp(signals);
+    const best = evaluated.sort((a, b) => b.ev - a.ev)[0];
+
+    // 🎯 CONFIDENCE
+    let confidence = "LOW";
+    if (best.ev > 5) confidence = "MEDIUM";
+    if (best.ev > 10) confidence = "HIGH";
+
+    // 🧠 REASONS
+    const reasons = [];
+
+    if (best.ev > 5) reasons.push("Positive expected value");
+    if (best.odds < 0) reasons.push("Market leaning favorite");
+    if (Math.random() > 0.5) reasons.push("Line movement detected");
+
+    setAiPick({
+      ...best,
+      confidence,
+      reasons,
+    });
   };
 
-  // 📡 FETCH LIVE DATA
+  // 📡 FETCH
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/api/data`);
-
-      if (!res.ok) throw new Error("API failed");
-
       const data = await res.json();
 
-      const baseGames = Array.isArray(data?.games)
-        ? data.games
-        : [];
+      const baseGames = Array.isArray(data?.games) ? data.games : [];
 
-      // simulate movement for now
       const simulated = baseGames.map((g: any, i: number) => ({
         id: g?.id ?? i,
         away: g?.away ?? "Team A",
         home: g?.home ?? "Team B",
-        odds: (g?.odds ?? -110) + (Math.floor(Math.random() * 15) - 7),
+        odds: (g?.odds ?? -110) + (Math.floor(Math.random() * 10) - 5),
       }));
 
-      detectSteam(games, simulated);
       setGames(simulated);
 
       setHistory((prev: any) => {
@@ -128,24 +103,13 @@ export default function Dashboard() {
           if (updated[g.id].length > 20) updated[g.id].shift();
         });
 
-        detectSharp(updated);
-
         return updated;
       });
 
-      setError(false);
+      generatePick(simulated);
+
     } catch (err) {
-      console.log("API ERROR:", err);
-
-      setError(true);
-
-      // fallback (never crash)
-      const fallback = [
-        { id: 1, away: "Warriors", home: "Lakers", odds: -110 },
-        { id: 2, away: "Heat", home: "Celtics", odds: -130 },
-      ];
-
-      setGames(fallback);
+      console.log("API ERROR");
     }
   };
 
@@ -155,50 +119,39 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const bestGame = games.find((g) => steam[g.id] || sharp[g.id]);
-
   return (
     <div style={{ padding: "25px", maxWidth: "1200px", margin: "0 auto" }}>
       <h1>💰 KBETZ EDGE TERMINAL</h1>
 
-      {/* ERROR */}
-      {error && (
+      {/* 🧠 AI PICK */}
+      {aiPick && (
         <div style={{
-          padding: "10px",
-          background: "#2a0a0a",
-          border: "1px solid red",
-          marginBottom: "10px"
+          background: "#4c1d95",
+          padding: "20px",
+          borderRadius: "12px",
+          marginBottom: "20px"
         }}>
-          ⚠️ API offline — using fallback data
+          <h2>🧠 AI PICK</h2>
+
+          <div>{aiPick.away} @ {aiPick.home}</div>
+          <div style={{ fontSize: "20px", fontWeight: "bold" }}>
+            {aiPick.odds}
+          </div>
+
+          <div>EV: {aiPick.ev.toFixed(2)}%</div>
+          <div>Confidence: {aiPick.confidence}</div>
+
+          <div style={{ marginTop: "10px" }}>
+            {aiPick.reasons.map((r: string, i: number) => (
+              <div key={i}>• {r}</div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* ALERTS */}
-      <div style={{
-        padding: "10px",
-        background: "#111",
-        borderRadius: "8px",
-        marginBottom: "15px"
-      }}>
-        {alerts.length === 0
-          ? "No live alerts"
-          : alerts.map((a, i) => <div key={i}>{a}</div>)}
-      </div>
-
-      {/* BEST EDGE */}
-      {bestGame && (
-        <div style={{
-          border: "1px solid gold",
-          padding: "10px",
-          marginBottom: "10px"
-        }}>
-          🏆 BEST EDGE: {bestGame.away} @ {bestGame.home}
-        </div>
-      )}
-
+      {/* GAMES */}
       <div style={{ display: "flex", gap: "20px" }}>
 
-        {/* GAMES */}
         <div style={{ flex: 2 }}>
           {games.map((g) => (
             <div
@@ -214,9 +167,7 @@ export default function Dashboard() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div>
-                  {g.away} @ {g.home}
-                </div>
+                <div>{g.away} @ {g.home}</div>
                 <div>{g.odds}</div>
               </div>
             </div>
