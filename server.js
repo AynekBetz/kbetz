@@ -1,68 +1,71 @@
 import express from "express";
 import cors from "cors";
+import fetch from "node-fetch";
 
 const app = express();
+
 app.use(cors());
+app.use(express.json());
 
-const PORT = 10000;
+const PORT = process.env.PORT || 10000;
+const API_KEY = process.env.ODDS_API_KEY;
 
-// =============================
-// MOCK DATA (ALWAYS WORKS)
-// =============================
-const games = [
-  {
-    id: "1",
-    home: "Lakers",
-    away: "Warriors",
-    odds: -110
-  },
-  {
-    id: "2",
-    home: "Celtics",
-    away: "Heat",
-    odds: -130
-  }
+// ✅ FALLBACK (NEVER BREAK FRONTEND)
+const fallbackGames = [
+  { id: 1, away: "Warriors", home: "Lakers", odds: -110 },
+  { id: 2, away: "Heat", home: "Celtics", odds: -130 },
 ];
 
-// =============================
-// EV CALC
-// =============================
-function calculateEV(odds) {
-  const prob = 0.5;
-  const payout = odds > 0 ? odds / 100 : 100 / Math.abs(odds);
-  return (prob * payout - (1 - prob)) * 100;
+// 🔥 LIVE ODDS FETCH
+async function fetchOdds() {
+  try {
+    const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=h2h`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!Array.isArray(data)) return fallbackGames;
+
+    return data.map((game, i) => {
+      const book = game.bookmakers?.[0];
+      const market = book?.markets?.[0];
+      const outcome = market?.outcomes?.[0];
+
+      return {
+        id: i + 1,
+        away: game.away_team || "Away",
+        home: game.home_team || "Home",
+        odds: outcome?.price || -110,
+      };
+    });
+  } catch (err) {
+    console.log("ODDS API ERROR:", err);
+    return fallbackGames;
+  }
 }
 
-// =============================
-// AI PICK
-// =============================
-function getAIPick() {
-  const best = games[0];
+// 🔒 LOCKED ROUTE
+app.get("/api/data", async (req, res) => {
+  try {
+    const games = await fetchOdds();
 
-  return {
-    matchup: `${best.away} @ ${best.home}`,
-    odds: best.odds,
-    ev: calculateEV(best.odds).toFixed(2),
-    confidence: "MEDIUM"
-  };
-}
-
-// =============================
-// ROUTE
-// =============================
-app.get("/api/data", (req, res) => {
-  const enriched = games.map((g) => ({
-    ...g,
-    ev: calculateEV(g.odds).toFixed(2)
-  }));
-
-  res.json({
-    games: enriched,
-    aiPick: getAIPick()
-  });
+    res.json({
+      success: true,
+      games,
+    });
+  } catch (err) {
+    res.json({
+      success: false,
+      games: fallbackGames,
+    });
+  }
 });
 
-// =============================
+// HEALTH
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 app.listen(PORT, () => {
-  console.log(`🔥 STABLE SERVER running on ${PORT}`);
+  console.log(`🔥 KBETZ LIVE SERVER ${PORT}`);
 });
