@@ -10,9 +10,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-// ✅ SAFE FALLBACK (VERY IMPORTANT)
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:10000";
+// 🔥 FORCE LIVE BACKEND (NO ENV ISSUES)
+const API_URL = "https://kbetz.onrender.com";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
@@ -33,15 +32,16 @@ export default function Dashboard() {
         audioRef.current?.pause();
         audioRef.current!.currentTime = 0;
       }).catch(() => {});
-
       window.removeEventListener("click", unlock);
     };
 
     window.addEventListener("click", unlock);
   }, []);
 
-  // 🚨 STEAM
+  // 🚨 STEAM DETECTION
   const detectSteam = (prev: any[], current: any[]) => {
+    if (!prev || !current) return;
+
     const s: any = {};
     const newAlerts: string[] = [];
 
@@ -65,8 +65,10 @@ export default function Dashboard() {
     setSteam(s);
   };
 
-  // 🧠 SHARP
+  // 🧠 SHARP DETECTION
   const detectSharp = (hist: any) => {
+    if (!hist) return;
+
     const signals: any = {};
 
     Object.keys(hist).forEach((id) => {
@@ -88,7 +90,7 @@ export default function Dashboard() {
     setSharp(signals);
   };
 
-  // 📡 FETCH (SAFE VERSION)
+  // 📡 FETCH LIVE DATA
   const fetchData = async () => {
     try {
       const res = await fetch(`${API_URL}/api/data`);
@@ -97,11 +99,17 @@ export default function Dashboard() {
 
       const data = await res.json();
 
-      // 🎲 simulate movement
-      const simulated = (data.games || []).map((g: any) => {
-        const move = Math.floor(Math.random() * 15) - 7;
-        return { ...g, odds: g.odds + move };
-      });
+      const baseGames = Array.isArray(data?.games)
+        ? data.games
+        : [];
+
+      // simulate movement for now
+      const simulated = baseGames.map((g: any, i: number) => ({
+        id: g?.id ?? i,
+        away: g?.away ?? "Team A",
+        home: g?.home ?? "Team B",
+        odds: (g?.odds ?? -110) + (Math.floor(Math.random() * 15) - 7),
+      }));
 
       detectSteam(games, simulated);
       setGames(simulated);
@@ -128,9 +136,10 @@ export default function Dashboard() {
       setError(false);
     } catch (err) {
       console.log("API ERROR:", err);
+
       setError(true);
 
-      // ✅ fallback mock (NO CRASH)
+      // fallback (never crash)
       const fallback = [
         { id: 1, away: "Warriors", home: "Lakers", odds: -110 },
         { id: 2, away: "Heat", home: "Celtics", odds: -130 },
@@ -152,7 +161,7 @@ export default function Dashboard() {
     <div style={{ padding: "25px", maxWidth: "1200px", margin: "0 auto" }}>
       <h1>💰 KBETZ EDGE TERMINAL</h1>
 
-      {/* ERROR STATE */}
+      {/* ERROR */}
       {error && (
         <div style={{
           padding: "10px",
@@ -164,28 +173,24 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ALERT BAR */}
+      {/* ALERTS */}
       <div style={{
-        margin: "15px 0",
         padding: "10px",
         background: "#111",
-        border: "1px solid #333",
-        borderRadius: "8px"
+        borderRadius: "8px",
+        marginBottom: "15px"
       }}>
-        {alerts.length === 0 && <div>No live alerts</div>}
-        {alerts.map((a, i) => (
-          <div key={i}>{a}</div>
-        ))}
+        {alerts.length === 0
+          ? "No live alerts"
+          : alerts.map((a, i) => <div key={i}>{a}</div>)}
       </div>
 
       {/* BEST EDGE */}
       {bestGame && (
         <div style={{
-          background: "#1f2937",
-          padding: "15px",
-          borderRadius: "10px",
-          marginBottom: "15px",
-          border: "1px solid gold"
+          border: "1px solid gold",
+          padding: "10px",
+          marginBottom: "10px"
         }}>
           🏆 BEST EDGE: {bestGame.away} @ {bestGame.home}
         </div>
@@ -195,50 +200,27 @@ export default function Dashboard() {
 
         {/* GAMES */}
         <div style={{ flex: 2 }}>
-          {games.map((g) => {
-            const isSteam = steam[g.id];
-            const isSharp = sharp[g.id];
-            const isHot = isSteam && isSharp;
-
-            return (
-              <div
-                key={g.id}
-                onClick={() => setSelected(g)}
-                style={{
-                  padding: "15px",
-                  marginBottom: "10px",
-                  background: isHot
-                    ? "#3f1d00"
-                    : isSteam
-                    ? "#2a0a0a"
-                    : isSharp
-                    ? "#0a2a0a"
-                    : "#0a0a0a",
-                  borderRadius: "10px",
-                  border: isHot
-                    ? "2px solid orange"
-                    : isSteam
-                    ? "1px solid red"
-                    : isSharp
-                    ? "1px solid #22c55e"
-                    : "1px solid #222",
-                  cursor: "pointer"
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <div>
-                    {g.away} @ {g.home}
-
-                    {isSteam && <div>🚨 STEAM</div>}
-                    {isSharp && <div>🟢 SHARP ({isSharp})</div>}
-                    {isHot && <div>🔥 HOT</div>}
-                  </div>
-
-                  <div>{g.odds}</div>
+          {games.map((g) => (
+            <div
+              key={g.id}
+              onClick={() => setSelected(g)}
+              style={{
+                padding: "15px",
+                marginBottom: "10px",
+                background: "#0a0a0a",
+                border: "1px solid #222",
+                borderRadius: "10px",
+                cursor: "pointer"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div>
+                  {g.away} @ {g.home}
                 </div>
+                <div>{g.odds}</div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
         {/* CHART */}
