@@ -12,6 +12,9 @@ import {
 
 const API_URL = "https://kbetz.onrender.com";
 
+// 🔒 TOGGLE THIS (simulate user)
+const isPro = false;
+
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [history, setHistory] = useState<any>({});
@@ -19,111 +22,50 @@ export default function Dashboard() {
   const [aiPick, setAiPick] = useState<any>(null);
   const [error, setError] = useState(false);
 
-  // 📊 IMPLIED PROBABILITY
   const impliedProb = (odds: number) => {
     if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
     return 100 / (odds + 100);
   };
 
-  // 🧠 AI ENGINE (REAL DATA)
   const generatePick = (games: any[], history: any) => {
     if (!games.length) return;
 
     const evaluated = games.map((g) => {
       const prob = impliedProb(g.odds);
-      const gameHistory = history[g.id] || [];
+      const hist = history[g.id] || [];
 
       let momentum = 0;
-      let steam = false;
-      let sharp = false;
-      let trap = false;
-
-      if (gameHistory.length >= 3) {
-        const first = gameHistory[0].odds;
-        const mid = gameHistory[Math.floor(gameHistory.length / 2)].odds;
-        const last = gameHistory[gameHistory.length - 1].odds;
-
-        momentum = last - first;
-
-        // 🚨 STEAM MOVE
-        if (Math.abs(last - mid) >= 8) {
-          steam = true;
-        }
-
-        // 💰 SHARP MONEY (reverse movement)
-        if (mid < first && last > mid) {
-          sharp = true;
-        }
-
-        // 🎣 TRAP LINE
-        if (g.odds > -110 && momentum > 0) {
-          trap = true;
-        }
+      if (hist.length >= 2) {
+        momentum = hist[hist.length - 1].odds - hist[0].odds;
       }
 
-      // 🧠 TRUE PROBABILITY ADJUSTMENTS
       let trueProb = prob;
 
-      if (steam) trueProb += 0.05;
-      if (sharp) trueProb += 0.06;
-      if (momentum < 0) trueProb += 0.03;
+      if (momentum < 0) trueProb += 0.04;
       if (momentum > 0) trueProb -= 0.04;
-      if (trap) trueProb -= 0.06;
 
       const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
 
-      return {
-        ...g,
-        ev,
-        momentum,
-        steam,
-        sharp,
-        trap,
-      };
+      return { ...g, ev };
     });
 
     const best = evaluated.sort((a, b) => b.ev - a.ev)[0];
 
-    // 🎯 CONFIDENCE
-    let confidence = "LOW";
-    if (best.ev > 4) confidence = "MEDIUM";
-    if (best.ev > 8) confidence = "HIGH";
-    if (best.ev > 14) confidence = "ELITE";
-
-    // 🧠 REASONS
-    const reasons = [];
-
-    if (best.ev > 5) reasons.push("Positive expected value");
-    if (best.momentum < 0) reasons.push("Line moving in favor");
-    if (best.steam) reasons.push("Steam move detected");
-    if (best.sharp) reasons.push("Sharp money detected");
-    if (best.trap) reasons.push("Trap line — caution");
-
-    setAiPick({
-      ...best,
-      confidence,
-      reasons,
-    });
+    setAiPick(best);
   };
 
-  // 📡 FETCH REAL DATA (NO SIMULATION)
   const fetchData = async () => {
     let data;
 
     try {
       const res = await fetch(`${API_URL}/api/data`);
-
-      if (!res.ok) throw new Error();
-
       data = await res.json();
       setError(false);
     } catch {
       setError(true);
-
       data = {
         games: [
           { id: 1, away: "Warriors", home: "Lakers", odds: -110 },
-          { id: 2, away: "Heat", home: "Celtics", odds: -130 },
         ],
       };
     }
@@ -132,7 +74,7 @@ export default function Dashboard() {
       id: g.id ?? i,
       away: g.away,
       home: g.home,
-      odds: g.odds, // ✅ REAL ODDS ONLY
+      odds: g.odds,
     }));
 
     setGames(realGames);
@@ -159,7 +101,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10000); // slower = real API safe
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -167,50 +109,59 @@ export default function Dashboard() {
     <div style={{ padding: "25px", maxWidth: "1200px", margin: "0 auto" }}>
       <h1>💰 KBETZ EDGE TERMINAL</h1>
 
-      {error && (
-        <div
-          style={{
-            background: "#2a0a0a",
-            border: "1px solid red",
-            padding: "10px",
-            marginBottom: "10px",
-          }}
-        >
-          ⚠️ API fallback active
+      {/* 🔒 PRO BANNER */}
+      {!isPro && (
+        <div style={{
+          background: "#111",
+          border: "1px solid gold",
+          padding: "10px",
+          marginBottom: "15px",
+          textAlign: "center"
+        }}>
+          🔒 Upgrade to PRO to unlock AI picks & alerts
         </div>
       )}
 
       {/* 🧠 AI PICK */}
       {aiPick && (
-        <div
-          style={{
-            background: "#4c1d95",
-            padding: "20px",
-            borderRadius: "12px",
-            marginBottom: "20px",
-          }}
-        >
+        <div style={{
+          background: "#4c1d95",
+          padding: "20px",
+          borderRadius: "12px",
+          marginBottom: "20px",
+          position: "relative",
+          filter: isPro ? "none" : "blur(6px)"
+        }}>
           <h2>🧠 AI PICK</h2>
 
-          <div>
-            {aiPick.away} @ {aiPick.home}
-          </div>
-
+          <div>{aiPick.away} @ {aiPick.home}</div>
           <div style={{ fontSize: "22px" }}>{aiPick.odds}</div>
 
-          <div>EV: {aiPick.ev.toFixed(2)}%</div>
-          <div>Confidence: {aiPick.confidence}</div>
+          <div>EV: {aiPick.ev?.toFixed(2)}%</div>
 
-          <div style={{ marginTop: "10px" }}>
-            {aiPick.reasons.map((r: string, i: number) => (
-              <div key={i}>• {r}</div>
-            ))}
-          </div>
+          {/* LOCK OVERLAY */}
+          {!isPro && (
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "18px",
+              color: "white",
+              background: "rgba(0,0,0,0.6)"
+            }}>
+              🔒 PRO ONLY
+            </div>
+          )}
         </div>
       )}
 
+      {/* GAMES */}
       <div style={{ display: "flex", gap: "20px" }}>
-        {/* GAMES */}
         <div style={{ flex: 2 }}>
           {games.map((g) => (
             <div
@@ -222,18 +173,11 @@ export default function Dashboard() {
                 background: "#0a0a0a",
                 border: "1px solid #222",
                 borderRadius: "10px",
-                cursor: "pointer",
+                cursor: "pointer"
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div>
-                  {g.away} @ {g.home}
-                </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div>{g.away} @ {g.home}</div>
                 <div>{g.odds}</div>
               </div>
             </div>
@@ -241,16 +185,14 @@ export default function Dashboard() {
         </div>
 
         {/* CHART */}
-        <div
-          style={{
-            flex: 1,
-            background: "#0a0a0a",
-            borderRadius: "10px",
-            padding: "15px",
-            border: "1px solid #222",
-            height: "400px",
-          }}
-        >
+        <div style={{
+          flex: 1,
+          background: "#0a0a0a",
+          borderRadius: "10px",
+          padding: "15px",
+          border: "1px solid #222",
+          height: "400px"
+        }}>
           <h2>📊 Movement</h2>
 
           {!selected && <div>Select a game</div>}
@@ -267,6 +209,22 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* 💰 UPGRADE BUTTON */}
+      {!isPro && (
+        <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <button style={{
+            padding: "12px 20px",
+            background: "gold",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "bold"
+          }}>
+            Upgrade to PRO
+          </button>
+        </div>
+      )}
     </div>
   );
 }
