@@ -19,51 +19,94 @@ export default function Dashboard() {
   const [aiPick, setAiPick] = useState<any>(null);
   const [error, setError] = useState(false);
 
-  // 🧮 implied probability
+  // 📊 implied probability
   const impliedProb = (odds: number) => {
     if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
     return 100 / (odds + 100);
   };
 
-  // 🧠 AI PICK
-  const generatePick = (games: any[]) => {
+  // 🧠 SMART AI ENGINE
+  const generatePick = (games: any[], history: any) => {
     if (!games.length) return;
 
     const evaluated = games.map((g) => {
       const prob = impliedProb(g.odds);
-      const trueProb = prob + (Math.random() * 0.08 - 0.02);
+
+      const gameHistory = history[g.id] || [];
+
+      let momentum = 0;
+      let steam = false;
+
+      if (gameHistory.length >= 2) {
+        const first = gameHistory[0].odds;
+        const last = gameHistory[gameHistory.length - 1].odds;
+
+        momentum = last - first;
+
+        if (Math.abs(momentum) >= 10) {
+          steam = true;
+        }
+      }
+
+      // 🧠 TRUE PROBABILITY ADJUSTMENT
+      let trueProb = prob;
+
+      // steam boost
+      if (steam) trueProb += 0.05;
+
+      // favorable movement (toward favorite)
+      if (momentum < 0) trueProb += 0.03;
+
+      // bad movement (against)
+      if (momentum > 0) trueProb -= 0.03;
+
+      // 💰 EV CALCULATION
       const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
 
-      return { ...g, ev };
+      return {
+        ...g,
+        ev,
+        momentum,
+        steam,
+      };
     });
 
     const best = evaluated.sort((a, b) => b.ev - a.ev)[0];
 
+    // 🎯 CONFIDENCE SYSTEM
     let confidence = "LOW";
-    if (best.ev > 5) confidence = "MEDIUM";
-    if (best.ev > 10) confidence = "HIGH";
+
+    if (best.ev > 3) confidence = "MEDIUM";
+    if (best.ev > 7) confidence = "HIGH";
+    if (best.ev > 12) confidence = "ELITE";
+
+    // 🧠 REASONS ENGINE
+    const reasons = [];
+
+    if (best.ev > 5) reasons.push("Positive expected value");
+    if (best.momentum < 0) reasons.push("Line moving in favor");
+    if (best.momentum > 0) reasons.push("Market resistance");
+    if (best.steam) reasons.push("Steam move detected");
 
     setAiPick({
       ...best,
       confidence,
+      reasons,
     });
   };
 
-  // 📡 SAFE FETCH (KEY FIX)
+  // 📡 FETCH
   const fetchData = async () => {
     let data;
 
     try {
       const res = await fetch(`${API_URL}/api/data`);
 
-      if (!res.ok) throw new Error("bad response");
+      if (!res.ok) throw new Error("bad");
 
       data = await res.json();
-
       setError(false);
-    } catch (err) {
-      console.log("FETCH FAILED — USING FALLBACK");
-
+    } catch {
       setError(true);
 
       data = {
@@ -74,14 +117,13 @@ export default function Dashboard() {
       };
     }
 
-    const baseGames = Array.isArray(data?.games) ? data.games : [];
+    const baseGames = data.games || [];
 
-    // simulate movement
     const simulated = baseGames.map((g: any, i: number) => ({
-      id: g?.id ?? i,
-      away: g?.away ?? "Team A",
-      home: g?.home ?? "Team B",
-      odds: (g?.odds ?? -110) + (Math.floor(Math.random() * 10) - 5),
+      id: g.id ?? i,
+      away: g.away,
+      home: g.home,
+      odds: g.odds + (Math.floor(Math.random() * 10) - 5),
     }));
 
     setGames(simulated);
@@ -97,18 +139,19 @@ export default function Dashboard() {
           odds: g.odds,
         });
 
-        if (updated[g.id].length > 20) updated[g.id].shift();
+        if (updated[g.id].length > 25) updated[g.id].shift();
       });
+
+      // 🔥 RUN AI WITH UPDATED HISTORY
+      generatePick(simulated, updated);
 
       return updated;
     });
-
-    generatePick(simulated);
   };
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 4000);
     return () => clearInterval(interval);
   }, []);
 
@@ -119,11 +162,11 @@ export default function Dashboard() {
       {error && (
         <div style={{
           background: "#2a0a0a",
-          padding: "10px",
           border: "1px solid red",
+          padding: "10px",
           marginBottom: "10px"
         }}>
-          ⚠️ API offline — fallback
+          ⚠️ API fallback active
         </div>
       )}
 
@@ -136,10 +179,18 @@ export default function Dashboard() {
           marginBottom: "20px"
         }}>
           <h2>🧠 AI PICK</h2>
+
           <div>{aiPick.away} @ {aiPick.home}</div>
-          <div style={{ fontSize: "20px" }}>{aiPick.odds}</div>
+          <div style={{ fontSize: "22px" }}>{aiPick.odds}</div>
+
           <div>EV: {aiPick.ev.toFixed(2)}%</div>
           <div>Confidence: {aiPick.confidence}</div>
+
+          <div style={{ marginTop: "10px" }}>
+            {aiPick.reasons.map((r: string, i: number) => (
+              <div key={i}>• {r}</div>
+            ))}
+          </div>
         </div>
       )}
 
