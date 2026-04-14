@@ -1,48 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { setToken } from "../../lib/auth";
+
+const API = "https://kbetz.onrender.com";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  async function handleLogin() {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      }
-    );
+  const login = async () => {
+    const res = await fetch(`${API}/api/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, password })
+    });
 
     const data = await res.json();
 
-    if (data.token) {
-      setToken(data.token);
+    if (data.success) {
+      localStorage.setItem("token", data.token);
       window.location.href = "/dashboard";
     } else {
       alert("Login failed");
     }
-  }
+  };
 
   return (
-    <div style={{ padding: "40px" }}>
+    <div>
       <h1>Login</h1>
-
-      <input
-        placeholder="Email"
-        onChange={(e) => setEmail(e.target.value)}
-      />
-
-      <input
-        type="password"
-        placeholder="Password"
-        onChange={(e) => setPassword(e.target.value)}
-      />
-
-      <button onClick={handleLogin}>Login</button>
+      <input onChange={(e) => setEmail(e.target.value)} placeholder="email" />
+      <input type="password" onChange={(e) => setPassword(e.target.value)} placeholder="password" />
+      <button onClick={login}>Login</button>
     </div>
   );
 }

@@ -2,32 +2,36 @@
 
 import { useState } from "react";
 
+const API = "https://kbetz.onrender.com";
+
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  async function handleSignup() {
-    await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      }
-    );
+  const signup = async () => {
+    const res = await fetch(`${API}/api/signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, password })
+    });
 
-    alert("Account created. Now login.");
-    window.location.href = "/login";
-  }
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Signup successful");
+    } else {
+      alert("Signup failed");
+    }
+  };
 
   return (
-    <div style={{ padding: "40px" }}>
+    <div>
       <h1>Signup</h1>
-
-      <input onChange={(e) => setEmail(e.target.value)} />
-      <input type="password" onChange={(e) => setPassword(e.target.value)} />
-
-      <button onClick={handleSignup}>Create Account</button>
+      <input onChange={(e) => setEmail(e.target.value)} placeholder="email" />
+      <input type="password" onChange={(e) => setPassword(e.target.value)} placeholder="password" />
+      <button onClick={signup}>Create Account</button>
     </div>
   );
 }

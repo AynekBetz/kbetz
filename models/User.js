@@ -3,21 +3,19 @@ import mongoose from "mongoose";
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
-    unique: true
+    required: true,
+    unique: true,
   },
-  password: String,
-
-  // 🔥 PRO ACCESS
-  pro: {
-    type: Boolean,
-    default: false
-  },
-
-  // 💳 STRIPE LINK
-  stripeCustomerId: {
+  password: {
     type: String,
-    default: null
-  }
+    required: true,
+  },
+  plan: {
+    type: String,
+    default: "free", // free or pro
+  },
+}, {
+  timestamps: true, // adds createdAt / updatedAt (useful later)
 });
 
 export default mongoose.model("User", userSchema);
