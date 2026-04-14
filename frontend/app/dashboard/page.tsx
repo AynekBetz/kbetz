@@ -19,12 +19,13 @@ export default function Dashboard() {
   const [aiPick, setAiPick] = useState<any>(null);
   const [error, setError] = useState(false);
 
+  // 📊 IMPLIED PROBABILITY
   const impliedProb = (odds: number) => {
     if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
     return 100 / (odds + 100);
   };
 
-  // 🧠 FULL AI ENGINE (WITH SHARP)
+  // 🧠 AI ENGINE (REAL DATA)
   const generatePick = (games: any[], history: any) => {
     if (!games.length) return;
 
@@ -44,12 +45,12 @@ export default function Dashboard() {
 
         momentum = last - first;
 
-        // 🚨 STEAM
+        // 🚨 STEAM MOVE
         if (Math.abs(last - mid) >= 8) {
           steam = true;
         }
 
-        // 💰 SHARP MONEY (reverse move)
+        // 💰 SHARP MONEY (reverse movement)
         if (mid < first && last > mid) {
           sharp = true;
         }
@@ -60,7 +61,7 @@ export default function Dashboard() {
         }
       }
 
-      // 🧠 TRUE PROBABILITY
+      // 🧠 TRUE PROBABILITY ADJUSTMENTS
       let trueProb = prob;
 
       if (steam) trueProb += 0.05;
@@ -105,11 +106,13 @@ export default function Dashboard() {
     });
   };
 
+  // 📡 FETCH REAL DATA (NO SIMULATION)
   const fetchData = async () => {
     let data;
 
     try {
       const res = await fetch(`${API_URL}/api/data`);
+
       if (!res.ok) throw new Error();
 
       data = await res.json();
@@ -125,19 +128,19 @@ export default function Dashboard() {
       };
     }
 
-    const simulated = data.games.map((g: any, i: number) => ({
+    const realGames = data.games.map((g: any, i: number) => ({
       id: g.id ?? i,
       away: g.away,
       home: g.home,
-      odds: g.odds + (Math.floor(Math.random() * 10) - 5),
+      odds: g.odds, // ✅ REAL ODDS ONLY
     }));
 
-    setGames(simulated);
+    setGames(realGames);
 
     setHistory((prev: any) => {
       const updated = { ...prev };
 
-      simulated.forEach((g: any) => {
+      realGames.forEach((g: any) => {
         if (!updated[g.id]) updated[g.id] = [];
 
         updated[g.id].push({
@@ -148,7 +151,7 @@ export default function Dashboard() {
         if (updated[g.id].length > 30) updated[g.id].shift();
       });
 
-      generatePick(simulated, updated);
+      generatePick(realGames, updated);
 
       return updated;
     });
@@ -156,7 +159,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 4000);
+    const interval = setInterval(fetchData, 10000); // slower = real API safe
     return () => clearInterval(interval);
   }, []);
 
@@ -165,27 +168,34 @@ export default function Dashboard() {
       <h1>💰 KBETZ EDGE TERMINAL</h1>
 
       {error && (
-        <div style={{
-          background: "#2a0a0a",
-          border: "1px solid red",
-          padding: "10px",
-          marginBottom: "10px"
-        }}>
+        <div
+          style={{
+            background: "#2a0a0a",
+            border: "1px solid red",
+            padding: "10px",
+            marginBottom: "10px",
+          }}
+        >
           ⚠️ API fallback active
         </div>
       )}
 
       {/* 🧠 AI PICK */}
       {aiPick && (
-        <div style={{
-          background: "#4c1d95",
-          padding: "20px",
-          borderRadius: "12px",
-          marginBottom: "20px"
-        }}>
+        <div
+          style={{
+            background: "#4c1d95",
+            padding: "20px",
+            borderRadius: "12px",
+            marginBottom: "20px",
+          }}
+        >
           <h2>🧠 AI PICK</h2>
 
-          <div>{aiPick.away} @ {aiPick.home}</div>
+          <div>
+            {aiPick.away} @ {aiPick.home}
+          </div>
+
           <div style={{ fontSize: "22px" }}>{aiPick.odds}</div>
 
           <div>EV: {aiPick.ev.toFixed(2)}%</div>
@@ -200,6 +210,7 @@ export default function Dashboard() {
       )}
 
       <div style={{ display: "flex", gap: "20px" }}>
+        {/* GAMES */}
         <div style={{ flex: 2 }}>
           {games.map((g) => (
             <div
@@ -211,25 +222,35 @@ export default function Dashboard() {
                 background: "#0a0a0a",
                 border: "1px solid #222",
                 borderRadius: "10px",
-                cursor: "pointer"
+                cursor: "pointer",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div>{g.away} @ {g.home}</div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  {g.away} @ {g.home}
+                </div>
                 <div>{g.odds}</div>
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{
-          flex: 1,
-          background: "#0a0a0a",
-          borderRadius: "10px",
-          padding: "15px",
-          border: "1px solid #222",
-          height: "400px"
-        }}>
+        {/* CHART */}
+        <div
+          style={{
+            flex: 1,
+            background: "#0a0a0a",
+            borderRadius: "10px",
+            padding: "15px",
+            border: "1px solid #222",
+            height: "400px",
+          }}
+        >
           <h2>📊 Movement</h2>
 
           {!selected && <div>Select a game</div>}
