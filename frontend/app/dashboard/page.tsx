@@ -21,9 +21,10 @@ export default function Dashboard() {
   }, []);
 
   // ================= USER =================
-
   const fetchUser = async () => {
     const token = localStorage.getItem("token");
+    console.log("FETCH USER TOKEN:", token);
+
     if (!token) return;
 
     try {
@@ -34,6 +35,8 @@ export default function Dashboard() {
       });
 
       const data = await res.json();
+      console.log("USER DATA:", data);
+
       setUser(data);
     } catch (err) {
       console.log("USER FETCH ERROR:", err);
@@ -41,7 +44,6 @@ export default function Dashboard() {
   };
 
   // ================= GAMES =================
-
   const fetchGames = async () => {
     try {
       const res = await fetch(`${API}/api/data`);
@@ -57,7 +59,6 @@ export default function Dashboard() {
   };
 
   // ================= SIGNALS =================
-
   const generateSignals = (games: any[]) => {
     const newSignals: string[] = [];
 
@@ -77,7 +78,6 @@ export default function Dashboard() {
   };
 
   // ================= PARLAY =================
-
   const addToParlay = (game: any) => {
     if (parlay.find((p) => p.id === game.id)) return;
     setParlay([...parlay, game]);
@@ -88,7 +88,7 @@ export default function Dashboard() {
   };
 
   const calcParlayOdds = () => {
-    if (!parlay.length) return 0;
+    if (!parlay.length) return "0.00";
 
     let total = 1;
 
@@ -104,14 +104,15 @@ export default function Dashboard() {
     return ((total - 1) * 100).toFixed(2);
   };
 
-  // ================= 🔥 FIXED UPGRADE =================
-
+  // ================= 🚨 FIXED UPGRADE =================
   const upgrade = async () => {
-    const token = localStorage.getItem("token");
+    console.log("🔥 CLICKED UPGRADE");
 
-    // 🔒 MUST BE LOGGED IN
+    const token = localStorage.getItem("token");
+    console.log("TOKEN:", token);
+
     if (!token) {
-      alert("Please login first");
+      alert("❌ Not logged in → redirecting to login");
       window.location.href = "/login";
       return;
     }
@@ -125,26 +126,26 @@ export default function Dashboard() {
         body: JSON.stringify({ token }),
       });
 
-      const data = await res.json();
+      console.log("RAW RESPONSE:", res);
 
-      console.log("CHECKOUT RESPONSE:", data);
+      const data = await res.json();
+      console.log("CHECKOUT DATA:", data);
 
       if (!data.url) {
-        alert("Checkout failed. Check backend.");
+        alert("❌ No Stripe URL returned — check backend");
         return;
       }
 
-      // 💳 REDIRECT TO STRIPE
+      alert("✅ Redirecting to Stripe...");
       window.location.href = data.url;
 
     } catch (err) {
       console.log("UPGRADE ERROR:", err);
-      alert("Something went wrong");
+      alert("❌ Upgrade failed");
     }
   };
 
   // ================= UI =================
-
   return (
     <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
       <h1>💰 KBETZ LIVE TERMINAL</h1>
@@ -165,7 +166,7 @@ export default function Dashboard() {
       {/* 🔒 PRO LOCK */}
       {!isPro && (
         <div style={{ color: "red", marginBottom: 10 }}>
-          🔒 Upgrade to PRO to unlock full AI + alerts
+          🔒 Upgrade to PRO to unlock AI + alerts
         </div>
       )}
 
