@@ -19,48 +19,56 @@ export default function Dashboard() {
   const [aiPick, setAiPick] = useState<any>(null);
   const [error, setError] = useState(false);
 
-  // 📊 implied probability
   const impliedProb = (odds: number) => {
     if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
     return 100 / (odds + 100);
   };
 
-  // 🧠 SMART AI ENGINE
+  // 🧠 FULL AI ENGINE (WITH SHARP)
   const generatePick = (games: any[], history: any) => {
     if (!games.length) return;
 
     const evaluated = games.map((g) => {
       const prob = impliedProb(g.odds);
-
       const gameHistory = history[g.id] || [];
 
       let momentum = 0;
       let steam = false;
+      let sharp = false;
+      let trap = false;
 
-      if (gameHistory.length >= 2) {
+      if (gameHistory.length >= 3) {
         const first = gameHistory[0].odds;
+        const mid = gameHistory[Math.floor(gameHistory.length / 2)].odds;
         const last = gameHistory[gameHistory.length - 1].odds;
 
         momentum = last - first;
 
-        if (Math.abs(momentum) >= 10) {
+        // 🚨 STEAM
+        if (Math.abs(last - mid) >= 8) {
           steam = true;
+        }
+
+        // 💰 SHARP MONEY (reverse move)
+        if (mid < first && last > mid) {
+          sharp = true;
+        }
+
+        // 🎣 TRAP LINE
+        if (g.odds > -110 && momentum > 0) {
+          trap = true;
         }
       }
 
-      // 🧠 TRUE PROBABILITY ADJUSTMENT
+      // 🧠 TRUE PROBABILITY
       let trueProb = prob;
 
-      // steam boost
       if (steam) trueProb += 0.05;
-
-      // favorable movement (toward favorite)
+      if (sharp) trueProb += 0.06;
       if (momentum < 0) trueProb += 0.03;
+      if (momentum > 0) trueProb -= 0.04;
+      if (trap) trueProb -= 0.06;
 
-      // bad movement (against)
-      if (momentum > 0) trueProb -= 0.03;
-
-      // 💰 EV CALCULATION
       const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
 
       return {
@@ -68,25 +76,27 @@ export default function Dashboard() {
         ev,
         momentum,
         steam,
+        sharp,
+        trap,
       };
     });
 
     const best = evaluated.sort((a, b) => b.ev - a.ev)[0];
 
-    // 🎯 CONFIDENCE SYSTEM
+    // 🎯 CONFIDENCE
     let confidence = "LOW";
+    if (best.ev > 4) confidence = "MEDIUM";
+    if (best.ev > 8) confidence = "HIGH";
+    if (best.ev > 14) confidence = "ELITE";
 
-    if (best.ev > 3) confidence = "MEDIUM";
-    if (best.ev > 7) confidence = "HIGH";
-    if (best.ev > 12) confidence = "ELITE";
-
-    // 🧠 REASONS ENGINE
+    // 🧠 REASONS
     const reasons = [];
 
     if (best.ev > 5) reasons.push("Positive expected value");
     if (best.momentum < 0) reasons.push("Line moving in favor");
-    if (best.momentum > 0) reasons.push("Market resistance");
     if (best.steam) reasons.push("Steam move detected");
+    if (best.sharp) reasons.push("Sharp money detected");
+    if (best.trap) reasons.push("Trap line — caution");
 
     setAiPick({
       ...best,
@@ -95,14 +105,12 @@ export default function Dashboard() {
     });
   };
 
-  // 📡 FETCH
   const fetchData = async () => {
     let data;
 
     try {
       const res = await fetch(`${API_URL}/api/data`);
-
-      if (!res.ok) throw new Error("bad");
+      if (!res.ok) throw new Error();
 
       data = await res.json();
       setError(false);
@@ -117,9 +125,7 @@ export default function Dashboard() {
       };
     }
 
-    const baseGames = data.games || [];
-
-    const simulated = baseGames.map((g: any, i: number) => ({
+    const simulated = data.games.map((g: any, i: number) => ({
       id: g.id ?? i,
       away: g.away,
       home: g.home,
@@ -139,10 +145,9 @@ export default function Dashboard() {
           odds: g.odds,
         });
 
-        if (updated[g.id].length > 25) updated[g.id].shift();
+        if (updated[g.id].length > 30) updated[g.id].shift();
       });
 
-      // 🔥 RUN AI WITH UPDATED HISTORY
       generatePick(simulated, updated);
 
       return updated;
