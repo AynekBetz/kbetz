@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -16,101 +16,94 @@ export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [history, setHistory] = useState<any>({});
   const [selected, setSelected] = useState<any>(null);
-  const [alerts, setAlerts] = useState<string[]>([]);
   const [aiPick, setAiPick] = useState<any>(null);
+  const [error, setError] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    audioRef.current = new Audio("/alert.mp3");
-  }, []);
-
-  // 🧮 ODDS → IMPLIED PROBABILITY
+  // 🧮 implied probability
   const impliedProb = (odds: number) => {
     if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
     return 100 / (odds + 100);
   };
 
-  // 🧠 AI ENGINE
+  // 🧠 AI PICK
   const generatePick = (games: any[]) => {
     if (!games.length) return;
 
     const evaluated = games.map((g) => {
       const prob = impliedProb(g.odds);
-
-      // simulate "true edge"
       const trueProb = prob + (Math.random() * 0.08 - 0.02);
-
       const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
 
-      return {
-        ...g,
-        prob,
-        trueProb,
-        ev,
-      };
+      return { ...g, ev };
     });
 
     const best = evaluated.sort((a, b) => b.ev - a.ev)[0];
 
-    // 🎯 CONFIDENCE
     let confidence = "LOW";
     if (best.ev > 5) confidence = "MEDIUM";
     if (best.ev > 10) confidence = "HIGH";
 
-    // 🧠 REASONS
-    const reasons = [];
-
-    if (best.ev > 5) reasons.push("Positive expected value");
-    if (best.odds < 0) reasons.push("Market leaning favorite");
-    if (Math.random() > 0.5) reasons.push("Line movement detected");
-
     setAiPick({
       ...best,
       confidence,
-      reasons,
     });
   };
 
-  // 📡 FETCH
+  // 📡 SAFE FETCH (KEY FIX)
   const fetchData = async () => {
+    let data;
+
     try {
       const res = await fetch(`${API_URL}/api/data`);
-      const data = await res.json();
 
-      const baseGames = Array.isArray(data?.games) ? data.games : [];
+      if (!res.ok) throw new Error("bad response");
 
-      const simulated = baseGames.map((g: any, i: number) => ({
-        id: g?.id ?? i,
-        away: g?.away ?? "Team A",
-        home: g?.home ?? "Team B",
-        odds: (g?.odds ?? -110) + (Math.floor(Math.random() * 10) - 5),
-      }));
+      data = await res.json();
 
-      setGames(simulated);
+      setError(false);
+    } catch (err) {
+      console.log("FETCH FAILED — USING FALLBACK");
 
-      setHistory((prev: any) => {
-        const updated = { ...prev };
+      setError(true);
 
-        simulated.forEach((g: any) => {
-          if (!updated[g.id]) updated[g.id] = [];
+      data = {
+        games: [
+          { id: 1, away: "Warriors", home: "Lakers", odds: -110 },
+          { id: 2, away: "Heat", home: "Celtics", odds: -130 },
+        ],
+      };
+    }
 
-          updated[g.id].push({
-            time: new Date().toLocaleTimeString(),
-            odds: g.odds,
-          });
+    const baseGames = Array.isArray(data?.games) ? data.games : [];
 
-          if (updated[g.id].length > 20) updated[g.id].shift();
+    // simulate movement
+    const simulated = baseGames.map((g: any, i: number) => ({
+      id: g?.id ?? i,
+      away: g?.away ?? "Team A",
+      home: g?.home ?? "Team B",
+      odds: (g?.odds ?? -110) + (Math.floor(Math.random() * 10) - 5),
+    }));
+
+    setGames(simulated);
+
+    setHistory((prev: any) => {
+      const updated = { ...prev };
+
+      simulated.forEach((g: any) => {
+        if (!updated[g.id]) updated[g.id] = [];
+
+        updated[g.id].push({
+          time: new Date().toLocaleTimeString(),
+          odds: g.odds,
         });
 
-        return updated;
+        if (updated[g.id].length > 20) updated[g.id].shift();
       });
 
-      generatePick(simulated);
+      return updated;
+    });
 
-    } catch (err) {
-      console.log("API ERROR");
-    }
+    generatePick(simulated);
   };
 
   useEffect(() => {
@@ -123,6 +116,17 @@ export default function Dashboard() {
     <div style={{ padding: "25px", maxWidth: "1200px", margin: "0 auto" }}>
       <h1>💰 KBETZ EDGE TERMINAL</h1>
 
+      {error && (
+        <div style={{
+          background: "#2a0a0a",
+          padding: "10px",
+          border: "1px solid red",
+          marginBottom: "10px"
+        }}>
+          ⚠️ API offline — fallback
+        </div>
+      )}
+
       {/* 🧠 AI PICK */}
       {aiPick && (
         <div style={{
@@ -132,26 +136,14 @@ export default function Dashboard() {
           marginBottom: "20px"
         }}>
           <h2>🧠 AI PICK</h2>
-
           <div>{aiPick.away} @ {aiPick.home}</div>
-          <div style={{ fontSize: "20px", fontWeight: "bold" }}>
-            {aiPick.odds}
-          </div>
-
+          <div style={{ fontSize: "20px" }}>{aiPick.odds}</div>
           <div>EV: {aiPick.ev.toFixed(2)}%</div>
           <div>Confidence: {aiPick.confidence}</div>
-
-          <div style={{ marginTop: "10px" }}>
-            {aiPick.reasons.map((r: string, i: number) => (
-              <div key={i}>• {r}</div>
-            ))}
-          </div>
         </div>
       )}
 
-      {/* GAMES */}
       <div style={{ display: "flex", gap: "20px" }}>
-
         <div style={{ flex: 2 }}>
           {games.map((g) => (
             <div
@@ -174,7 +166,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* CHART */}
         <div style={{
           flex: 1,
           background: "#0a0a0a",
@@ -198,7 +189,6 @@ export default function Dashboard() {
             </ResponsiveContainer>
           )}
         </div>
-
       </div>
     </div>
   );
