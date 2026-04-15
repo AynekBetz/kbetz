@@ -9,21 +9,26 @@ export default function Login() {
   const [password, setPassword] = useState("");
 
   const login = async () => {
-    const res = await fetch(`${API}/api/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const res = await fetch(`${API}/api/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success) {
-      localStorage.setItem("token", data.token);
-      window.location.href = "/dashboard";
-    } else {
-      alert("Login failed");
+      if (data.success) {
+        localStorage.setItem("token", data.token);
+        window.location.href = "/dashboard";
+      } else {
+        alert("Login failed");
+      }
+    } catch (err) {
+      console.log(err);
+      alert("Login error");
     }
   };
 
@@ -31,21 +36,13 @@ export default function Login() {
     <div style={{ padding: 40 }}>
       <h1>Login</h1>
 
-      <input
-        placeholder="email"
-        onChange={(e) => setEmail(e.target.value)}
-      />
-
-      <input
-        type="password"
-        placeholder="password"
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
+      <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
 
       <button onClick={login}>Login</button>
 
       <div style={{ marginTop: 20 }}>
-        No account? <a href="/signup">Sign up</a>
+        No account? <a href="/signup">Signup</a>
       </div>
     </div>
   );
