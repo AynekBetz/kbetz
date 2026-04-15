@@ -7,7 +7,7 @@ const API = "https://kbetz.onrender.com";
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [prevOdds, setPrevOdds] = useState<any>({});
-  const [signals, setSignals] = useState<string[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
 
   const isPro = user?.plan === "pro";
@@ -16,7 +16,7 @@ export default function Dashboard() {
     fetchGames();
     fetchUser();
 
-    const interval = setInterval(fetchGames, 5000);
+    const interval = setInterval(fetchGames, 4000);
     return () => clearInterval(interval);
   }, []);
 
@@ -32,50 +32,54 @@ export default function Dashboard() {
     setUser(data);
   };
 
+  const playSound = () => {
+    try {
+      const audio = new Audio("/alert.mp3");
+      audio.volume = 1;
+      audio.play();
+    } catch {}
+  };
+
   const fetchGames = async () => {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
 
     const newGames = data.games || [];
 
-    // store previous odds
-    const prev = { ...prevOdds };
-    const updatedPrev: any = {};
+    const updatedPrev: any = { ...prevOdds };
 
     newGames.forEach((g: any) => {
-      updatedPrev[g.id] = prev[g.id] ?? g.odds;
+      const prev = prevOdds[g.id];
+
+      if (prev !== undefined) {
+        const diff = g.odds - prev;
+
+        if (Math.abs(diff) >= 5) {
+          createAlert(
+            diff > 0
+              ? `🔴 Odds Worsening: ${g.away} @ ${g.home}`
+              : `🟢 Odds Improving: ${g.away} @ ${g.home}`
+          );
+
+          playSound();
+        }
+      }
+
+      updatedPrev[g.id] = g.odds;
     });
 
     setPrevOdds(updatedPrev);
     setGames(newGames);
-
-    generateSignals(newGames);
   };
 
-  const generateSignals = (games: any[]) => {
-    const newSignals: string[] = [];
+  const createAlert = (text: string) => {
+    const id = Date.now();
 
-    games.forEach((g) => {
-      const rand = Math.random();
-      if (rand > 0.8) {
-        newSignals.push(`🚨 Steam: ${g.away} @ ${g.home}`);
-      }
-    });
+    setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
 
-    setSignals((prev) => [...newSignals, ...prev].slice(0, 5));
-  };
-
-  const getMovement = (id: number, odds: number) => {
-    const prev = prevOdds[id];
-    if (prev === undefined) return { color: "white", arrow: "" };
-
-    if (odds > prev) {
-      return { color: "#ef4444", arrow: "⬆️" }; // worse
-    } else if (odds < prev) {
-      return { color: "#22c55e", arrow: "⬇️" }; // better
-    } else {
-      return { color: "white", arrow: "" };
-    }
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    }, 4000);
   };
 
   const upgrade = async () => {
@@ -108,65 +112,124 @@ export default function Dashboard() {
       color: "white",
       padding: "20px"
     }}>
+
+      {/* HEADER */}
       <h1 style={{
         background: "linear-gradient(90deg, #a855f7, #22c55e)",
         WebkitBackgroundClip: "text",
-        color: "transparent"
+        color: "transparent",
+        fontSize: "28px"
       }}>
-        KBETZ LIVE TERMINAL
+        KBETZ AI TERMINAL
       </h1>
 
-      {!isPro && (
-        <button onClick={upgrade} style={{
-          background: "gold",
-          padding: "10px",
-          marginBottom: "20px",
-          borderRadius: "6px"
-        }}>
-          Upgrade PRO
-        </button>
-      )}
-
-      {/* SIGNALS */}
+      {/* 🚨 ALERTS */}
       <div style={{
-        background: "#111",
-        padding: "10px",
-        borderRadius: "8px",
-        marginBottom: "20px"
+        position: "fixed",
+        top: 20,
+        right: 20,
+        zIndex: 999
       }}>
-        <h3>🚨 Signals</h3>
-        {signals.map((s, i) => (
-          <div key={i}>{s}</div>
+        {alerts.map(a => (
+          <div key={a.id} style={{
+            background: "#111",
+            padding: "12px",
+            marginBottom: "10px",
+            borderRadius: "8px",
+            border: "1px solid #333"
+          }}>
+            {a.text}
+          </div>
         ))}
       </div>
 
-      {/* GAMES */}
+      {/* 🧠 AI BET CARD */}
       <div style={{
-        filter: isPro ? "none" : "blur(6px)"
+        position: "relative",
+        background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
+        padding: "20px",
+        borderRadius: "16px",
+        marginBottom: "20px",
+        overflow: "hidden"
+      }}>
+        <h2>🧠 AI BEST BET</h2>
+
+        <div style={{
+          marginTop: "10px",
+          fontSize: "18px",
+          filter: isPro ? "none" : "blur(8px)"
+        }}>
+          Lakers ML -110  
+          <br />
+          Confidence: HIGH  
+          <br />
+          Edge: +8.2%
+        </div>
+
+        {/* 🔒 LOCK OVERLAY */}
+        {!isPro && (
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            textAlign: "center"
+          }}>
+            <div style={{ fontSize: "18px", marginBottom: "10px" }}>
+              🔒 PRO ONLY
+            </div>
+
+            <button onClick={upgrade} style={{
+              background: "gold",
+              padding: "10px 16px",
+              borderRadius: "8px",
+              border: "none",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}>
+              Unlock AI Picks
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 📊 GAMES */}
+      <div style={{
+        filter: isPro ? "none" : "blur(5px)"
       }}>
         {games.map((g) => {
-          const movement = getMovement(g.id, g.odds);
+          const prev = prevOdds[g.id];
+
+          let color = "white";
+          let arrow = "";
+
+          if (prev !== undefined) {
+            if (g.odds > prev) {
+              color = "#ef4444";
+              arrow = "⬆️";
+            } else if (g.odds < prev) {
+              color = "#22c55e";
+              arrow = "⬇️";
+            }
+          }
 
           return (
             <div key={g.id} style={{
               padding: "12px",
               marginBottom: "10px",
               background: "#0a0a0a",
-              borderRadius: "8px",
+              borderRadius: "10px",
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center",
-              transition: "0.3s",
-              boxShadow: `0 0 10px ${movement.color}`
+              boxShadow: `0 0 10px ${color}`
             }}>
               <div>{g.away} @ {g.home}</div>
 
-              <div style={{
-                color: movement.color,
-                fontWeight: "bold",
-                fontSize: "18px"
-              }}>
-                {movement.arrow} {g.odds}
+              <div style={{ color, fontWeight: "bold" }}>
+                {arrow} {g.odds}
               </div>
             </div>
           );
