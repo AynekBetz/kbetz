@@ -9,7 +9,8 @@ export default function Dashboard() {
   const [prevOdds, setPrevOdds] = useState<any>({});
   const [alerts, setAlerts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [aiPick, setAiPick] = useState<any>(null);
+  const [topPicks, setTopPicks] = useState<any[]>([]);
+  const [parlayPick, setParlayPick] = useState<any>(null);
 
   const isPro = user?.plan === "pro";
 
@@ -41,10 +42,8 @@ export default function Dashboard() {
   };
 
   // ================= AI ENGINE =================
-  const generatePick = (games: any[], prevOdds: any) => {
-    let best = null;
-
-    games.forEach((g) => {
+  const generateAI = (games: any[], prevOdds: any) => {
+    const evaluated = games.map((g) => {
       const prob = impliedProb(g.odds);
       const prev = prevOdds[g.id];
 
@@ -54,14 +53,10 @@ export default function Dashboard() {
       if (prev !== undefined) {
         momentum = g.odds - prev;
 
-        if (momentum < 0) {
-          reasons.push("Line moving in favor");
-        } else if (momentum > 0) {
-          reasons.push("Market fading this side");
-        }
+        if (momentum < 0) reasons.push("Line moving in favor");
+        if (momentum > 0) reasons.push("Market fading this side");
       }
 
-      // simulate sharper probability
       let trueProb = prob;
 
       if (momentum < 0) trueProb += 0.04;
@@ -69,23 +64,54 @@ export default function Dashboard() {
 
       const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
 
-      if (!best || ev > best.ev) {
-        best = {
-          ...g,
-          ev,
-          confidence:
-            ev > 10 ? "ELITE" :
-            ev > 6 ? "HIGH" :
-            ev > 3 ? "MEDIUM" : "LOW",
-          reasons,
-        };
-      }
+      return {
+        ...g,
+        ev,
+        confidence:
+          ev > 10 ? "ELITE" :
+          ev > 6 ? "HIGH" :
+          ev > 3 ? "MEDIUM" : "LOW",
+        reasons,
+      };
     });
 
-    setAiPick(best);
+    // 🧠 TOP 3 PICKS
+    const sorted = evaluated.sort((a, b) => b.ev - a.ev);
+    setTopPicks(sorted.slice(0, 3));
+
+    // 🎯 PARLAY AI (top 2 combined)
+    if (sorted.length >= 2) {
+      const p1 = sorted[0];
+      const p2 = sorted[1];
+
+      const decimal1 = p1.odds < 0
+        ? 1 + 100 / Math.abs(p1.odds)
+        : 1 + p1.odds / 100;
+
+      const decimal2 = p2.odds < 0
+        ? 1 + 100 / Math.abs(p2.odds)
+        : 1 + p2.odds / 100;
+
+      const combinedOdds = ((decimal1 * decimal2) - 1) * 100;
+
+      setParlayPick({
+        legs: [p1, p2],
+        odds: combinedOdds.toFixed(2),
+      });
+    }
   };
 
-  // ================= ALERT SOUND =================
+  // ================= ALERT =================
+  const createAlert = (text: string) => {
+    const id = Date.now();
+
+    setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
+
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    }, 4000);
+  };
+
   const playSound = () => {
     try {
       const audio = new Audio("/alert.mp3");
@@ -93,13 +119,12 @@ export default function Dashboard() {
     } catch {}
   };
 
-  // ================= FETCH GAMES =================
+  // ================= FETCH =================
   const fetchGames = async () => {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
 
     const newGames = data.games || [];
-
     const updatedPrev = { ...prevOdds };
 
     newGames.forEach((g: any) => {
@@ -124,21 +149,9 @@ export default function Dashboard() {
     setPrevOdds(updatedPrev);
     setGames(newGames);
 
-    generatePick(newGames, updatedPrev);
+    generateAI(newGames, updatedPrev);
   };
 
-  // ================= ALERT =================
-  const createAlert = (text: string) => {
-    const id = Date.now();
-
-    setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
-
-    setTimeout(() => {
-      setAlerts((prev) => prev.filter((a) => a.id !== id));
-    }, 4000);
-  };
-
-  // ================= UPGRADE =================
   const upgrade = async () => {
     const token = localStorage.getItem("token");
 
@@ -175,58 +188,52 @@ export default function Dashboard() {
         KBETZ AI TERMINAL
       </h1>
 
-      {/* 🧠 AI BET CARD */}
-      {aiPick && (
-        <div style={{
-          position: "relative",
-          background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
-          padding: "20px",
-          borderRadius: "16px",
-          marginBottom: "20px"
-        }}>
-          <h2>🧠 AI BEST BET</h2>
+      {/* 🧠 TOP PICKS */}
+      <div style={{ marginBottom: "20px" }}>
+        <h2>🧠 Top AI Picks</h2>
 
-          <div style={{
-            marginTop: "10px",
-            filter: isPro ? "none" : "blur(8px)"
-          }}>
-            {aiPick.away} @ {aiPick.home} ({aiPick.odds})
+        <div style={{ filter: isPro ? "none" : "blur(8px)" }}>
+          {topPicks.map((p, i) => (
+            <div key={i} style={{ marginBottom: "10px" }}>
+              {p.away} @ {p.home} ({p.odds})  
+              EV: {p.ev.toFixed(2)}%  
+              Confidence: {p.confidence}
 
-            <div>EV: {aiPick.ev.toFixed(2)}%</div>
-            <div>Confidence: {aiPick.confidence}</div>
-
-            <div style={{ marginTop: "10px" }}>
-              {aiPick.reasons.map((r: string, i: number) => (
-                <div key={i}>• {r}</div>
-              ))}
+              <div>
+                {p.reasons.map((r: string, idx: number) => (
+                  <div key={idx}>• {r}</div>
+                ))}
+              </div>
             </div>
+          ))}
+        </div>
+
+        {!isPro && <button onClick={upgrade}>Unlock Picks</button>}
+      </div>
+
+      {/* 🎯 PARLAY AI */}
+      {parlayPick && (
+        <div style={{ marginBottom: "20px" }}>
+          <h2>🎯 AI Parlay</h2>
+
+          <div style={{ filter: isPro ? "none" : "blur(8px)" }}>
+            {parlayPick.legs.map((l: any, i: number) => (
+              <div key={i}>
+                {l.away} @ {l.home}
+              </div>
+            ))}
+
+            <div>Odds: +{parlayPick.odds}</div>
           </div>
-
-          {!isPro && (
-            <div style={{
-              position: "absolute",
-              inset: 0,
-              background: "rgba(0,0,0,0.7)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              alignItems: "center"
-            }}>
-              🔒 PRO ONLY
-              <button onClick={upgrade}>Unlock</button>
-            </div>
-          )}
         </div>
       )}
 
-      {/* 🚨 ALERTS */}
-      <div>
-        {alerts.map((a) => (
-          <div key={a.id}>{a.text}</div>
-        ))}
-      </div>
+      {/* ALERTS */}
+      {alerts.map((a) => (
+        <div key={a.id}>{a.text}</div>
+      ))}
 
-      {/* 📊 GAMES */}
+      {/* GAMES */}
       {games.map((g) => (
         <div key={g.id}>
           {g.away} @ {g.home} ({g.odds})
