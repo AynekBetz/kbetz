@@ -7,7 +7,6 @@ const API = "https://kbetz.onrender.com";
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [signals, setSignals] = useState<string[]>([]);
-  const [parlay, setParlay] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
 
   const isPro = user?.plan === "pro";
@@ -23,7 +22,6 @@ export default function Dashboard() {
   // ================= USER =================
   const fetchUser = async () => {
     const token = localStorage.getItem("token");
-    console.log("FETCH USER TOKEN:", token);
 
     if (!token) return;
 
@@ -35,11 +33,9 @@ export default function Dashboard() {
       });
 
       const data = await res.json();
-      console.log("USER DATA:", data);
-
       setUser(data);
     } catch (err) {
-      console.log("USER FETCH ERROR:", err);
+      console.log("USER ERROR:", err);
     }
   };
 
@@ -54,65 +50,40 @@ export default function Dashboard() {
 
       generateSignals(g);
     } catch (err) {
-      console.log("FETCH GAMES ERROR:", err);
+      console.log("FETCH ERROR:", err);
     }
   };
 
-  // ================= SIGNALS =================
+  // ================= 🔊 SOUND =================
+  const playSound = () => {
+    try {
+      const audio = new Audio("/alert.mp3");
+      audio.play();
+    } catch {}
+  };
+
+  // ================= 🚨 SIGNALS =================
   const generateSignals = (games: any[]) => {
     const newSignals: string[] = [];
 
     games.forEach((g) => {
       const rand = Math.random();
 
-      if (rand > 0.8) {
+      if (rand > 0.75) {
         newSignals.push(`🚨 Steam move on ${g.away} @ ${g.home}`);
-      } else if (rand > 0.6) {
-        newSignals.push(`💰 Sharp money on ${g.home}`);
-      } else if (rand > 0.4) {
-        newSignals.push(`🎯 Value spot: ${g.away}`);
+        playSound();
       }
     });
 
-    setSignals((prev) => [...newSignals, ...prev].slice(0, 6));
+    setSignals(newSignals);
   };
 
-  // ================= PARLAY =================
-  const addToParlay = (game: any) => {
-    if (parlay.find((p) => p.id === game.id)) return;
-    setParlay([...parlay, game]);
-  };
-
-  const removeFromParlay = (id: number) => {
-    setParlay(parlay.filter((p) => p.id !== id));
-  };
-
-  const calcParlayOdds = () => {
-    if (!parlay.length) return "0.00";
-
-    let total = 1;
-
-    parlay.forEach((p) => {
-      const decimal =
-        p.odds < 0
-          ? 1 + 100 / Math.abs(p.odds)
-          : 1 + p.odds / 100;
-
-      total *= decimal;
-    });
-
-    return ((total - 1) * 100).toFixed(2);
-  };
-
-  // ================= 🚨 FIXED UPGRADE =================
+  // ================= 💳 UPGRADE =================
   const upgrade = async () => {
-    console.log("🔥 CLICKED UPGRADE");
-
     const token = localStorage.getItem("token");
-    console.log("TOKEN:", token);
 
     if (!token) {
-      alert("❌ Not logged in → redirecting to login");
+      alert("Login first");
       window.location.href = "/login";
       return;
     }
@@ -126,112 +97,62 @@ export default function Dashboard() {
         body: JSON.stringify({ token }),
       });
 
-      console.log("RAW RESPONSE:", res);
-
       const data = await res.json();
-      console.log("CHECKOUT DATA:", data);
 
       if (!data.url) {
-        alert("❌ No Stripe URL returned — check backend");
+        alert("Checkout failed");
         return;
       }
 
-      alert("✅ Redirecting to Stripe...");
       window.location.href = data.url;
 
     } catch (err) {
-      console.log("UPGRADE ERROR:", err);
-      alert("❌ Upgrade failed");
+      alert("Upgrade error");
     }
   };
 
-  // ================= UI =================
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
-      <h1>💰 KBETZ LIVE TERMINAL</h1>
+    <div style={{ padding: 20 }}>
+      <h1>💰 KBETZ</h1>
 
-      {/* 🚨 SIGNALS */}
-      <div style={{
-        background: "#111",
-        padding: 10,
-        marginBottom: 15,
-        borderRadius: 8
-      }}>
-        <h3>🚨 LIVE SIGNALS</h3>
-        {signals.map((s, i) => (
-          <div key={i}>{s}</div>
-        ))}
-      </div>
-
-      {/* 🔒 PRO LOCK */}
       {!isPro && (
         <div style={{ color: "red", marginBottom: 10 }}>
-          🔒 Upgrade to PRO to unlock AI + alerts
+          🔒 PRO required for full access
         </div>
       )}
 
-      {/* 🎯 PARLAY BUILDER */}
+      {/* 🔒 BLUR LOCK */}
       <div style={{
-        background: "#0a0a0a",
-        padding: 15,
-        marginBottom: 20,
-        borderRadius: 10
+        filter: isPro ? "none" : "blur(6px)"
       }}>
-        <h2>🎯 Parlay Builder</h2>
-
-        {parlay.map((p) => (
-          <div key={p.id}>
-            {p.away} @ {p.home} ({p.odds})
-            <button onClick={() => removeFromParlay(p.id)}>❌</button>
-          </div>
+        <h2>🚨 Signals</h2>
+        {signals.map((s, i) => (
+          <div key={i}>{s}</div>
         ))}
 
-        <div style={{ marginTop: 10 }}>
-          💰 Parlay Odds: {calcParlayOdds()}
-        </div>
+        <h2>Games</h2>
+        {games.map((g) => (
+          <div key={g.id}>
+            {g.away} @ {g.home} ({g.odds})
+          </div>
+        ))}
       </div>
 
-      {/* 💳 UPGRADE BUTTON */}
       {!isPro && (
         <button
           onClick={upgrade}
           style={{
-            marginBottom: 20,
-            background: "gold",
+            marginTop: 20,
             padding: 12,
+            background: "gold",
             border: "none",
             borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold"
+            cursor: "pointer"
           }}
         >
           Upgrade to PRO
         </button>
       )}
-
-      {/* 📊 GAMES */}
-      <h2>Games</h2>
-
-      {games.map((g) => (
-        <div
-          key={g.id}
-          style={{
-            padding: 10,
-            marginBottom: 10,
-            background: "#111",
-            borderRadius: 8
-          }}
-        >
-          {g.away} @ {g.home} ({g.odds})
-
-          <button
-            onClick={() => addToParlay(g)}
-            style={{ marginLeft: 10 }}
-          >
-            ➕ Add
-          </button>
-        </div>
-      ))}
     </div>
   );
 }

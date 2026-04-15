@@ -12,9 +12,9 @@ export default function Login() {
     const res = await fetch(`${API}/api/login`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     });
 
     const data = await res.json();
@@ -28,11 +28,25 @@ export default function Login() {
   };
 
   return (
-    <div>
+    <div style={{ padding: 40 }}>
       <h1>Login</h1>
-      <input onChange={(e) => setEmail(e.target.value)} placeholder="email" />
-      <input type="password" onChange={(e) => setPassword(e.target.value)} placeholder="password" />
+
+      <input
+        placeholder="email"
+        onChange={(e) => setEmail(e.target.value)}
+      />
+
+      <input
+        type="password"
+        placeholder="password"
+        onChange={(e) => setPassword(e.target.value)}
+      />
+
       <button onClick={login}>Login</button>
+
+      <div style={{ marginTop: 20 }}>
+        No account? <a href="/signup">Sign up</a>
+      </div>
     </div>
   );
 }
