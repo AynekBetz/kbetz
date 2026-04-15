@@ -9,6 +9,7 @@ export default function Dashboard() {
   const [prevOdds, setPrevOdds] = useState<any>({});
   const [alerts, setAlerts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [aiPick, setAiPick] = useState<any>(null);
 
   const isPro = user?.plan === "pro";
 
@@ -16,10 +17,11 @@ export default function Dashboard() {
     fetchGames();
     fetchUser();
 
-    const interval = setInterval(fetchGames, 4000);
+    const interval = setInterval(fetchGames, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  // ================= USER =================
   const fetchUser = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -32,21 +34,73 @@ export default function Dashboard() {
     setUser(data);
   };
 
+  // ================= IMPLIED PROB =================
+  const impliedProb = (odds: number) => {
+    if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
+    return 100 / (odds + 100);
+  };
+
+  // ================= AI ENGINE =================
+  const generatePick = (games: any[], prevOdds: any) => {
+    let best = null;
+
+    games.forEach((g) => {
+      const prob = impliedProb(g.odds);
+      const prev = prevOdds[g.id];
+
+      let momentum = 0;
+      let reasons: string[] = [];
+
+      if (prev !== undefined) {
+        momentum = g.odds - prev;
+
+        if (momentum < 0) {
+          reasons.push("Line moving in favor");
+        } else if (momentum > 0) {
+          reasons.push("Market fading this side");
+        }
+      }
+
+      // simulate sharper probability
+      let trueProb = prob;
+
+      if (momentum < 0) trueProb += 0.04;
+      if (momentum > 0) trueProb -= 0.03;
+
+      const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
+
+      if (!best || ev > best.ev) {
+        best = {
+          ...g,
+          ev,
+          confidence:
+            ev > 10 ? "ELITE" :
+            ev > 6 ? "HIGH" :
+            ev > 3 ? "MEDIUM" : "LOW",
+          reasons,
+        };
+      }
+    });
+
+    setAiPick(best);
+  };
+
+  // ================= ALERT SOUND =================
   const playSound = () => {
     try {
       const audio = new Audio("/alert.mp3");
-      audio.volume = 1;
       audio.play();
     } catch {}
   };
 
+  // ================= FETCH GAMES =================
   const fetchGames = async () => {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
 
     const newGames = data.games || [];
 
-    const updatedPrev: any = { ...prevOdds };
+    const updatedPrev = { ...prevOdds };
 
     newGames.forEach((g: any) => {
       const prev = prevOdds[g.id];
@@ -60,7 +114,6 @@ export default function Dashboard() {
               ? `🔴 Odds Worsening: ${g.away} @ ${g.home}`
               : `🟢 Odds Improving: ${g.away} @ ${g.home}`
           );
-
           playSound();
         }
       }
@@ -70,8 +123,11 @@ export default function Dashboard() {
 
     setPrevOdds(updatedPrev);
     setGames(newGames);
+
+    generatePick(newGames, updatedPrev);
   };
 
+  // ================= ALERT =================
   const createAlert = (text: string) => {
     const id = Date.now();
 
@@ -82,6 +138,7 @@ export default function Dashboard() {
     }, 4000);
   };
 
+  // ================= UPGRADE =================
   const upgrade = async () => {
     const token = localStorage.getItem("token");
 
@@ -100,9 +157,7 @@ export default function Dashboard() {
 
     const data = await res.json();
 
-    if (data.url) {
-      window.location.href = data.url;
-    }
+    if (data.url) window.location.href = data.url;
   };
 
   return (
@@ -112,129 +167,71 @@ export default function Dashboard() {
       color: "white",
       padding: "20px"
     }}>
-
-      {/* HEADER */}
       <h1 style={{
         background: "linear-gradient(90deg, #a855f7, #22c55e)",
         WebkitBackgroundClip: "text",
-        color: "transparent",
-        fontSize: "28px"
+        color: "transparent"
       }}>
         KBETZ AI TERMINAL
       </h1>
 
-      {/* 🚨 ALERTS */}
-      <div style={{
-        position: "fixed",
-        top: 20,
-        right: 20,
-        zIndex: 999
-      }}>
-        {alerts.map(a => (
-          <div key={a.id} style={{
-            background: "#111",
-            padding: "12px",
-            marginBottom: "10px",
-            borderRadius: "8px",
-            border: "1px solid #333"
+      {/* 🧠 AI BET CARD */}
+      {aiPick && (
+        <div style={{
+          position: "relative",
+          background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
+          padding: "20px",
+          borderRadius: "16px",
+          marginBottom: "20px"
+        }}>
+          <h2>🧠 AI BEST BET</h2>
+
+          <div style={{
+            marginTop: "10px",
+            filter: isPro ? "none" : "blur(8px)"
           }}>
-            {a.text}
+            {aiPick.away} @ {aiPick.home} ({aiPick.odds})
+
+            <div>EV: {aiPick.ev.toFixed(2)}%</div>
+            <div>Confidence: {aiPick.confidence}</div>
+
+            <div style={{ marginTop: "10px" }}>
+              {aiPick.reasons.map((r: string, i: number) => (
+                <div key={i}>• {r}</div>
+              ))}
+            </div>
           </div>
+
+          {!isPro && (
+            <div style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(0,0,0,0.7)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center"
+            }}>
+              🔒 PRO ONLY
+              <button onClick={upgrade}>Unlock</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 🚨 ALERTS */}
+      <div>
+        {alerts.map((a) => (
+          <div key={a.id}>{a.text}</div>
         ))}
       </div>
 
-      {/* 🧠 AI BET CARD */}
-      <div style={{
-        position: "relative",
-        background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
-        padding: "20px",
-        borderRadius: "16px",
-        marginBottom: "20px",
-        overflow: "hidden"
-      }}>
-        <h2>🧠 AI BEST BET</h2>
-
-        <div style={{
-          marginTop: "10px",
-          fontSize: "18px",
-          filter: isPro ? "none" : "blur(8px)"
-        }}>
-          Lakers ML -110  
-          <br />
-          Confidence: HIGH  
-          <br />
-          Edge: +8.2%
-        </div>
-
-        {/* 🔒 LOCK OVERLAY */}
-        {!isPro && (
-          <div style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            textAlign: "center"
-          }}>
-            <div style={{ fontSize: "18px", marginBottom: "10px" }}>
-              🔒 PRO ONLY
-            </div>
-
-            <button onClick={upgrade} style={{
-              background: "gold",
-              padding: "10px 16px",
-              borderRadius: "8px",
-              border: "none",
-              fontWeight: "bold",
-              cursor: "pointer"
-            }}>
-              Unlock AI Picks
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* 📊 GAMES */}
-      <div style={{
-        filter: isPro ? "none" : "blur(5px)"
-      }}>
-        {games.map((g) => {
-          const prev = prevOdds[g.id];
-
-          let color = "white";
-          let arrow = "";
-
-          if (prev !== undefined) {
-            if (g.odds > prev) {
-              color = "#ef4444";
-              arrow = "⬆️";
-            } else if (g.odds < prev) {
-              color = "#22c55e";
-              arrow = "⬇️";
-            }
-          }
-
-          return (
-            <div key={g.id} style={{
-              padding: "12px",
-              marginBottom: "10px",
-              background: "#0a0a0a",
-              borderRadius: "10px",
-              display: "flex",
-              justifyContent: "space-between",
-              boxShadow: `0 0 10px ${color}`
-            }}>
-              <div>{g.away} @ {g.home}</div>
-
-              <div style={{ color, fontWeight: "bold" }}>
-                {arrow} {g.odds}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {games.map((g) => (
+        <div key={g.id}>
+          {g.away} @ {g.home} ({g.odds})
+        </div>
+      ))}
     </div>
   );
 }
