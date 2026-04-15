@@ -21,7 +21,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // ================= USER =================
+  // USER
   const fetchUser = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -34,26 +34,21 @@ export default function Dashboard() {
     setUser(data);
   };
 
-  // ================= IMPLIED PROB =================
+  // AI
   const impliedProb = (odds: number) => {
     if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
     return 100 / (odds + 100);
   };
 
-  // ================= AI ENGINE =================
   const generateAI = (games: any[]) => {
     const evaluated = games.map((g) => {
       const prob = impliedProb(g.odds);
-
-      // simple edge logic
       const trueProb = prob + 0.03;
       const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
-
       return { ...g, ev };
     });
 
     const sorted = evaluated.sort((a, b) => b.ev - a.ev);
-
     setTopPicks(sorted.slice(0, 3));
 
     if (sorted.length >= 2) {
@@ -72,10 +67,9 @@ export default function Dashboard() {
     }
   };
 
-  // ================= ALERT =================
+  // ALERTS
   const createAlert = (text: string) => {
     const id = Date.now();
-
     setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
 
     setTimeout(() => {
@@ -83,7 +77,6 @@ export default function Dashboard() {
     }, 4000);
   };
 
-  // ================= SOUND =================
   const playSound = () => {
     try {
       const audio = new Audio("/alert.mp3");
@@ -91,7 +84,7 @@ export default function Dashboard() {
     } catch {}
   };
 
-  // ================= FETCH =================
+  // FETCH
   const fetchGames = async () => {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
@@ -101,14 +94,13 @@ export default function Dashboard() {
 
     generateAI(g);
 
-    // trigger fake alerts
     if (Math.random() > 0.7) {
       createAlert("🚨 Market movement detected");
       playSound();
     }
   };
 
-  // ================= UPGRADE =================
+  // UPGRADE
   const upgrade = async () => {
     const token = localStorage.getItem("token");
 
@@ -135,37 +127,72 @@ export default function Dashboard() {
       background: "#050505",
       minHeight: "100vh",
       color: "white",
-      padding: "20px"
+      padding: "20px",
+      fontFamily: "Inter, sans-serif"
     }}>
-      {/* HEADER */}
-      <h1 style={{
-        background: "linear-gradient(90deg, #a855f7, #22c55e)",
-        WebkitBackgroundClip: "text",
-        color: "transparent"
-      }}>
-        KBETZ TERMINAL
-      </h1>
 
-      {/* UPGRADE */}
-      {!isPro && (
-        <button onClick={upgrade} style={{ marginBottom: 20 }}>
-          Upgrade PRO
-        </button>
-      )}
+      {/* HEADER */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "25px"
+      }}>
+        <h1 style={{
+          fontSize: "28px",
+          background: "linear-gradient(90deg, #a855f7, #22c55e)",
+          WebkitBackgroundClip: "text",
+          color: "transparent"
+        }}>
+          KBETZ TERMINAL
+        </h1>
+
+        {!isPro && (
+          <button onClick={upgrade} style={{
+            background: "linear-gradient(90deg, gold, orange)",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            border: "none",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}>
+            Upgrade PRO
+          </button>
+        )}
+      </div>
 
       {/* ALERTS */}
-      {alerts.map((a) => (
-        <div key={a.id}>{a.text}</div>
-      ))}
+      <div style={{ marginBottom: "20px" }}>
+        {alerts.map((a) => (
+          <div key={a.id} style={{
+            background: "#111",
+            padding: "10px",
+            borderRadius: "8px",
+            marginBottom: "8px",
+            border: "1px solid #222"
+          }}>
+            {a.text}
+          </div>
+        ))}
+      </div>
 
       {/* AI PICKS */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{
+        background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
+        padding: "20px",
+        borderRadius: "16px",
+        marginBottom: "20px",
+        boxShadow: "0 0 20px rgba(168,85,247,0.3)"
+      }}>
         <h2>🧠 AI PICKS</h2>
 
         <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
           {topPicks.map((p, i) => (
-            <div key={i}>
-              {p.away} @ {p.home} — EV: {p.ev.toFixed(2)}
+            <div key={i} style={{ marginBottom: "10px" }}>
+              {p.away} @ {p.home}  
+              <div style={{ color: "#22c55e" }}>
+                EV: {p.ev.toFixed(2)}
+              </div>
             </div>
           ))}
         </div>
@@ -173,29 +200,54 @@ export default function Dashboard() {
 
       {/* PARLAY */}
       {parlay && (
-        <div style={{ marginBottom: 20 }}>
+        <div style={{
+          background: "#0a0a0a",
+          padding: "15px",
+          borderRadius: "12px",
+          marginBottom: "20px"
+        }}>
           <h2>🎯 AI PARLAY</h2>
 
           <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
             {parlay.legs.map((l: any, i: number) => (
               <div key={i}>{l.away} @ {l.home}</div>
             ))}
-
-            <div>Odds: +{parlay.odds}</div>
+            <div style={{ color: "#22c55e" }}>
+              Odds: +{parlay.odds}
+            </div>
           </div>
         </div>
       )}
 
       {/* GAMES */}
       <div style={{
-        filter: isPro ? "none" : "blur(6px)"
+        background: "rgba(255,255,255,0.05)",
+        backdropFilter: "blur(10px)",
+        padding: "15px",
+        borderRadius: "12px"
       }}>
-        {games.map((g) => (
-          <div key={g.id}>
-            {g.away} @ {g.home} ({g.odds})
-          </div>
-        ))}
+        <h2>Markets</h2>
+
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {games.map((g) => (
+            <div key={g.id} style={{
+              padding: "12px",
+              marginBottom: "10px",
+              background: "#0a0a0a",
+              borderRadius: "10px",
+              display: "flex",
+              justifyContent: "space-between"
+            }}>
+              <div>{g.away} @ {g.home}</div>
+
+              <div style={{ color: "#22c55e", fontWeight: "bold" }}>
+                {g.odds}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
+
     </div>
   );
 }
