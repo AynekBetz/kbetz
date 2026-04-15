@@ -10,13 +10,48 @@ import User from "./models/User.js";
 dotenv.config();
 
 const app = express();
+
+// ⚠️ IMPORTANT: webhook needs raw body BEFORE json middleware
+app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const sig = req.headers["stripe-signature"];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.log("❌ Webhook signature failed");
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const email = session.customer_email;
+
+    console.log("💰 PAYMENT SUCCESS:", email);
+
+    await User.findOneAndUpdate(
+      { email },
+      { plan: "pro" }
+    );
+  }
+
+  res.json({ received: true });
+});
+
+// NORMAL MIDDLEWARE AFTER
 app.use(cors());
 app.use(express.json());
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET || "secret123";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // ================= DB =================
 mongoose.connect(process.env.MONGO_URI)
@@ -24,8 +59,6 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.log(err));
 
 // ================= AUTH =================
-
-// SIGNUP (FIXED)
 app.post("/api/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -49,32 +82,27 @@ app.post("/api/signup", async (req, res) => {
 
     await user.save();
 
-    return res.json({ success: true });
+    res.json({ success: true });
 
   } catch (err) {
     console.log("SIGNUP ERROR:", err);
-    return res.json({ success: false, message: "Server error" });
+    res.json({ success: false });
   }
 });
 
-// LOGIN (FIXED)
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.json({ success: false, message: "No user found" });
-    }
+    if (!user) return res.json({ success: false });
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.json({ success: false, message: "Wrong password" });
-    }
+    if (!valid) return res.json({ success: false });
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET);
 
-    return res.json({
+    res.json({
       success: true,
       token,
       user: {
@@ -85,19 +113,13 @@ app.post("/api/login", async (req, res) => {
 
   } catch (err) {
     console.log("LOGIN ERROR:", err);
-    return res.json({ success: false });
+    res.json({ success: false });
   }
 });
 
-// GET CURRENT USER
 app.get("/api/me", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-
-    if (!token) {
-      return res.status(401).json({ error: "No token" });
-    }
-
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.id);
 
@@ -148,7 +170,6 @@ const getBestOdds = (bookmakers) => {
   return best;
 };
 
-// MAIN DATA ROUTE
 app.get("/api/data", async (req, res) => {
   try {
     let allGames = [];
@@ -194,8 +215,7 @@ app.get("/api/data", async (req, res) => {
   }
 });
 
-// ================= STRIPE =================
-
+// ================= STRIPE CHECKOUT =================
 app.post("/api/checkout", async (req, res) => {
   try {
     const { token } = req.body;
@@ -232,5 +252,5 @@ app.get("/api/health", (req, res) => {
 
 // ================= START =================
 app.listen(PORT, () => {
-  console.log(`SERVER RUNNING ON PORT ${PORT}`);
+  console.log(`🚀 SERVER RUNNING ON PORT ${PORT}`);
 });

@@ -18,7 +18,6 @@ export default function Dashboard() {
     checkAuth();
   }, []);
 
-  // ================= 🔐 AUTH PROTECTION =================
   const checkAuth = async () => {
     const token = localStorage.getItem("token");
 
@@ -29,9 +28,7 @@ export default function Dashboard() {
 
     try {
       const res = await fetch(`${API}/api/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!res.ok) throw new Error();
@@ -121,26 +118,30 @@ export default function Dashboard() {
     generateAI(newGames);
   };
 
-  // ================= LOGOUT =================
+  // ================= UPGRADE =================
+  const upgrade = async () => {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`${API}/api/checkout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+
+    const data = await res.json();
+
+    if (data.url) window.location.href = data.url;
+  };
+
   const logout = () => {
     localStorage.removeItem("token");
     window.location.href = "/login";
   };
 
-  // ================= LOADING SCREEN =================
   if (loading) {
-    return (
-      <div style={{
-        background: "#050505",
-        color: "white",
-        height: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center"
-      }}>
-        Loading...
-      </div>
-    );
+    return <div style={{ color: "white" }}>Loading...</div>;
   }
 
   return (
@@ -165,27 +166,72 @@ export default function Dashboard() {
         </h1>
 
         <div>
-          <span style={{ marginRight: 10 }}>
-            {user?.email}
-          </span>
-
-          <button onClick={logout}>
-            Logout
-          </button>
+          <span style={{ marginRight: 10 }}>{user?.email}</span>
+          <button onClick={logout}>Logout</button>
         </div>
       </div>
 
-      {/* ALERTS */}
-      {alerts.map((a) => (
-        <div key={a.id}>{a.text}</div>
-      ))}
+      {/* 🚨 LIVE SIGNALS */}
+      <div style={{
+        marginBottom: "20px",
+        position: "relative"
+      }}>
+        <h2>🚨 LIVE SIGNALS</h2>
 
-      {/* MARKETS */}
-      {games.map((g) => (
-        <div key={g.id}>
-          {g.away} @ {g.home} ({g.odds}) — {g.book}
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {alerts.map((a) => (
+            <div key={a.id}>{a.text}</div>
+          ))}
         </div>
-      ))}
+
+        {!isPro && (
+          <button onClick={upgrade}>
+            🔒 Unlock Live Signals
+          </button>
+        )}
+      </div>
+
+      {/* 🧠 AI PICK */}
+      <div style={{
+        marginBottom: "20px",
+        position: "relative"
+      }}>
+        <h2>🧠 AI PICK</h2>
+
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {topPick && (
+            <>
+              <div>{topPick.away} @ {topPick.home}</div>
+              <div>EV: {topPick.ev.toFixed(2)}</div>
+            </>
+          )}
+        </div>
+
+        {!isPro && (
+          <button onClick={upgrade}>
+            🔒 Unlock AI Picks
+          </button>
+        )}
+      </div>
+
+      {/* 📊 MARKETS */}
+      <div>
+        <h2>📊 Markets</h2>
+
+        <div style={{ filter: isPro ? "none" : "blur(4px)" }}>
+          {games.map((g) => (
+            <div key={g.id}>
+              {g.away} @ {g.home} ({g.odds}) — {g.book}
+            </div>
+          ))}
+        </div>
+
+        {!isPro && (
+          <button onClick={upgrade}>
+            🔒 Unlock Full Market View
+          </button>
+        )}
+      </div>
     </div>
   );
 }
