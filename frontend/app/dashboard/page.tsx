@@ -6,6 +6,7 @@ const API = "https://kbetz.onrender.com";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
+  const [prevOdds, setPrevOdds] = useState<any>({});
   const [signals, setSignals] = useState<string[]>([]);
   const [user, setUser] = useState<any>(null);
 
@@ -15,7 +16,7 @@ export default function Dashboard() {
     fetchGames();
     fetchUser();
 
-    const interval = setInterval(fetchGames, 8000);
+    const interval = setInterval(fetchGames, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -35,18 +36,20 @@ export default function Dashboard() {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
 
-    const g = data.games || [];
-    setGames(g);
+    const newGames = data.games || [];
 
-    generateSignals(g);
-  };
+    // store previous odds
+    const prev = { ...prevOdds };
+    const updatedPrev: any = {};
 
-  const playSound = () => {
-    try {
-      const audio = new Audio("/alert.mp3");
-      audio.volume = 0.5;
-      audio.play();
-    } catch {}
+    newGames.forEach((g: any) => {
+      updatedPrev[g.id] = prev[g.id] ?? g.odds;
+    });
+
+    setPrevOdds(updatedPrev);
+    setGames(newGames);
+
+    generateSignals(newGames);
   };
 
   const generateSignals = (games: any[]) => {
@@ -54,14 +57,25 @@ export default function Dashboard() {
 
     games.forEach((g) => {
       const rand = Math.random();
-
-      if (rand > 0.75) {
-        newSignals.push(`🚨 STEAM: ${g.away} @ ${g.home}`);
-        playSound();
+      if (rand > 0.8) {
+        newSignals.push(`🚨 Steam: ${g.away} @ ${g.home}`);
       }
     });
 
     setSignals((prev) => [...newSignals, ...prev].slice(0, 5));
+  };
+
+  const getMovement = (id: number, odds: number) => {
+    const prev = prevOdds[id];
+    if (prev === undefined) return { color: "white", arrow: "" };
+
+    if (odds > prev) {
+      return { color: "#ef4444", arrow: "⬆️" }; // worse
+    } else if (odds < prev) {
+      return { color: "#22c55e", arrow: "⬇️" }; // better
+    } else {
+      return { color: "white", arrow: "" };
+    }
   };
 
   const upgrade = async () => {
@@ -84,162 +98,79 @@ export default function Dashboard() {
 
     if (data.url) {
       window.location.href = data.url;
-    } else {
-      alert("Checkout failed");
     }
   };
 
   return (
     <div style={{
-      minHeight: "100vh",
       background: "#050505",
+      minHeight: "100vh",
       color: "white",
-      padding: "20px",
-      fontFamily: "Arial"
+      padding: "20px"
     }}>
-
-      {/* HEADER */}
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "20px"
+      <h1 style={{
+        background: "linear-gradient(90deg, #a855f7, #22c55e)",
+        WebkitBackgroundClip: "text",
+        color: "transparent"
       }}>
-        <h1 style={{
-          fontSize: "28px",
-          fontWeight: "bold",
-          background: "linear-gradient(90deg, #a855f7, #22c55e)",
-          WebkitBackgroundClip: "text",
-          color: "transparent"
-        }}>
-          KBETZ TERMINAL
-        </h1>
+        KBETZ LIVE TERMINAL
+      </h1>
 
-        {!isPro && (
-          <button onClick={upgrade} style={{
-            background: "linear-gradient(90deg, gold, orange)",
-            padding: "10px 18px",
-            borderRadius: "8px",
-            border: "none",
-            fontWeight: "bold",
-            cursor: "pointer"
-          }}>
-            Upgrade PRO
-          </button>
-        )}
-      </div>
+      {!isPro && (
+        <button onClick={upgrade} style={{
+          background: "gold",
+          padding: "10px",
+          marginBottom: "20px",
+          borderRadius: "6px"
+        }}>
+          Upgrade PRO
+        </button>
+      )}
 
       {/* SIGNALS */}
       <div style={{
-        background: "rgba(255,255,255,0.05)",
-        padding: "15px",
-        borderRadius: "12px",
-        marginBottom: "20px",
-        backdropFilter: "blur(10px)",
-        border: "1px solid rgba(255,255,255,0.1)"
+        background: "#111",
+        padding: "10px",
+        borderRadius: "8px",
+        marginBottom: "20px"
       }}>
-        <h3 style={{ marginBottom: "10px" }}>🚨 LIVE SIGNALS</h3>
-
-        {signals.length === 0 && <div>No signals yet...</div>}
-
+        <h3>🚨 Signals</h3>
         {signals.map((s, i) => (
-          <div key={i} style={{
-            padding: "6px 0",
-            animation: "fade 0.3s ease"
-          }}>
-            {s}
-          </div>
+          <div key={i}>{s}</div>
         ))}
       </div>
 
-      {/* CONTENT GRID */}
+      {/* GAMES */}
       <div style={{
-        display: "grid",
-        gridTemplateColumns: "2fr 1fr",
-        gap: "20px"
+        filter: isPro ? "none" : "blur(6px)"
       }}>
+        {games.map((g) => {
+          const movement = getMovement(g.id, g.odds);
 
-        {/* GAMES */}
-        <div style={{
-          background: "rgba(255,255,255,0.05)",
-          padding: "15px",
-          borderRadius: "12px",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.1)"
-        }}>
-          <h2 style={{ marginBottom: "10px" }}>📊 Markets</h2>
-
-          <div style={{
-            filter: isPro ? "none" : "blur(6px)"
-          }}>
-            {games.map((g) => (
-              <div key={g.id} style={{
-                padding: "12px",
-                marginBottom: "10px",
-                background: "#0a0a0a",
-                borderRadius: "10px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                border: "1px solid #1f1f1f",
-                transition: "0.2s"
-              }}>
-                <div>
-                  {g.away} @ {g.home}
-                </div>
-
-                <div style={{
-                  color: "#22c55e",
-                  fontWeight: "bold"
-                }}>
-                  {g.odds}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* SIDE PANEL */}
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "20px"
-        }}>
-
-          {/* AI PICK */}
-          <div style={{
-            background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
-            padding: "15px",
-            borderRadius: "12px"
-          }}>
-            <h3>🧠 AI PICK</h3>
-
-            <div style={{
-              filter: isPro ? "none" : "blur(6px)",
-              marginTop: "10px"
+          return (
+            <div key={g.id} style={{
+              padding: "12px",
+              marginBottom: "10px",
+              background: "#0a0a0a",
+              borderRadius: "8px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              transition: "0.3s",
+              boxShadow: `0 0 10px ${movement.color}`
             }}>
-              Best edge detected
-            </div>
+              <div>{g.away} @ {g.home}</div>
 
-            {!isPro && (
-              <div style={{ marginTop: "10px", fontSize: "12px" }}>
-                🔒 PRO ONLY
+              <div style={{
+                color: movement.color,
+                fontWeight: "bold",
+                fontSize: "18px"
+              }}>
+                {movement.arrow} {g.odds}
               </div>
-            )}
-          </div>
-
-          {/* STATUS */}
-          <div style={{
-            background: "rgba(255,255,255,0.05)",
-            padding: "15px",
-            borderRadius: "12px"
-          }}>
-            <h3>📡 STATUS</h3>
-            <div>Live Data Active</div>
-            <div>User: {user?.email || "Guest"}</div>
-          </div>
-
-        </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
