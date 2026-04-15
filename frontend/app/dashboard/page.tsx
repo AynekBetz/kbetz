@@ -9,6 +9,7 @@ export default function Dashboard() {
   const [prevOdds, setPrevOdds] = useState<any>({});
   const [alerts, setAlerts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [topPick, setTopPick] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const isPro = user?.plan === "pro";
@@ -17,7 +18,7 @@ export default function Dashboard() {
     checkAuth();
   }, []);
 
-  // ================= AUTO LOGIN =================
+  // ================= 🔐 AUTH PROTECTION =================
   const checkAuth = async () => {
     const token = localStorage.getItem("token");
 
@@ -39,14 +40,36 @@ export default function Dashboard() {
       setUser(data);
 
       setLoading(false);
-      fetchGames();
 
+      fetchGames();
       setInterval(fetchGames, 5000);
 
     } catch {
       localStorage.removeItem("token");
       window.location.href = "/login";
     }
+  };
+
+  // ================= AI =================
+  const impliedProb = (odds: number) => {
+    if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
+    return 100 / (odds + 100);
+  };
+
+  const generateAI = (games: any[]) => {
+    let best = null;
+
+    games.forEach((g) => {
+      const prob = impliedProb(g.odds);
+      const trueProb = prob + 0.04;
+      const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
+
+      if (!best || ev > best.ev) {
+        best = { ...g, ev };
+      }
+    });
+
+    setTopPick(best);
   };
 
   // ================= ALERT =================
@@ -71,6 +94,7 @@ export default function Dashboard() {
     const data = await res.json();
 
     const newGames = data.games || [];
+
     const updatedPrev = { ...prevOdds };
 
     newGames.forEach((g: any) => {
@@ -94,6 +118,7 @@ export default function Dashboard() {
 
     setPrevOdds(updatedPrev);
     setGames(newGames);
+    generateAI(newGames);
   };
 
   // ================= LOGOUT =================
@@ -102,6 +127,7 @@ export default function Dashboard() {
     window.location.href = "/login";
   };
 
+  // ================= LOADING SCREEN =================
   if (loading) {
     return (
       <div style={{
@@ -109,8 +135,8 @@ export default function Dashboard() {
         color: "white",
         height: "100vh",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
+        justifyContent: "center",
+        alignItems: "center"
       }}>
         Loading...
       </div>
@@ -143,7 +169,9 @@ export default function Dashboard() {
             {user?.email}
           </span>
 
-          <button onClick={logout}>Logout</button>
+          <button onClick={logout}>
+            Logout
+          </button>
         </div>
       </div>
 
