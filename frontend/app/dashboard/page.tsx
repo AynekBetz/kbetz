@@ -7,120 +7,84 @@ const API = "https://kbetz.onrender.com";
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
   const [prevOdds, setPrevOdds] = useState<any>({});
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [signals, setSignals] = useState<string[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [topPick, setTopPick] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   const isPro = user?.plan === "pro";
 
   useEffect(() => {
-    checkAuth();
+    fetchGames();
+    fetchUser();
+
+    const interval = setInterval(fetchGames, 5000);
+    return () => clearInterval(interval);
   }, []);
 
-  const checkAuth = async () => {
+  const fetchUser = async () => {
     const token = localStorage.getItem("token");
+    if (!token) return;
 
-    if (!token) {
-      window.location.href = "/login";
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API}/api/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) throw new Error();
-
-      const data = await res.json();
-      setUser(data);
-
-      setLoading(false);
-
-      fetchGames();
-      setInterval(fetchGames, 5000);
-
-    } catch {
-      localStorage.removeItem("token");
-      window.location.href = "/login";
-    }
-  };
-
-  // ================= AI =================
-  const impliedProb = (odds: number) => {
-    if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
-    return 100 / (odds + 100);
-  };
-
-  const generateAI = (games: any[]) => {
-    let best = null;
-
-    games.forEach((g) => {
-      const prob = impliedProb(g.odds);
-      const trueProb = prob + 0.04;
-      const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
-
-      if (!best || ev > best.ev) {
-        best = { ...g, ev };
-      }
+    const res = await fetch(`${API}/api/me`, {
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    setTopPick(best);
+    const data = await res.json();
+    setUser(data);
   };
 
-  // ================= ALERT =================
-  const createAlert = (text: string) => {
-    const id = Date.now();
-    setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
-
-    setTimeout(() => {
-      setAlerts((prev) => prev.filter((a) => a.id !== id));
-    }, 4000);
-  };
-
-  const playSound = () => {
-    try {
-      new Audio("/alert.mp3").play();
-    } catch {}
-  };
-
-  // ================= FETCH =================
   const fetchGames = async () => {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
 
     const newGames = data.games || [];
 
-    const updatedPrev = { ...prevOdds };
+    // store previous odds
+    const prev = { ...prevOdds };
+    const updatedPrev: any = {};
 
     newGames.forEach((g: any) => {
-      const prev = prevOdds[g.id];
-
-      if (prev !== undefined) {
-        const diff = g.odds - prev;
-
-        if (Math.abs(diff) >= 5) {
-          createAlert(
-            diff > 0
-              ? `🔴 Odds worsening: ${g.away} @ ${g.home}`
-              : `🟢 Odds improving: ${g.away} @ ${g.home}`
-          );
-          playSound();
-        }
-      }
-
-      updatedPrev[g.id] = g.odds;
+      updatedPrev[g.id] = prev[g.id] ?? g.odds;
     });
 
     setPrevOdds(updatedPrev);
     setGames(newGames);
-    generateAI(newGames);
+
+    generateSignals(newGames);
   };
 
-  // ================= UPGRADE =================
+  const generateSignals = (games: any[]) => {
+    const newSignals: string[] = [];
+
+    games.forEach((g) => {
+      const rand = Math.random();
+      if (rand > 0.8) {
+        newSignals.push(`🚨 Steam: ${g.away} @ ${g.home}`);
+      }
+    });
+
+    setSignals((prev) => [...newSignals, ...prev].slice(0, 5));
+  };
+
+  const getMovement = (id: number, odds: number) => {
+    const prev = prevOdds[id];
+    if (prev === undefined) return { color: "white", arrow: "" };
+
+    if (odds > prev) {
+      return { color: "#ef4444", arrow: "⬆️" }; // worse
+    } else if (odds < prev) {
+      return { color: "#22c55e", arrow: "⬇️" }; // better
+    } else {
+      return { color: "white", arrow: "" };
+    }
+  };
+
   const upgrade = async () => {
     const token = localStorage.getItem("token");
+
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
 
     const res = await fetch(`${API}/api/checkout`, {
       method: "POST",
@@ -132,17 +96,10 @@ export default function Dashboard() {
 
     const data = await res.json();
 
-    if (data.url) window.location.href = data.url;
+    if (data.url) {
+      window.location.href = data.url;
+    }
   };
-
-  const logout = () => {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-  };
-
-  if (loading) {
-    return <div style={{ color: "white" }}>Loading...</div>;
-  }
 
   return (
     <div style={{
@@ -151,86 +108,69 @@ export default function Dashboard() {
       color: "white",
       padding: "20px"
     }}>
-      {/* HEADER */}
+      <h1 style={{
+        background: "linear-gradient(90deg, #a855f7, #22c55e)",
+        WebkitBackgroundClip: "text",
+        color: "transparent"
+      }}>
+        KBETZ LIVE TERMINAL
+      </h1>
+
+      {!isPro && (
+        <button onClick={upgrade} style={{
+          background: "gold",
+          padding: "10px",
+          marginBottom: "20px",
+          borderRadius: "6px"
+        }}>
+          Upgrade PRO
+        </button>
+      )}
+
+      {/* SIGNALS */}
       <div style={{
-        display: "flex",
-        justifyContent: "space-between",
+        background: "#111",
+        padding: "10px",
+        borderRadius: "8px",
         marginBottom: "20px"
       }}>
-        <h1 style={{
-          background: "linear-gradient(90deg, #a855f7, #22c55e)",
-          WebkitBackgroundClip: "text",
-          color: "transparent"
-        }}>
-          KBETZ TERMINAL
-        </h1>
-
-        <div>
-          <span style={{ marginRight: 10 }}>{user?.email}</span>
-          <button onClick={logout}>Logout</button>
-        </div>
+        <h3>🚨 Signals</h3>
+        {signals.map((s, i) => (
+          <div key={i}>{s}</div>
+        ))}
       </div>
 
-      {/* 🚨 LIVE SIGNALS */}
+      {/* GAMES */}
       <div style={{
-        marginBottom: "20px",
-        position: "relative"
+        filter: isPro ? "none" : "blur(6px)"
       }}>
-        <h2>🚨 LIVE SIGNALS</h2>
+        {games.map((g) => {
+          const movement = getMovement(g.id, g.odds);
 
-        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
-          {alerts.map((a) => (
-            <div key={a.id}>{a.text}</div>
-          ))}
-        </div>
+          return (
+            <div key={g.id} style={{
+              padding: "12px",
+              marginBottom: "10px",
+              background: "#0a0a0a",
+              borderRadius: "8px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              transition: "0.3s",
+              boxShadow: `0 0 10px ${movement.color}`
+            }}>
+              <div>{g.away} @ {g.home}</div>
 
-        {!isPro && (
-          <button onClick={upgrade}>
-            🔒 Unlock Live Signals
-          </button>
-        )}
-      </div>
-
-      {/* 🧠 AI PICK */}
-      <div style={{
-        marginBottom: "20px",
-        position: "relative"
-      }}>
-        <h2>🧠 AI PICK</h2>
-
-        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
-          {topPick && (
-            <>
-              <div>{topPick.away} @ {topPick.home}</div>
-              <div>EV: {topPick.ev.toFixed(2)}</div>
-            </>
-          )}
-        </div>
-
-        {!isPro && (
-          <button onClick={upgrade}>
-            🔒 Unlock AI Picks
-          </button>
-        )}
-      </div>
-
-      {/* 📊 MARKETS */}
-      <div>
-        <h2>📊 Markets</h2>
-
-        <div style={{ filter: isPro ? "none" : "blur(4px)" }}>
-          {games.map((g) => (
-            <div key={g.id}>
-              {g.away} @ {g.home} ({g.odds}) — {g.book}
+              <div style={{
+                color: movement.color,
+                fontWeight: "bold",
+                fontSize: "18px"
+              }}>
+                {movement.arrow} {g.odds}
+              </div>
             </div>
-          ))}
-        </div>
-
-        {!isPro && (
-          <button onClick={upgrade}>
-            🔒 Unlock Full Market View
-          </button>
-        )}
+          );
+        })}
       </div>
     </div>
   );
