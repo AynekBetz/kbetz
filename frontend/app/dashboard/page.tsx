@@ -6,20 +6,22 @@ const API = "https://kbetz.onrender.com";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
-  const [prevOdds, setPrevOdds] = useState<any>({});
-  const [signals, setSignals] = useState<string[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [topPicks, setTopPicks] = useState<any[]>([]);
+  const [parlay, setParlay] = useState<any>(null);
 
   const isPro = user?.plan === "pro";
 
   useEffect(() => {
-    fetchGames();
     fetchUser();
+    fetchGames();
 
     const interval = setInterval(fetchGames, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  // USER
   const fetchUser = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -32,52 +34,73 @@ export default function Dashboard() {
     setUser(data);
   };
 
+  // AI
+  const impliedProb = (odds: number) => {
+    if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
+    return 100 / (odds + 100);
+  };
+
+  const generateAI = (games: any[]) => {
+    const evaluated = games.map((g) => {
+      const prob = impliedProb(g.odds);
+      const trueProb = prob + 0.03;
+      const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
+      return { ...g, ev };
+    });
+
+    const sorted = evaluated.sort((a, b) => b.ev - a.ev);
+    setTopPicks(sorted.slice(0, 3));
+
+    if (sorted.length >= 2) {
+      const p1 = sorted[0];
+      const p2 = sorted[1];
+
+      const d1 = p1.odds < 0 ? 1 + 100 / Math.abs(p1.odds) : 1 + p1.odds / 100;
+      const d2 = p2.odds < 0 ? 1 + 100 / Math.abs(p2.odds) : 1 + p2.odds / 100;
+
+      const combined = ((d1 * d2) - 1) * 100;
+
+      setParlay({
+        legs: [p1, p2],
+        odds: combined.toFixed(2),
+      });
+    }
+  };
+
+  // ALERTS
+  const createAlert = (text: string) => {
+    const id = Date.now();
+    setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
+
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    }, 4000);
+  };
+
+  const playSound = () => {
+    try {
+      const audio = new Audio("/alert.mp3");
+      audio.play();
+    } catch {}
+  };
+
+  // FETCH
   const fetchGames = async () => {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
 
-    const newGames = data.games || [];
+    const g = data.games || [];
+    setGames(g);
 
-    // store previous odds
-    const prev = { ...prevOdds };
-    const updatedPrev: any = {};
+    generateAI(g);
 
-    newGames.forEach((g: any) => {
-      updatedPrev[g.id] = prev[g.id] ?? g.odds;
-    });
-
-    setPrevOdds(updatedPrev);
-    setGames(newGames);
-
-    generateSignals(newGames);
-  };
-
-  const generateSignals = (games: any[]) => {
-    const newSignals: string[] = [];
-
-    games.forEach((g) => {
-      const rand = Math.random();
-      if (rand > 0.8) {
-        newSignals.push(`🚨 Steam: ${g.away} @ ${g.home}`);
-      }
-    });
-
-    setSignals((prev) => [...newSignals, ...prev].slice(0, 5));
-  };
-
-  const getMovement = (id: number, odds: number) => {
-    const prev = prevOdds[id];
-    if (prev === undefined) return { color: "white", arrow: "" };
-
-    if (odds > prev) {
-      return { color: "#ef4444", arrow: "⬆️" }; // worse
-    } else if (odds < prev) {
-      return { color: "#22c55e", arrow: "⬇️" }; // better
-    } else {
-      return { color: "white", arrow: "" };
+    if (Math.random() > 0.7) {
+      createAlert("🚨 Market movement detected");
+      playSound();
     }
   };
 
+  // UPGRADE
   const upgrade = async () => {
     const token = localStorage.getItem("token");
 
@@ -96,9 +119,7 @@ export default function Dashboard() {
 
     const data = await res.json();
 
-    if (data.url) {
-      window.location.href = data.url;
-    }
+    if (data.url) window.location.href = data.url;
   };
 
   return (
@@ -106,72 +127,127 @@ export default function Dashboard() {
       background: "#050505",
       minHeight: "100vh",
       color: "white",
-      padding: "20px"
+      padding: "20px",
+      fontFamily: "Inter, sans-serif"
     }}>
-      <h1 style={{
-        background: "linear-gradient(90deg, #a855f7, #22c55e)",
-        WebkitBackgroundClip: "text",
-        color: "transparent"
-      }}>
-        KBETZ LIVE TERMINAL
-      </h1>
 
-      {!isPro && (
-        <button onClick={upgrade} style={{
-          background: "gold",
-          padding: "10px",
-          marginBottom: "20px",
-          borderRadius: "6px"
-        }}>
-          Upgrade PRO
-        </button>
-      )}
-
-      {/* SIGNALS */}
+      {/* HEADER */}
       <div style={{
-        background: "#111",
-        padding: "10px",
-        borderRadius: "8px",
-        marginBottom: "20px"
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "25px"
       }}>
-        <h3>🚨 Signals</h3>
-        {signals.map((s, i) => (
-          <div key={i}>{s}</div>
+        <h1 style={{
+          fontSize: "28px",
+          background: "linear-gradient(90deg, #a855f7, #22c55e)",
+          WebkitBackgroundClip: "text",
+          color: "transparent"
+        }}>
+          KBETZ TERMINAL
+        </h1>
+
+        {!isPro && (
+          <button onClick={upgrade} style={{
+            background: "linear-gradient(90deg, gold, orange)",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            border: "none",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}>
+            Upgrade PRO
+          </button>
+        )}
+      </div>
+
+      {/* ALERTS */}
+      <div style={{ marginBottom: "20px" }}>
+        {alerts.map((a) => (
+          <div key={a.id} style={{
+            background: "#111",
+            padding: "10px",
+            borderRadius: "8px",
+            marginBottom: "8px",
+            border: "1px solid #222"
+          }}>
+            {a.text}
+          </div>
         ))}
       </div>
 
+      {/* AI PICKS */}
+      <div style={{
+        background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
+        padding: "20px",
+        borderRadius: "16px",
+        marginBottom: "20px",
+        boxShadow: "0 0 20px rgba(168,85,247,0.3)"
+      }}>
+        <h2>🧠 AI PICKS</h2>
+
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {topPicks.map((p, i) => (
+            <div key={i} style={{ marginBottom: "10px" }}>
+              {p.away} @ {p.home}  
+              <div style={{ color: "#22c55e" }}>
+                EV: {p.ev.toFixed(2)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* PARLAY */}
+      {parlay && (
+        <div style={{
+          background: "#0a0a0a",
+          padding: "15px",
+          borderRadius: "12px",
+          marginBottom: "20px"
+        }}>
+          <h2>🎯 AI PARLAY</h2>
+
+          <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+            {parlay.legs.map((l: any, i: number) => (
+              <div key={i}>{l.away} @ {l.home}</div>
+            ))}
+            <div style={{ color: "#22c55e" }}>
+              Odds: +{parlay.odds}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* GAMES */}
       <div style={{
-        filter: isPro ? "none" : "blur(6px)"
+        background: "rgba(255,255,255,0.05)",
+        backdropFilter: "blur(10px)",
+        padding: "15px",
+        borderRadius: "12px"
       }}>
-        {games.map((g) => {
-          const movement = getMovement(g.id, g.odds);
+        <h2>Markets</h2>
 
-          return (
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {games.map((g) => (
             <div key={g.id} style={{
               padding: "12px",
               marginBottom: "10px",
               background: "#0a0a0a",
-              borderRadius: "8px",
+              borderRadius: "10px",
               display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              transition: "0.3s",
-              boxShadow: `0 0 10px ${movement.color}`
+              justifyContent: "space-between"
             }}>
               <div>{g.away} @ {g.home}</div>
 
-              <div style={{
-                color: movement.color,
-                fontWeight: "bold",
-                fontSize: "18px"
-              }}>
-                {movement.arrow} {g.odds}
+              <div style={{ color: "#22c55e", fontWeight: "bold" }}>
+                {g.odds}
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
+
     </div>
   );
 }
