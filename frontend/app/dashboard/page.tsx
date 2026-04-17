@@ -6,6 +6,7 @@ const API = "https://kbetz.onrender.com";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
+  const [prevOdds, setPrevOdds] = useState<any>({});
   const [alerts, setAlerts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [topPicks, setTopPicks] = useState<any[]>([]);
@@ -21,7 +22,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // USER
+  // ================= USER =================
   const fetchUser = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -34,7 +35,7 @@ export default function Dashboard() {
     setUser(data);
   };
 
-  // AI
+  // ================= AI =================
   const impliedProb = (odds: number) => {
     if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
     return 100 / (odds + 100);
@@ -67,7 +68,7 @@ export default function Dashboard() {
     }
   };
 
-  // ALERTS
+  // ================= ALERTS =================
   const createAlert = (text: string) => {
     const id = Date.now();
     setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
@@ -84,23 +85,35 @@ export default function Dashboard() {
     } catch {}
   };
 
-  // FETCH
+  // ================= FETCH =================
   const fetchGames = async () => {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
 
-    const g = data.games || [];
-    setGames(g);
+    const newGames = data.games || [];
+    const updatedPrev = { ...prevOdds };
 
-    generateAI(g);
+    newGames.forEach((g: any) => {
+      const prev = prevOdds[g.id];
 
-    if (Math.random() > 0.7) {
-      createAlert("🚨 Market movement detected");
-      playSound();
-    }
+      if (prev !== undefined && prev !== g.odds) {
+        createAlert(
+          g.odds < prev
+            ? `🟢 Odds improving: ${g.away}`
+            : `🔴 Odds worsening: ${g.away}`
+        );
+        playSound();
+      }
+
+      updatedPrev[g.id] = g.odds;
+    });
+
+    setPrevOdds(updatedPrev);
+    setGames(newGames);
+    generateAI(newGames);
   };
 
-  // UPGRADE
+  // ================= UPGRADE =================
   const upgrade = async () => {
     const token = localStorage.getItem("token");
 
@@ -189,7 +202,7 @@ export default function Dashboard() {
         <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
           {topPicks.map((p, i) => (
             <div key={i} style={{ marginBottom: "10px" }}>
-              {p.away} @ {p.home}  
+              {p.away} @ {p.home}
               <div style={{ color: "#22c55e" }}>
                 EV: {p.ev.toFixed(2)}
               </div>
@@ -219,7 +232,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* GAMES */}
+      {/* MARKETS */}
       <div style={{
         background: "rgba(255,255,255,0.05)",
         backdropFilter: "blur(10px)",
@@ -240,7 +253,16 @@ export default function Dashboard() {
             }}>
               <div>{g.away} @ {g.home}</div>
 
-              <div style={{ color: "#22c55e", fontWeight: "bold" }}>
+              <div style={{
+                color:
+                  prevOdds[g.id] && g.odds < prevOdds[g.id]
+                    ? "#22c55e"
+                    : prevOdds[g.id] && g.odds > prevOdds[g.id]
+                    ? "#ef4444"
+                    : "#22c55e",
+                fontWeight: "bold",
+                transition: "all 0.3s ease",
+              }}>
                 {g.odds}
               </div>
             </div>

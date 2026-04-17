@@ -11,7 +11,7 @@ dotenv.config();
 
 const app = express();
 
-// ================= STRIPE WEBHOOK (RAW BODY FIRST) =================
+// ================= STRIPE WEBHOOK (MUST BE FIRST) =================
 app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const sig = req.headers["stripe-signature"];
@@ -25,7 +25,7 @@ app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, 
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.log("❌ Webhook signature failed:", err.message);
+    console.log("❌ Webhook signature failed");
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -66,7 +66,7 @@ app.use(express.json());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const PORT = process.env.PORT || 10000;
-const JWT_SECRET = process.env.JWT_SECRET || "secret123";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // ================= DB =================
 mongoose.connect(process.env.MONGO_URI)
@@ -75,22 +75,18 @@ mongoose.connect(process.env.MONGO_URI)
 
 // ================= AUTH =================
 
-// 🔥 FIXED SIGNUP (WITH DEBUG LOGGING)
+// 🔥 SIGNUP (FIXED + AUTO LOGIN)
 app.post("/api/signup", async (req, res) => {
   try {
-    console.log("📩 SIGNUP BODY:", req.body);
-
     const { email, password } = req.body;
 
     if (!email || !password) {
-      console.log("❌ Missing fields");
       return res.json({ success: false, message: "Missing fields" });
     }
 
     const existing = await User.findOne({ email });
 
     if (existing) {
-      console.log("❌ User already exists");
       return res.json({ success: false, message: "User already exists" });
     }
 
@@ -104,30 +100,35 @@ app.post("/api/signup", async (req, res) => {
 
     await user.save();
 
-    console.log("✅ USER CREATED:", email);
+    // 🔥 AUTO LOGIN TOKEN
+    const token = jwt.sign({ id: user._id }, JWT_SECRET);
 
-    return res.json({ success: true });
+    res.json({
+      success: true,
+      token,
+      user: { email: user.email, plan: user.plan }
+    });
 
   } catch (err) {
-    console.log("🔥 SIGNUP ERROR:", err);
-    return res.json({ success: false, message: err.message });
+    console.log("SIGNUP ERROR:", err);
+    res.json({ success: false, message: "Signup failed" });
   }
 });
 
-// LOGIN
+// 🔥 LOGIN (IMPROVED)
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
+
     if (!user) {
-      console.log("❌ No user found");
       return res.json({ success: false, message: "No user found" });
     }
 
     const valid = await bcrypt.compare(password, user.password);
+
     if (!valid) {
-      console.log("❌ Wrong password");
       return res.json({ success: false, message: "Wrong password" });
     }
 
@@ -136,15 +137,12 @@ app.post("/api/login", async (req, res) => {
     res.json({
       success: true,
       token,
-      user: {
-        email: user.email,
-        plan: user.plan
-      }
+      user: { email: user.email, plan: user.plan }
     });
 
   } catch (err) {
-    console.log("🔥 LOGIN ERROR:", err);
-    res.json({ success: false });
+    console.log("LOGIN ERROR:", err);
+    res.json({ success: false, message: "Login failed" });
   }
 });
 
@@ -153,9 +151,7 @@ app.get("/api/me", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
-    if (!token) {
-      return res.status(401).json({ error: "No token" });
-    }
+    if (!token) return res.status(401).json({ error: "No token" });
 
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.id);
@@ -170,7 +166,7 @@ app.get("/api/me", async (req, res) => {
   }
 });
 
-// ================= MULTI-SPORT + LINE SHOPPING =================
+// ================= MULTI-SPORT ODDS =================
 
 const SPORTS = [
   "basketball_nba",
@@ -234,7 +230,7 @@ app.get("/api/data", async (req, res) => {
     res.json({ success: true, games: allGames });
 
   } catch (err) {
-    console.log("🔥 ODDS ERROR:", err);
+    console.log("ODDS ERROR:", err);
 
     res.json({
       success: true,
@@ -277,7 +273,7 @@ app.post("/api/checkout", async (req, res) => {
     res.json({ url: session.url });
 
   } catch (err) {
-    console.log("🔥 STRIPE ERROR:", err);
+    console.log("STRIPE ERROR:", err);
     res.json({ error: "Stripe failed" });
   }
 });
