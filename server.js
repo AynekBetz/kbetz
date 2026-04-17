@@ -5,13 +5,14 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Stripe from "stripe";
+import fetch from "node-fetch";
 import User from "./models/User.js";
 
 dotenv.config();
 
 const app = express();
 
-// ================= STRIPE WEBHOOK (MUST BE FIRST) =================
+// ================= STRIPE WEBHOOK =================
 app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const sig = req.headers["stripe-signature"];
@@ -26,23 +27,18 @@ app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, 
     );
   } catch (err) {
     console.log("❌ Webhook signature failed");
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    return res.status(400).send(`Webhook Error`);
   }
 
   const obj = event.data.object;
 
-  // ✅ UPGRADE
   if (event.type === "checkout.session.completed") {
     const email = obj.customer_email;
     console.log("💰 UPGRADE:", email);
 
-    await User.findOneAndUpdate(
-      { email },
-      { plan: "pro" }
-    );
+    await User.findOneAndUpdate({ email }, { plan: "pro" });
   }
 
-  // ❌ DOWNGRADE
   if (
     event.type === "invoice.payment_failed" ||
     event.type === "customer.subscription.deleted"
@@ -50,16 +46,13 @@ app.post("/api/webhook", express.raw({ type: "application/json" }), async (req, 
     const email = obj.customer_email;
     console.log("❌ DOWNGRADE:", email);
 
-    await User.findOneAndUpdate(
-      { email },
-      { plan: "free" }
-    );
+    await User.findOneAndUpdate({ email }, { plan: "free" });
   }
 
   res.json({ received: true });
 });
 
-// ================= NORMAL MIDDLEWARE =================
+// ================= MIDDLEWARE =================
 app.use(cors());
 app.use(express.json());
 
@@ -74,8 +67,6 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.log("❌ Mongo error:", err));
 
 // ================= AUTH =================
-
-// 🔥 SIGNUP (FIXED + AUTO LOGIN)
 app.post("/api/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -85,7 +76,6 @@ app.post("/api/signup", async (req, res) => {
     }
 
     const existing = await User.findOne({ email });
-
     if (existing) {
       return res.json({ success: false, message: "User already exists" });
     }
@@ -100,7 +90,6 @@ app.post("/api/signup", async (req, res) => {
 
     await user.save();
 
-    // 🔥 AUTO LOGIN TOKEN
     const token = jwt.sign({ id: user._id }, JWT_SECRET);
 
     res.json({
@@ -115,7 +104,6 @@ app.post("/api/signup", async (req, res) => {
   }
 });
 
-// 🔥 LOGIN (IMPROVED)
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -146,11 +134,10 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// GET USER
+// ================= USER =================
 app.get("/api/me", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-
     if (!token) return res.status(401).json({ error: "No token" });
 
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -166,8 +153,7 @@ app.get("/api/me", async (req, res) => {
   }
 });
 
-// ================= MULTI-SPORT ODDS =================
-
+// ================= ODDS FIXED =================
 const SPORTS = [
   "basketball_nba",
   "americanfootball_nfl",
@@ -175,12 +161,24 @@ const SPORTS = [
 ];
 
 const fetchSportOdds = async (sport) => {
-  const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${process.env.ODDS_API_KEY}&regions=us&markets=h2h`;
+  try {
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${process.env.ODDS_API_KEY}&regions=us&markets=h2h`;
 
-  const res = await fetch(url);
-  const data = await res.json();
+    const res = await fetch(url);
+    const data = await res.json();
 
-  return data;
+    // 🔥 FIX: prevent crash
+    if (!Array.isArray(data)) {
+      console.log("❌ ODDS API BAD RESPONSE:", data);
+      return [];
+    }
+
+    return data;
+
+  } catch (err) {
+    console.log("❌ FETCH ERROR:", err);
+    return [];
+  }
 };
 
 const getBestOdds = (bookmakers) => {
@@ -211,8 +209,10 @@ app.get("/api/data", async (req, res) => {
     for (const sport of SPORTS) {
       const data = await fetchSportOdds(sport);
 
+      if (!Array.isArray(data)) continue;
+
       data.forEach((game) => {
-        const best = getBestOdds(game.bookmakers);
+        const best = getBestOdds(game.bookmakers || []);
 
         if (!best) return;
 
@@ -234,27 +234,27 @@ app.get("/api/data", async (req, res) => {
 
     res.json({
       success: true,
-      games: [
-        {
-          id: 1,
-          sport: "fallback",
-          away: "Fallback Team",
-          home: "Fallback Opponent",
-          odds: -110,
-          book: "Mock"
-        }
-      ]
+      games: []
     });
   }
 });
 
-// ================= STRIPE CHECKOUT =================
+// ================= STRIPE FIXED =================
 app.post("/api/checkout", async (req, res) => {
   try {
+    console.log("🚀 CHECKOUT HIT");
+
     const { token } = req.body;
+
+    if (!token) return res.json({ error: "No token" });
 
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.id);
+
+    if (!user) return res.json({ error: "User not found" });
+
+    console.log("👤 USER:", user.email);
+    console.log("💰 PRICE ID:", process.env.STRIPE_PRICE_ID);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -270,11 +270,13 @@ app.post("/api/checkout", async (req, res) => {
       cancel_url: `${process.env.CLIENT_URL}/dashboard`,
     });
 
+    console.log("✅ STRIPE SESSION CREATED");
+
     res.json({ url: session.url });
 
   } catch (err) {
-    console.log("STRIPE ERROR:", err);
-    res.json({ error: "Stripe failed" });
+    console.log("🔥 CHECKOUT ERROR:", err.message);
+    res.json({ error: err.message });
   }
 });
 
