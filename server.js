@@ -1,31 +1,31 @@
 import express from "express";
+import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
-import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Stripe from "stripe";
-import User from "./models/User.js";
 
 dotenv.config();
 
 const app = express();
-
-// Stripe webhook MUST be raw
-app.use("/api/webhook", express.raw({ type: "application/json" }));
-
 app.use(cors());
 app.use(express.json());
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const PORT = process.env.PORT || 10000;
-const JWT_SECRET = process.env.JWT_SECRET || "secret123";
-
-// DB
+// ================= DB =================
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ Mongo connected"))
-  .catch(err => console.log(err));
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch(err => console.log("❌ DB ERROR:", err));
+
+// ================= USER MODEL =================
+const userSchema = new mongoose.Schema({
+  email: String,
+  password: String,
+  plan: { type: String, default: "free" }
+});
+
+const User = mongoose.model("User", userSchema);
 
 // ================= AUTH =================
 
@@ -34,129 +34,137 @@ app.post("/api/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const hashed = await bcrypt.hash(password, 10);
+    const existing = await User.findOne({ email });
+    if (existing) return res.json({ error: "User exists" });
 
-    const user = new User({
-      email,
-      password: hashed,
-    });
+    const user = await User.create({ email, password });
 
-    await user.save();
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
-    res.json({ success: true });
-  } catch {
-    res.json({ success: false });
+    res.json({ token });
+
+  } catch (err) {
+    console.log(err);
+    res.json({ error: "Signup failed" });
   }
 });
 
 // LOGIN
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) return res.json({ success: false });
+    const user = await User.findOne({ email, password });
+    if (!user) return res.json({ error: "Invalid login" });
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.json({ success: false });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
 
-  const token = jwt.sign({ id: user._id }, JWT_SECRET);
+    res.json({ token });
 
-  res.json({
-    success: true,
-    token,
-    user: {
-      email: user.email,
-      plan: user.plan,
-    }
-  });
+  } catch (err) {
+    console.log(err);
+    res.json({ error: "Login failed" });
+  }
 });
 
 // GET USER
 app.get("/api/me", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = await User.findById(decoded.id);
 
-    res.json({
-      email: user.email,
-      plan: user.plan,
-    });
-  } catch {
-    res.status(401).json({ error: "Unauthorized" });
+    res.json(user);
+
+  } catch (err) {
+    res.json({ error: "Auth failed" });
   }
 });
 
-// ================= STRIPE =================
+// ================= ODDS (SAFE) =================
 
-// CREATE CHECKOUT
-app.post("/api/checkout", async (req, res) => {
-  const { token } = req.body;
-
-  const decoded = jwt.verify(token, JWT_SECRET);
-  const user = await User.findById(decoded.id);
-
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    mode: "subscription",
-    customer_email: user.email,
-    line_items: [
-      {
-        price: process.env.STRIPE_PRICE_ID,
-        quantity: 1,
-      },
-    ],
-    success_url: `${process.env.CLIENT_URL}/dashboard`,
-    cancel_url: `${process.env.CLIENT_URL}/dashboard`,
-  });
-
-  res.json({ url: session.url });
-});
-
-// WEBHOOK
-app.post("/api/webhook", async (req, res) => {
-  const sig = req.headers["stripe-signature"];
-
-  let event;
-
+app.get("/api/data", async (req, res) => {
   try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch {
-    return res.sendStatus(400);
+    // SAFE FALLBACK DATA (prevents crash)
+    const games = [
+      { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
+      { id: 2, home: "Celtics", away: "Heat", odds: -105 }
+    ];
+
+    res.json({ games });
+
+  } catch (err) {
+    console.log("ODDS ERROR:", err);
+    res.json({ games: [] });
   }
+});
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
+// ================= 🔥 STRIPE CHECKOUT =================
 
-    const user = await User.findOne({
-      email: session.customer_email,
+app.post("/api/checkout", async (req, res) => {
+  try {
+    console.log("🚀 CHECKOUT HIT");
+
+    const { token } = req.body;
+
+    if (!token) {
+      return res.json({ error: "No token provided" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      return res.json({ error: "Invalid token" });
+    }
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.json({ error: "User not found" });
+    }
+
+    if (!process.env.STRIPE_PRICE_ID) {
+      return res.json({ error: "Missing STRIPE_PRICE_ID" });
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.json({ error: "Missing STRIPE_SECRET_KEY" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "subscription",
+      customer_email: user.email,
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      success_url: `${process.env.CLIENT_URL}/dashboard`,
+      cancel_url: `${process.env.CLIENT_URL}/dashboard`,
     });
 
-    if (user) {
-      user.plan = "pro";
-      await user.save();
-    }
+    console.log("✅ STRIPE URL:", session.url);
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.log("🔥 STRIPE ERROR:", err.message);
+    res.json({ error: err.message });
   }
-
-  res.sendStatus(200);
 });
 
-// TEST DATA
-app.get("/api/data", (req, res) => {
-  res.json({
-    success: true,
-    games: [
-      { id: 1, away: "Warriors", home: "Lakers", odds: -110 },
-      { id: 2, away: "Heat", home: "Celtics", odds: -130 },
-    ],
-  });
+// ================= HEALTH =================
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
 });
+
+// ================= SERVER =================
+const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
-  console.log(`🔥 SERVER RUNNING ON ${PORT}`);
+  console.log(`🔥 SERVER RUNNING ON PORT ${PORT}`);
 });
