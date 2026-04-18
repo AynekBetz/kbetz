@@ -6,232 +6,248 @@ const API = "https://kbetz.onrender.com";
 
 export default function Dashboard() {
   const [games, setGames] = useState<any[]>([]);
-  const [signals, setSignals] = useState<string[]>([]);
-  const [parlay, setParlay] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [topPicks, setTopPicks] = useState<any[]>([]);
+  const [parlay, setParlay] = useState<any>(null);
 
   const isPro = user?.plan === "pro";
 
   useEffect(() => {
-    fetchGames();
     fetchUser();
+    fetchGames();
 
-    const interval = setInterval(fetchGames, 10000);
+    const interval = setInterval(fetchGames, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // ================= USER =================
+  // USER
   const fetchUser = async () => {
     const token = localStorage.getItem("token");
-    console.log("FETCH USER TOKEN:", token);
-
     if (!token) return;
 
-    try {
-      const res = await fetch(`${API}/api/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    const res = await fetch(`${API}/api/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await res.json();
+    setUser(data);
+  };
+
+  // AI
+  const impliedProb = (odds: number) => {
+    if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
+    return 100 / (odds + 100);
+  };
+
+  const generateAI = (games: any[]) => {
+    const evaluated = games.map((g) => {
+      const prob = impliedProb(g.odds);
+      const trueProb = prob + 0.03;
+      const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
+      return { ...g, ev };
+    });
+
+    const sorted = evaluated.sort((a, b) => b.ev - a.ev);
+    setTopPicks(sorted.slice(0, 3));
+
+    if (sorted.length >= 2) {
+      const p1 = sorted[0];
+      const p2 = sorted[1];
+
+      const d1 = p1.odds < 0 ? 1 + 100 / Math.abs(p1.odds) : 1 + p1.odds / 100;
+      const d2 = p2.odds < 0 ? 1 + 100 / Math.abs(p2.odds) : 1 + p2.odds / 100;
+
+      const combined = ((d1 * d2) - 1) * 100;
+
+      setParlay({
+        legs: [p1, p2],
+        odds: combined.toFixed(2),
       });
-
-      const data = await res.json();
-      console.log("USER DATA:", data);
-
-      setUser(data);
-    } catch (err) {
-      console.log("USER FETCH ERROR:", err);
     }
   };
 
-  // ================= GAMES =================
-  const fetchGames = async () => {
+  // ALERTS
+  const createAlert = (text: string) => {
+    const id = Date.now();
+    setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
+
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    }, 4000);
+  };
+
+  const playSound = () => {
     try {
-      const res = await fetch(`${API}/api/data`);
-      const data = await res.json();
+      const audio = new Audio("/alert.mp3");
+      audio.play();
+    } catch {}
+  };
 
-      const g = data.games || [];
-      setGames(g);
+  // FETCH
+  const fetchGames = async () => {
+    const res = await fetch(`${API}/api/data`);
+    const data = await res.json();
 
-      generateSignals(g);
-    } catch (err) {
-      console.log("FETCH GAMES ERROR:", err);
+    const g = data.games || [];
+    setGames(g);
+
+    generateAI(g);
+
+    if (Math.random() > 0.7) {
+      createAlert("🚨 Market movement detected");
+      playSound();
     }
   };
 
-  // ================= SIGNALS =================
-  const generateSignals = (games: any[]) => {
-    const newSignals: string[] = [];
-
-    games.forEach((g) => {
-      const rand = Math.random();
-
-      if (rand > 0.8) {
-        newSignals.push(`🚨 Steam move on ${g.away} @ ${g.home}`);
-      } else if (rand > 0.6) {
-        newSignals.push(`💰 Sharp money on ${g.home}`);
-      } else if (rand > 0.4) {
-        newSignals.push(`🎯 Value spot: ${g.away}`);
-      }
-    });
-
-    setSignals((prev) => [...newSignals, ...prev].slice(0, 6));
-  };
-
-  // ================= PARLAY =================
-  const addToParlay = (game: any) => {
-    if (parlay.find((p) => p.id === game.id)) return;
-    setParlay([...parlay, game]);
-  };
-
-  const removeFromParlay = (id: number) => {
-    setParlay(parlay.filter((p) => p.id !== id));
-  };
-
-  const calcParlayOdds = () => {
-    if (!parlay.length) return "0.00";
-
-    let total = 1;
-
-    parlay.forEach((p) => {
-      const decimal =
-        p.odds < 0
-          ? 1 + 100 / Math.abs(p.odds)
-          : 1 + p.odds / 100;
-
-      total *= decimal;
-    });
-
-    return ((total - 1) * 100).toFixed(2);
-  };
-
-  // ================= 🚨 FIXED UPGRADE =================
+  // UPGRADE
   const upgrade = async () => {
-    console.log("🔥 CLICKED UPGRADE");
-
     const token = localStorage.getItem("token");
-    console.log("TOKEN:", token);
 
     if (!token) {
-      alert("❌ Not logged in → redirecting to login");
       window.location.href = "/login";
       return;
     }
 
-    try {
-      const res = await fetch(`${API}/api/checkout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token }),
-      });
+    const res = await fetch(`${API}/api/checkout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
 
-      console.log("RAW RESPONSE:", res);
+    const data = await res.json();
 
-      const data = await res.json();
-      console.log("CHECKOUT DATA:", data);
-
-      if (!data.url) {
-        alert("❌ No Stripe URL returned — check backend");
-        return;
-      }
-
-      alert("✅ Redirecting to Stripe...");
-      window.location.href = data.url;
-
-    } catch (err) {
-      console.log("UPGRADE ERROR:", err);
-      alert("❌ Upgrade failed");
-    }
+    if (data.url) window.location.href = data.url;
   };
 
-  // ================= UI =================
   return (
-    <div style={{ padding: 20, maxWidth: 1200, margin: "0 auto" }}>
-      <h1>💰 KBETZ LIVE TERMINAL</h1>
+    <div style={{
+      background: "#050505",
+      minHeight: "100vh",
+      color: "white",
+      padding: "20px",
+      fontFamily: "Inter, sans-serif"
+    }}>
 
-      {/* 🚨 SIGNALS */}
+      {/* HEADER */}
       <div style={{
-        background: "#111",
-        padding: 10,
-        marginBottom: 15,
-        borderRadius: 8
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "25px"
       }}>
-        <h3>🚨 LIVE SIGNALS</h3>
-        {signals.map((s, i) => (
-          <div key={i}>{s}</div>
-        ))}
+        <h1 style={{
+          fontSize: "28px",
+          background: "linear-gradient(90deg, #a855f7, #22c55e)",
+          WebkitBackgroundClip: "text",
+          color: "transparent"
+        }}>
+          KBETZ TERMINAL
+        </h1>
+
+        {!isPro && (
+          <button onClick={upgrade} style={{
+            background: "linear-gradient(90deg, gold, orange)",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            border: "none",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}>
+            Upgrade PRO
+          </button>
+        )}
       </div>
 
-      {/* 🔒 PRO LOCK */}
-      {!isPro && (
-        <div style={{ color: "red", marginBottom: 10 }}>
-          🔒 Upgrade to PRO to unlock AI + alerts
-        </div>
-      )}
-
-      {/* 🎯 PARLAY BUILDER */}
-      <div style={{
-        background: "#0a0a0a",
-        padding: 15,
-        marginBottom: 20,
-        borderRadius: 10
-      }}>
-        <h2>🎯 Parlay Builder</h2>
-
-        {parlay.map((p) => (
-          <div key={p.id}>
-            {p.away} @ {p.home} ({p.odds})
-            <button onClick={() => removeFromParlay(p.id)}>❌</button>
+      {/* ALERTS */}
+      <div style={{ marginBottom: "20px" }}>
+        {alerts.map((a) => (
+          <div key={a.id} style={{
+            background: "#111",
+            padding: "10px",
+            borderRadius: "8px",
+            marginBottom: "8px",
+            border: "1px solid #222"
+          }}>
+            {a.text}
           </div>
         ))}
+      </div>
 
-        <div style={{ marginTop: 10 }}>
-          💰 Parlay Odds: {calcParlayOdds()}
+      {/* AI PICKS */}
+      <div style={{
+        background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
+        padding: "20px",
+        borderRadius: "16px",
+        marginBottom: "20px",
+        boxShadow: "0 0 20px rgba(168,85,247,0.3)"
+      }}>
+        <h2>🧠 AI PICKS</h2>
+
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {topPicks.map((p, i) => (
+            <div key={i} style={{ marginBottom: "10px" }}>
+              {p.away} @ {p.home}  
+              <div style={{ color: "#22c55e" }}>
+                EV: {p.ev.toFixed(2)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* 💳 UPGRADE BUTTON */}
-      {!isPro && (
-        <button
-          onClick={upgrade}
-          style={{
-            marginBottom: 20,
-            background: "gold",
-            padding: 12,
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: "bold"
-          }}
-        >
-          Upgrade to PRO
-        </button>
+      {/* PARLAY */}
+      {parlay && (
+        <div style={{
+          background: "#0a0a0a",
+          padding: "15px",
+          borderRadius: "12px",
+          marginBottom: "20px"
+        }}>
+          <h2>🎯 AI PARLAY</h2>
+
+          <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+            {parlay.legs.map((l: any, i: number) => (
+              <div key={i}>{l.away} @ {l.home}</div>
+            ))}
+            <div style={{ color: "#22c55e" }}>
+              Odds: +{parlay.odds}
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* 📊 GAMES */}
-      <h2>Games</h2>
+      {/* GAMES */}
+      <div style={{
+        background: "rgba(255,255,255,0.05)",
+        backdropFilter: "blur(10px)",
+        padding: "15px",
+        borderRadius: "12px"
+      }}>
+        <h2>Markets</h2>
 
-      {games.map((g) => (
-        <div
-          key={g.id}
-          style={{
-            padding: 10,
-            marginBottom: 10,
-            background: "#111",
-            borderRadius: 8
-          }}
-        >
-          {g.away} @ {g.home} ({g.odds})
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {games.map((g) => (
+            <div key={g.id} style={{
+              padding: "12px",
+              marginBottom: "10px",
+              background: "#0a0a0a",
+              borderRadius: "10px",
+              display: "flex",
+              justifyContent: "space-between"
+            }}>
+              <div>{g.away} @ {g.home}</div>
 
-          <button
-            onClick={() => addToParlay(g)}
-            style={{ marginLeft: 10 }}
-          >
-            ➕ Add
-          </button>
+              <div style={{ color: "#22c55e", fontWeight: "bold" }}>
+                {g.odds}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
+
     </div>
   );
 }
