@@ -3,52 +3,45 @@
 import { useState } from "react";
 
 export default function Signup() {
-const [email, setEmail] = useState("");
-const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-const handleSignup = (e) => {
-e.preventDefault();
+  const handleSignup = (e) => {
+    e.preventDefault();
 
-```
-// 🔥 Create user locally (same as login)
-localStorage.setItem(
-  "user",
-  JSON.stringify({
-    email,
-    plan: "pro",
-  })
-);
+    localStorage.setItem(
+      "user",
+      JSON.stringify({
+        email,
+        plan: "pro"
+      })
+    );
 
-// go to dashboard
-window.location.href = "/dashboard";
-```
+    window.location.href = "/dashboard";
+  };
 
-};
+  return (
+    <div style={{ padding: 40, color: "white" }}>
+      <h1>Signup</h1>
 
-return (
-<div style={{ padding: 40, color: "white" }}> <h1>Signup</h1>
+      <form onSubmit={handleSignup}>
+        <input
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <br /><br />
 
-```
-  <form onSubmit={handleSignup}>
-    <input
-      placeholder="Email"
-      value={email}
-      onChange={(e) => setEmail(e.target.value)}
-    />
-    <br /><br />
+        <input
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <br /><br />
 
-    <input
-      placeholder="Password"
-      type="password"
-      value={password}
-      onChange={(e) => setPassword(e.target.value)}
-    />
-    <br /><br />
-
-    <button type="submit">Create Account</button>
-  </form>
-</div>
-```
-
-);
+        <button type="submit">Create Account</button>
+      </form>
+    </div>
+  );
 }
