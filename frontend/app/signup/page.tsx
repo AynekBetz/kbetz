@@ -2,48 +2,53 @@
 
 import { useState } from "react";
 
-const API = "https://kbetz.onrender.com";
-
 export default function Signup() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
 
-  const signup = async () => {
-    try {
-      const res = await fetch(`${API}/api/signup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+const handleSignup = (e) => {
+e.preventDefault();
 
-      const data = await res.json();
+```
+// 🔥 Create user locally (same as login)
+localStorage.setItem(
+  "user",
+  JSON.stringify({
+    email,
+    plan: "pro",
+  })
+);
 
-      if (data.success) {
-        alert("Signup successful");
-        window.location.href = "/login";
-      } else {
-        alert(data.message || "Signup failed");
-      }
-    } catch (err) {
-      console.log(err);
-      alert("Signup error");
-    }
-  };
+// go to dashboard
+window.location.href = "/dashboard";
+```
 
-  return (
-    <div style={{ padding: 40 }}>
-      <h1>Signup</h1>
+};
 
-      <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
-      <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+return (
+<div style={{ padding: 40, color: "white" }}> <h1>Signup</h1>
 
-      <button onClick={signup}>Create Account</button>
+```
+  <form onSubmit={handleSignup}>
+    <input
+      placeholder="Email"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+    />
+    <br /><br />
 
-      <div style={{ marginTop: 20 }}>
-        Already have account? <a href="/login">Login</a>
-      </div>
-    </div>
-  );
+    <input
+      placeholder="Password"
+      type="password"
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+    />
+    <br /><br />
+
+    <button type="submit">Create Account</button>
+  </form>
+</div>
+```
+
+);
 }
