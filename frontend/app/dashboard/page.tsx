@@ -2,188 +2,252 @@
 
 import { useEffect, useState } from "react";
 
+const API = "https://kbetz.onrender.com";
+
 export default function Dashboard() {
-const [user, setUser] = useState(null);
+  const [games, setGames] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [topPicks, setTopPicks] = useState<any[]>([]);
+  const [parlay, setParlay] = useState<any>(null);
 
-const isPro = user?.plan === "pro";
+  const isPro = user?.plan === "pro";
 
-useEffect(() => {
-const stored = localStorage.getItem("user");
-if (stored) {
-setUser(JSON.parse(stored));
-}
-}, []);
+  useEffect(() => {
+    fetchUser();
+    fetchGames();
 
-const logout = () => {
-localStorage.removeItem("user");
-window.location.href = "/login";
-};
+    const interval = setInterval(fetchGames, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-return (
-<div
-style={{
-background: "#050505",
-minHeight: "100vh",
-color: "white",
-padding: "20px",
-fontFamily: "Inter, sans-serif",
-}}
->
-{/* HEADER */}
-<div
-style={{
-display: "flex",
-justifyContent: "space-between",
-alignItems: "center",
-marginBottom: "25px",
-}}
->
-<h1
-style={{
-fontSize: "28px",
-background: "linear-gradient(90deg, #a855f7, #22c55e)",
-WebkitBackgroundClip: "text",
-color: "transparent",
-}}
->
-KBETZ TERMINAL </h1>
+  // USER
+  const fetchUser = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
-```
-    <div style={{ display: "flex", gap: "10px" }}>
-      <button
-        onClick={() => (window.location.href = "/signup")}
-        style={{
-          background: "linear-gradient(90deg, gold, orange)",
-          padding: "10px 18px",
-          borderRadius: "8px",
-          border: "none",
-          fontWeight: "bold",
-          cursor: "pointer",
-        }}
-      >
-        Upgrade PRO
-      </button>
+    const res = await fetch(`${API}/api/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      <button onClick={logout}>Logout</button>
-    </div>
-  </div>
+    const data = await res.json();
+    setUser(data);
+  };
 
-  {/* ALERT */}
-  <div style={{ marginBottom: "20px" }}>
-    <div
-      style={{
-        background: "#111",
-        padding: "10px",
-        borderRadius: "8px",
-        border: "1px solid #222",
-      }}
-    >
-      🚨 Market movement detected
-    </div>
-  </div>
+  // AI
+  const impliedProb = (odds: number) => {
+    if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
+    return 100 / (odds + 100);
+  };
 
-  {/* AI PICKS */}
-  <div
-    style={{
-      background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
+  const generateAI = (games: any[]) => {
+    const evaluated = games.map((g) => {
+      const prob = impliedProb(g.odds);
+      const trueProb = prob + 0.03;
+      const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
+      return { ...g, ev };
+    });
+
+    const sorted = evaluated.sort((a, b) => b.ev - a.ev);
+    setTopPicks(sorted.slice(0, 3));
+
+    if (sorted.length >= 2) {
+      const p1 = sorted[0];
+      const p2 = sorted[1];
+
+      const d1 = p1.odds < 0 ? 1 + 100 / Math.abs(p1.odds) : 1 + p1.odds / 100;
+      const d2 = p2.odds < 0 ? 1 + 100 / Math.abs(p2.odds) : 1 + p2.odds / 100;
+
+      const combined = ((d1 * d2) - 1) * 100;
+
+      setParlay({
+        legs: [p1, p2],
+        odds: combined.toFixed(2),
+      });
+    }
+  };
+
+  // ALERTS
+  const createAlert = (text: string) => {
+    const id = Date.now();
+    setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
+
+    setTimeout(() => {
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    }, 4000);
+  };
+
+  const playSound = () => {
+    try {
+      const audio = new Audio("/alert.mp3");
+      audio.play();
+    } catch {}
+  };
+
+  // FETCH
+  const fetchGames = async () => {
+    const res = await fetch(`${API}/api/data`);
+    const data = await res.json();
+
+    const g = data.games || [];
+    setGames(g);
+
+    generateAI(g);
+
+    if (Math.random() > 0.7) {
+      createAlert("🚨 Market movement detected");
+      playSound();
+    }
+  };
+
+  // UPGRADE
+  const upgrade = async () => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+
+    const res = await fetch(`${API}/api/checkout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+
+    const data = await res.json();
+
+    if (data.url) window.location.href = data.url;
+  };
+
+  return (
+    <div style={{
+      background: "#050505",
+      minHeight: "100vh",
+      color: "white",
       padding: "20px",
-      borderRadius: "16px",
-      marginBottom: "20px",
-      boxShadow: "0 0 20px rgba(168,85,247,0.3)",
-    }}
-  >
-    <h2>🧠 AI PICKS</h2>
+      fontFamily: "Inter, sans-serif"
+    }}>
 
-    <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
-      <div style={{ marginBottom: "10px" }}>
-        Warriors @ Lakers
-        <div style={{ color: "#22c55e" }}>EV: 6.30</div>
+      {/* HEADER */}
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "25px"
+      }}>
+        <h1 style={{
+          fontSize: "28px",
+          background: "linear-gradient(90deg, #a855f7, #22c55e)",
+          WebkitBackgroundClip: "text",
+          color: "transparent"
+        }}>
+          KBETZ TERMINAL
+        </h1>
+
+        {!isPro && (
+          <button onClick={upgrade} style={{
+            background: "linear-gradient(90deg, gold, orange)",
+            padding: "10px 18px",
+            borderRadius: "8px",
+            border: "none",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}>
+            Upgrade PRO
+          </button>
+        )}
       </div>
 
-      <div style={{ marginBottom: "10px" }}>
-        Heat @ Celtics
-        <div style={{ color: "#22c55e" }}>EV: 6.15</div>
+      {/* ALERTS */}
+      <div style={{ marginBottom: "20px" }}>
+        {alerts.map((a) => (
+          <div key={a.id} style={{
+            background: "#111",
+            padding: "10px",
+            borderRadius: "8px",
+            marginBottom: "8px",
+            border: "1px solid #222"
+          }}>
+            {a.text}
+          </div>
+        ))}
       </div>
-    </div>
 
-    {!isPro && (
-      <p style={{ color: "gold", marginTop: "10px" }}>
-        🔒 Upgrade to PRO to unlock AI Picks
-      </p>
-    )}
-  </div>
+      {/* AI PICKS */}
+      <div style={{
+        background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
+        padding: "20px",
+        borderRadius: "16px",
+        marginBottom: "20px",
+        boxShadow: "0 0 20px rgba(168,85,247,0.3)"
+      }}>
+        <h2>🧠 AI PICKS</h2>
 
-  {/* AI PARLAY */}
-  <div
-    style={{
-      background: "#0a0a0a",
-      padding: "15px",
-      borderRadius: "12px",
-      marginBottom: "20px",
-    }}
-  >
-    <h2>🎯 AI PARLAY</h2>
-
-    <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
-      <div>Warriors @ Lakers</div>
-      <div>Heat @ Celtics</div>
-      <div style={{ color: "#22c55e" }}>Odds: +272.73</div>
-    </div>
-  </div>
-
-  {/* MARKETS */}
-  <div
-    style={{
-      background: "rgba(255,255,255,0.05)",
-      backdropFilter: "blur(10px)",
-      padding: "15px",
-      borderRadius: "12px",
-    }}
-  >
-    <h2>Markets</h2>
-
-    <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
-      <div
-        style={{
-          padding: "12px",
-          marginBottom: "10px",
-          background: "#0a0a0a",
-          borderRadius: "10px",
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <div>Warriors @ Lakers</div>
-        <div style={{ color: "#22c55e", fontWeight: "bold" }}>
-          -110
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {topPicks.map((p, i) => (
+            <div key={i} style={{ marginBottom: "10px" }}>
+              {p.away} @ {p.home}  
+              <div style={{ color: "#22c55e" }}>
+                EV: {p.ev.toFixed(2)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div
-        style={{
-          padding: "12px",
-          marginBottom: "10px",
+      {/* PARLAY */}
+      {parlay && (
+        <div style={{
           background: "#0a0a0a",
-          borderRadius: "10px",
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <div>Heat @ Celtics</div>
-        <div style={{ color: "#22c55e", fontWeight: "bold" }}>
-          -105
+          padding: "15px",
+          borderRadius: "12px",
+          marginBottom: "20px"
+        }}>
+          <h2>🎯 AI PARLAY</h2>
+
+          <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+            {parlay.legs.map((l: any, i: number) => (
+              <div key={i}>{l.away} @ {l.home}</div>
+            ))}
+            <div style={{ color: "#22c55e" }}>
+              Odds: +{parlay.odds}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GAMES */}
+      <div style={{
+        background: "rgba(255,255,255,0.05)",
+        backdropFilter: "blur(10px)",
+        padding: "15px",
+        borderRadius: "12px"
+      }}>
+        <h2>Markets</h2>
+
+        <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+          {games.map((g) => (
+            <div key={g.id} style={{
+              padding: "12px",
+              marginBottom: "10px",
+              background: "#0a0a0a",
+              borderRadius: "10px",
+              display: "flex",
+              justifyContent: "space-between"
+            }}>
+              <div>{g.away} @ {g.home}</div>
+
+              <div style={{ color: "#22c55e", fontWeight: "bold" }}>
+                {g.odds}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
+
     </div>
-
-    {!isPro && (
-      <p style={{ color: "gold", marginTop: "10px" }}>
-        🔒 Upgrade to PRO to unlock full market view
-      </p>
-    )}
-  </div>
-</div>
-```
-
-);
+  );
 }
