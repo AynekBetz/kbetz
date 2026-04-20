@@ -43,14 +43,12 @@ try {
   console.log(err);
   alert("Login error");
 }
-```
 
 };
 
 return (
 <div style={{ padding: 40, color: "white", background: "#050505", minHeight: "100vh" }}> <h1>Login</h1>
 
-```
   <form onSubmit={handleLogin}>
     <input
       placeholder="Email"
@@ -72,7 +70,6 @@ return (
     <button type="submit">Login</button>
   </form>
 </div>
-```
 
 );
 }
