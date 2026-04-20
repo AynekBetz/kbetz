@@ -23,18 +23,20 @@ try {
 
   const data = await res.json();
 
+  console.log("LOGIN RESPONSE:", data); // 🔥 IMPORTANT
+
   if (!data.token) {
     alert("Login failed");
     return;
   }
 
-  // ✅ SAVE TOKEN
+  // ✅ store token
   localStorage.setItem("token", data.token);
 
-  // optional: temporary unlock until Stripe/user plan is wired
+  // temporary unlock (so UI shows)
   localStorage.setItem("demo", "true");
 
-  // redirect to dashboard
+  // redirect
   window.location.href = "/dashboard";
 
 } catch (err) {
@@ -46,12 +48,7 @@ try {
 };
 
 return (
-<div style={{
-background: "#050505",
-minHeight: "100vh",
-color: "white",
-padding: "40px"
-}}> <h1>Login</h1>
+<div style={{ padding: 40, color: "white", background: "#050505", minHeight: "100vh" }}> <h1>Login</h1>
 
 ```
   <form onSubmit={handleLogin}>
@@ -59,29 +56,20 @@ padding: "40px"
       placeholder="Email"
       value={email}
       onChange={(e) => setEmail(e.target.value)}
-      style={{ padding: 10, marginBottom: 10, width: 250 }}
     />
 
-    <br />
+    <br /><br />
 
     <input
       type="password"
       placeholder="Password"
       value={password}
       onChange={(e) => setPassword(e.target.value)}
-      style={{ padding: 10, marginBottom: 10, width: 250 }}
     />
 
-    <br />
+    <br /><br />
 
-    <button style={{
-      padding: "10px 20px",
-      background: "gold",
-      border: "none",
-      cursor: "pointer"
-    }}>
-      Login
-    </button>
+    <button type="submit">Login</button>
   </form>
 </div>
 ```
