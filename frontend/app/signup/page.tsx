@@ -11,7 +11,6 @@ const [password, setPassword] = useState("");
 const handleSignup = async (e: any) => {
 e.preventDefault();
 
-```
 try {
   const res = await fetch(`${API}/api/signup`, {
     method: "POST",
@@ -35,7 +34,6 @@ try {
   console.log(err);
   alert("Signup error");
 }
-```
 
 };
 
@@ -47,7 +45,6 @@ color: "white",
 padding: "40px"
 }}> <h1>Signup</h1>
 
-```
   <form onSubmit={handleSignup}>
     <input
       placeholder="Email"
@@ -78,7 +75,6 @@ padding: "40px"
     </button>
   </form>
 </div>
-```
 
 );
 }

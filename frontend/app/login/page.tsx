@@ -7,13 +7,16 @@ const API = "https://kbetz.onrender.com";
 export default function Login() {
 const [email, setEmail] = useState("");
 const [password, setPassword] = useState("");
+const [loading, setLoading] = useState(false);
 
-const handleLogin = async (e: any) => {
+const handleLogin = async (e) => {
 e.preventDefault();
+if (loading) return;
 
-```
+setLoading(true);
+
 try {
-  const res = await fetch(`${API}/api/login`, {
+  const res = await fetch(API + "/api/login", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -22,32 +25,30 @@ try {
   });
 
   const data = await res.json();
+  console.log("LOGIN RESPONSE:", data);
 
-  console.log("LOGIN RESPONSE:", data); // 🔥 IMPORTANT
-
-  if (!data.token) {
+  if (!data || !data.token) {
     alert("Login failed");
+    setLoading(false);
     return;
   }
 
-  // ✅ store token
+  // ✅ REAL AUTH ONLY (NO DEMO MODE)
   localStorage.setItem("token", data.token);
 
-  // temporary unlock (so UI shows)
-  localStorage.setItem("demo", "true");
-
-  // redirect
+  // redirect to dashboard
   window.location.href = "/dashboard";
 
 } catch (err) {
   console.log(err);
   alert("Login error");
+  setLoading(false);
 }
 
 };
 
 return (
-<div style={{ padding: 40, color: "white", background: "#050505", minHeight: "100vh" }}> <h1>Login</h1>
+<div style={{ padding: 40, background: "#050505", color: "white", minHeight: "100vh" }}> <h1>Login</h1>
 
   <form onSubmit={handleLogin}>
     <input
@@ -67,7 +68,9 @@ return (
 
     <br /><br />
 
-    <button type="submit">Login</button>
+    <button type="submit" disabled={loading}>
+      {loading ? "Logging in..." : "Login"}
+    </button>
   </form>
 </div>
 
