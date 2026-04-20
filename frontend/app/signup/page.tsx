@@ -2,46 +2,83 @@
 
 import { useState } from "react";
 
+const API = "https://kbetz.onrender.com";
+
 export default function Signup() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
 
-  const handleSignup = (e) => {
-    e.preventDefault();
+const handleSignup = async (e: any) => {
+e.preventDefault();
 
-    localStorage.setItem(
-      "user",
-      JSON.stringify({
-        email,
-        plan: "pro"
-      })
-    );
+```
+try {
+  const res = await fetch(`${API}/api/signup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
 
-    window.location.href = "/dashboard";
-  };
+  const data = await res.json();
 
-  return (
-    <div style={{ padding: 40, color: "white" }}>
-      <h1>Signup</h1>
+  if (!data.success) {
+    alert("Signup failed");
+    return;
+  }
 
-      <form onSubmit={handleSignup}>
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <br /><br />
+  alert("Account created! Now login.");
+  window.location.href = "/login";
 
-        <input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <br /><br />
+} catch (err) {
+  console.log(err);
+  alert("Signup error");
+}
+```
 
-        <button type="submit">Create Account</button>
-      </form>
-    </div>
-  );
+};
+
+return (
+<div style={{
+background: "#050505",
+minHeight: "100vh",
+color: "white",
+padding: "40px"
+}}> <h1>Signup</h1>
+
+```
+  <form onSubmit={handleSignup}>
+    <input
+      placeholder="Email"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+      style={{ padding: 10, marginBottom: 10, width: 250 }}
+    />
+
+    <br />
+
+    <input
+      type="password"
+      placeholder="Password"
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      style={{ padding: 10, marginBottom: 10, width: 250 }}
+    />
+
+    <br />
+
+    <button style={{
+      padding: "10px 20px",
+      background: "lime",
+      border: "none",
+      cursor: "pointer"
+    }}>
+      Create Account
+    </button>
+  </form>
+</div>
+```
+
+);
 }

@@ -2,46 +2,89 @@
 
 import { useState } from "react";
 
+const API = "https://kbetz.onrender.com";
+
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
 
-  const handleLogin = (e) => {
-    e.preventDefault();
+const handleLogin = async (e: any) => {
+e.preventDefault();
 
-    localStorage.setItem(
-      "user",
-      JSON.stringify({
-        email,
-        plan: "pro"
-      })
-    );
+```
+try {
+  const res = await fetch(`${API}/api/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
 
-    window.location.href = "/dashboard";
-  };
+  const data = await res.json();
 
-  return (
-    <div style={{ padding: 40, color: "white" }}>
-      <h1>Login</h1>
+  if (!data.token) {
+    alert("Login failed");
+    return;
+  }
 
-      <form onSubmit={handleLogin}>
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <br /><br />
+  // ✅ SAVE TOKEN
+  localStorage.setItem("token", data.token);
 
-        <input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <br /><br />
+  // optional: temporary unlock until Stripe/user plan is wired
+  localStorage.setItem("demo", "true");
 
-        <button type="submit">Login</button>
-      </form>
-    </div>
-  );
+  // redirect to dashboard
+  window.location.href = "/dashboard";
+
+} catch (err) {
+  console.log(err);
+  alert("Login error");
+}
+```
+
+};
+
+return (
+<div style={{
+background: "#050505",
+minHeight: "100vh",
+color: "white",
+padding: "40px"
+}}> <h1>Login</h1>
+
+```
+  <form onSubmit={handleLogin}>
+    <input
+      placeholder="Email"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+      style={{ padding: 10, marginBottom: 10, width: 250 }}
+    />
+
+    <br />
+
+    <input
+      type="password"
+      placeholder="Password"
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      style={{ padding: 10, marginBottom: 10, width: 250 }}
+    />
+
+    <br />
+
+    <button style={{
+      padding: "10px 20px",
+      background: "gold",
+      border: "none",
+      cursor: "pointer"
+    }}>
+      Login
+    </button>
+  </form>
+</div>
+```
+
+);
 }
