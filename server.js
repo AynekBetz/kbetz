@@ -34,22 +34,17 @@ res.json({ status: "OK" });
 app.post("/api/signup", async (req, res) => {
 try {
 const { email, password } = req.body;
-
 const existing = await User.findOne({ email });
 if (existing) {
-  return res.json({ success: false, message: "User exists" });
+return res.json({ success: false, message: "User exists" });
 }
-
 const hashed = await bcrypt.hash(password, 10);
-
 await User.create({
-  email,
-  password: hashed,
-  plan: "free"
+email,
+password: hashed,
+plan: "free"
 });
-
 res.json({ success: true });
-
 } catch (err) {
 console.log(err);
 res.json({ success: false });
@@ -59,33 +54,26 @@ res.json({ success: false });
 app.post("/api/login", async (req, res) => {
 try {
 const { email, password } = req.body;
-
 const user = await User.findOne({ email });
-
 if (!user) {
-  return res.json({ error: "Invalid login" });
+return res.json({ error: "Invalid login" });
 }
-
 const valid = await bcrypt.compare(password, user.password);
-
 if (!valid) {
-  return res.json({ error: "Invalid login" });
+return res.json({ error: "Invalid login" });
 }
-
 const token = jwt.sign(
-  { id: user._id },
-  process.env.JWT_SECRET || "secret123"
+{ id: user._id },
+process.env.JWT_SECRET || "secret123"
 );
-
 res.json({
-  success: true,
-  token,
-  user: {
-    email: user.email,
-    plan: user.plan
-  }
+success: true,
+token,
+user: {
+email: user.email,
+plan: user.plan
+}
 });
-
 } catch (err) {
 console.log(err);
 res.json({ error: "Server error" });
@@ -95,29 +83,22 @@ res.json({ error: "Server error" });
 app.get("/api/me", async (req, res) => {
 try {
 const auth = req.headers.authorization;
-
 if (!auth) {
-  return res.json({ error: "No token" });
+return res.json({ error: "No token" });
 }
-
 const token = auth.split(" ")[1];
-
 const decoded = jwt.verify(
-  token,
-  process.env.JWT_SECRET || "secret123"
+token,
+process.env.JWT_SECRET || "secret123"
 );
-
 const user = await User.findById(decoded.id);
-
 if (!user) {
-  return res.json({ error: "User not found" });
+return res.json({ error: "User not found" });
 }
-
 res.json({
-  email: user.email,
-  plan: user.plan
+email: user.email,
+plan: user.plan
 });
-
 } catch (err) {
 res.json({ error: "Invalid token" });
 }
@@ -128,58 +109,38 @@ try {
 console.log("=== /api/data HIT ===");
 
 const API_KEY = process.env.ODDS_API_KEY;
+console.log("KEY:", API_KEY);
 
 if (!API_KEY) {
-  console.log("NO ODDS_API_KEY → USING DEMO");
-
-  return res.json({
-    source: "demo-no-key",
-    games: [
-      { id: 1, home: "Warriors", away: "Lakers", odds: "-120 (Demo)" },
-      { id: 2, home: "Heat", away: "Celtics", odds: "+105 (Demo)" }
-    ]
-  });
+return res.json({ source: "no-key", games: [] });
 }
-
-console.log("FETCHING REAL ODDS...");
 
 const url = "https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=" + API_KEY + "&regions=us&markets=h2h";
 
 const response = await fetch(url);
 
-if (!response.ok) {
-  console.log("ODDS API FAILED:", response.status);
+const text = await response.text();
+console.log("STATUS:", response.status);
+console.log("RESPONSE:", text);
 
-  return res.json({
-    source: "api-failed",
-    games: []
-  });
+if (!response.ok) {
+return res.json({ source: "api-failed", games: [] });
 }
 
-const data = await response.json();
-
-console.log("ODDS SUCCESS:", data.length);
+const data = JSON.parse(text);
 
 const games = data.slice(0, 5).map((g, i) => ({
-  id: i,
-  home: g.home_team,
-  away: g.away_team,
-  odds: "LIVE"
+id: i,
+home: g.home_team,
+away: g.away_team,
+odds: "LIVE"
 }));
 
-res.json({
-  source: "real",
-  games
-});
+res.json({ source: "real", games });
 
 } catch (err) {
 console.log("CRASH:", err);
-
-res.json({
-  source: "error",
-  games: []
-});
-
+res.json({ source: "error", games: [] });
 }
 });
 
