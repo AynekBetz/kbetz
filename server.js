@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import fetch from "node-fetch";
+import Stripe from "stripe";
 
 dotenv.config();
 
@@ -109,7 +110,6 @@ try {
 console.log("=== /api/data HIT ===");
 
 const API_KEY = process.env.ODDS_API_KEY;
-console.log("KEY:", API_KEY);
 
 if (!API_KEY) {
 return res.json({ source: "no-key", games: [] });
@@ -141,6 +141,31 @@ res.json({ source: "real", games });
 } catch (err) {
 console.log("CRASH:", err);
 res.json({ source: "error", games: [] });
+}
+});
+
+app.post("/api/checkout", async (req, res) => {
+try {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const session = await stripe.checkout.sessions.create({
+payment_method_types: ["card"],
+mode: "subscription",
+line_items: [
+{
+price: process.env.STRIPE_PRICE_ID,
+quantity: 1
+}
+],
+success_url: "https://kbetz.vercel.app/dashboard",
+cancel_url: "https://kbetz.vercel.app/dashboard"
+});
+
+res.json({ url: session.url });
+
+} catch (err) {
+console.log("STRIPE ERROR:", err);
+res.status(500).json({ error: "Stripe failed" });
 }
 });
 
