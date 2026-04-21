@@ -14,6 +14,27 @@ const [parlay, setParlay] = useState<any>(null);
 const isPro = user?.plan === "pro";
 
 useEffect(() => {
+
+// 🔥 STEP 2: UPGRADE DETECTION (ADDED)
+const params = new URLSearchParams(window.location.search);
+
+if (params.get("upgrade") === "success") {
+const token = localStorage.getItem("token");
+
+if (token) {
+  fetch(`${API}/api/upgrade`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token
+    }
+  }).then(() => {
+    window.location.href = "/dashboard";
+  });
+}
+
+}
+
 fetchUser();
 fetchGames();
 
@@ -22,35 +43,35 @@ return () => clearInterval(interval);
 
 }, []);
 
-// USER (✅ FIXED ONLY HERE)
+// USER
 const fetchUser = async () => {
 const token = localStorage.getItem("token");
 
 if (!token) {
-  console.log("No token → redirect");
-  window.location.href = "/login";
-  return;
+console.log("No token → redirect");
+window.location.href = "/login";
+return;
 }
 
 try {
-  const res = await fetch(`${API}/api/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+const res = await fetch(`${API}/api/me`, {
+headers: { Authorization: `Bearer ${token}` },
+});
 
-  const data = await res.json();
-  console.log("ME RESPONSE:", data);
+const data = await res.json();
+console.log("ME RESPONSE:", data);
 
-  if (!data || data.error) {
-    console.log("Invalid token → redirect");
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-    return;
-  }
+if (!data || data.error) {
+console.log("Invalid token → redirect");
+localStorage.removeItem("token");
+window.location.href = "/login";
+return;
+}
 
-  setUser(data);
+setUser(data);
 } catch (err) {
-  console.log("Auth error:", err);
-  window.location.href = "/login";
+console.log("Auth error:", err);
+window.location.href = "/login";
 }
 
 };
@@ -73,18 +94,18 @@ const sorted = evaluated.sort((a, b) => b.ev - a.ev);
 setTopPicks(sorted.slice(0, 3));
 
 if (sorted.length >= 2) {
-  const p1 = sorted[0];
-  const p2 = sorted[1];
+const p1 = sorted[0];
+const p2 = sorted[1];
 
-  const d1 = p1.odds < 0 ? 1 + 100 / Math.abs(p1.odds) : 1 + p1.odds / 100;
-  const d2 = p2.odds < 0 ? 1 + 100 / Math.abs(p2.odds) : 1 + p2.odds / 100;
+const d1 = p1.odds < 0 ? 1 + 100 / Math.abs(p1.odds) : 1 + p1.odds / 100;
+const d2 = p2.odds < 0 ? 1 + 100 / Math.abs(p2.odds) : 1 + p2.odds / 100;
 
-  const combined = ((d1 * d2) - 1) * 100;
+const combined = ((d1 * d2) - 1) * 100;
 
-  setParlay({
-    legs: [p1, p2],
-    odds: combined.toFixed(2),
-  });
+setParlay({
+legs: [p1, p2],
+odds: combined.toFixed(2),
+});
 }
 
 };
@@ -95,7 +116,7 @@ const id = Date.now();
 setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
 
 setTimeout(() => {
-  setAlerts((prev) => prev.filter((a) => a.id !== id));
+setAlerts((prev) => prev.filter((a) => a.id !== id));
 }, 4000);
 
 };
@@ -118,8 +139,8 @@ setGames(g);
 generateAI(g);
 
 if (Math.random() > 0.7) {
-  createAlert("🚨 Market movement detected");
-  playSound();
+createAlert("🚨 Market movement detected");
+playSound();
 }
 
 };
@@ -129,15 +150,15 @@ const upgrade = async () => {
 const token = localStorage.getItem("token");
 
 if (!token) {
-  window.location.href = "/login";
-  return;
+window.location.href = "/login";
+return;
 }
 const res = await fetch(`${API}/api/checkout`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({ token }),
+method: "POST",
+headers: {
+"Content-Type": "application/json",
+},
+body: JSON.stringify({ token }),
 });
 
 const data = await res.json();
@@ -147,15 +168,17 @@ if (data.url) window.location.href = data.url;
 };
 
 return (
+
 <div style={{
-background: "#050505",
+background: "linear-gradient(135deg, #050505, #0a0a0a)",
 minHeight: "100vh",
 color: "white",
 padding: "20px",
 fontFamily: "Inter, sans-serif"
 }}>
 
-  {/* HEADER */}
+{/* HEADER */}
+
   <div style={{
     display: "flex",
     justifyContent: "space-between",
@@ -171,21 +194,23 @@ fontFamily: "Inter, sans-serif"
       KBETZ TERMINAL
     </h1>
 
-    {!isPro && (
-      <button onClick={upgrade} style={{
-        background: "linear-gradient(90deg, gold, orange)",
-        padding: "10px 18px",
-        borderRadius: "8px",
-        border: "none",
-        fontWeight: "bold",
-        cursor: "pointer"
-      }}>
-        Upgrade PRO
-      </button>
-    )}
+{!isPro && (
+  <button onClick={upgrade} style={{
+    background: "linear-gradient(90deg, gold, orange)",
+    padding: "10px 18px",
+    borderRadius: "8px",
+    border: "none",
+    fontWeight: "bold",
+    cursor: "pointer"
+  }}>
+    Upgrade PRO
+  </button>
+)}
+
   </div>
 
-  {/* ALERTS */}
+{/* ALERTS */}
+
   <div style={{ marginBottom: "20px" }}>
     {alerts.map((a) => (
       <div key={a.id} style={{
@@ -200,7 +225,8 @@ fontFamily: "Inter, sans-serif"
     ))}
   </div>
 
-  {/* AI PICKS */}
+{/* AI PICKS */}
+
   <div style={{
     background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
     padding: "20px",
@@ -210,40 +236,42 @@ fontFamily: "Inter, sans-serif"
   }}>
     <h2>🧠 AI PICKS</h2>
 
-    <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
-      {topPicks.map((p, i) => (
-        <div key={i} style={{ marginBottom: "10px" }}>
-          {p.away} @ {p.home}
-          <div style={{ color: "#22c55e" }}>
-            EV: {p.ev.toFixed(2)}
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-
-  {/* PARLAY */}
-  {parlay && (
-    <div style={{
-      background: "#0a0a0a",
-      padding: "15px",
-      borderRadius: "12px",
-      marginBottom: "20px"
-    }}>
-      <h2>🎯 AI PARLAY</h2>
-
-      <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
-        {parlay.legs.map((l: any, i: number) => (
-          <div key={i}>{l.away} @ {l.home}</div>
-        ))}
-        <div style={{ color: "#22c55e" }}>
-          Odds: +{parlay.odds}
-        </div>
+<div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+  {topPicks.map((p, i) => (
+    <div key={i} style={{ marginBottom: "10px" }}>
+      {p.away} @ {p.home}
+      <div style={{ color: "#22c55e" }}>
+        EV: {p.ev.toFixed(2)}
       </div>
     </div>
-  )}
+  ))}
+</div>
 
-  {/* GAMES */}
+  </div>
+
+{/* PARLAY */}
+{parlay && (
+<div style={{
+background: "#0a0a0a",
+padding: "15px",
+borderRadius: "12px",
+marginBottom: "20px"
+}}> <h2>🎯 AI PARLAY</h2>
+
+  <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+    {parlay.legs.map((l: any, i: number) => (
+      <div key={i}>{l.away} @ {l.home}</div>
+    ))}
+    <div style={{ color: "#22c55e" }}>
+      Odds: +{parlay.odds}
+    </div>
+  </div>
+</div>
+
+)}
+
+{/* GAMES */}
+
   <div style={{
     background: "rgba(255,255,255,0.05)",
     backdropFilter: "blur(10px)",
@@ -252,24 +280,25 @@ fontFamily: "Inter, sans-serif"
   }}>
     <h2>Markets</h2>
 
-    <div style={{ filter: isPro ? "none" : "blur(6px)" }}>
-      {games.map((g) => (
-        <div key={g.id} style={{
-          padding: "12px",
-          marginBottom: "10px",
-          background: "#0a0a0a",
-          borderRadius: "10px",
-          display: "flex",
-          justifyContent: "space-between"
-        }}>
-          <div>{g.away} @ {g.home}</div>
+<div style={{ filter: isPro ? "none" : "blur(6px)" }}>
+  {games.map((g) => (
+    <div key={g.id} style={{
+      padding: "12px",
+      marginBottom: "10px",
+      background: "#0a0a0a",
+      borderRadius: "10px",
+      display: "flex",
+      justifyContent: "space-between"
+    }}>
+      <div>{g.away} @ {g.home}</div>
 
-          <div style={{ color: "#22c55e", fontWeight: "bold" }}>
-            {g.odds}
-          </div>
-        </div>
-      ))}
+      <div style={{ color: "#22c55e", fontWeight: "bold" }}>
+        {g.odds}
+      </div>
     </div>
+  ))}
+</div>
+
   </div>
 
 </div>

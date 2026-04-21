@@ -107,27 +107,21 @@ res.json({ error: "Invalid token" });
 
 app.get("/api/data", async (req, res) => {
 try {
-console.log("=== /api/data HIT ===");
-
 const API_KEY = process.env.ODDS_API_KEY;
 
 if (!API_KEY) {
-return res.json({ source: "no-key", games: [] });
+return res.json({ source: "demo", games: [] });
 }
 
 const url = "https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=" + API_KEY + "&regions=us&markets=h2h";
 
 const response = await fetch(url);
 
-const text = await response.text();
-console.log("STATUS:", response.status);
-console.log("RESPONSE:", text);
-
 if (!response.ok) {
 return res.json({ source: "api-failed", games: [] });
 }
 
-const data = JSON.parse(text);
+const data = await response.json();
 
 const games = data.slice(0, 5).map((g, i) => ({
 id: i,
@@ -139,11 +133,11 @@ odds: "LIVE"
 res.json({ source: "real", games });
 
 } catch (err) {
-console.log("CRASH:", err);
 res.json({ source: "error", games: [] });
 }
 });
 
+// 🔥 STRIPE CHECKOUT
 app.post("/api/checkout", async (req, res) => {
 try {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -157,7 +151,7 @@ price: process.env.STRIPE_PRICE_ID,
 quantity: 1
 }
 ],
-success_url: "https://kbetz.vercel.app/dashboard",
+success_url: "https://kbetz.vercel.app/dashboard?upgrade=success",
 cancel_url: "https://kbetz.vercel.app/dashboard"
 });
 
@@ -166,6 +160,27 @@ res.json({ url: session.url });
 } catch (err) {
 console.log("STRIPE ERROR:", err);
 res.status(500).json({ error: "Stripe failed" });
+}
+});
+
+// 🔥 UPGRADE USER TO PRO
+app.post("/api/upgrade", async (req, res) => {
+try {
+const token = req.headers.authorization.split(" ")[1];
+
+const decoded = jwt.verify(
+token,
+process.env.JWT_SECRET || "secret123"
+);
+
+await User.findByIdAndUpdate(decoded.id, {
+plan: "pro"
+});
+
+res.json({ success: true });
+
+} catch (err) {
+res.json({ error: "Upgrade failed" });
 }
 });
 
