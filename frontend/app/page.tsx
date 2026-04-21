@@ -1,17 +1,18 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 export default function Home() {
-return (
-<div
-style={{
-background: "black",
-color: "white",
-minHeight: "100vh",
-display: "flex",
-alignItems: "center",
-justifyContent: "center",
-fontFamily: "Inter, sans-serif",
-fontSize: "24px"
-}}
->
-KBETZ HOME </div>
-);
+  const router = useRouter();
+
+  useEffect(() => {
+    router.push("/dashboard");
+  }, []);
+
+  return (
+    <div style={{ color: "white", padding: "40px" }}>
+      Redirecting...
+    </div>
+  );
 }
