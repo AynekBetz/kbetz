@@ -16,18 +16,37 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
+// 🔥 IMPORTANT FIX (prevents timeout issue)
+mongoose.set("bufferCommands", false);
+
 // 🔥 STRIPE INIT
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// 🔌 DATABASE (WITH DEBUG)
+// 🔌 DATABASE STATE
+let isDBConnected = false;
+
+// 🔌 CONNECT TO MONGO (SAFE)
 mongoose.connect(process.env.MONGO_URI, {
 useNewUrlParser: true,
 useUnifiedTopology: true,
 })
-.then(() => console.log("✅ MongoDB Connected"))
+.then(() => {
+console.log("✅ MongoDB Connected");
+isDBConnected = true;
+})
 .catch(err => {
 console.log("❌ MongoDB FAILED");
 console.log(err.message);
+});
+
+// 🛑 BLOCK REQUESTS UNTIL DB READY
+app.use((req, res, next) => {
+if (!isDBConnected) {
+return res.status(503).json({
+error: "Database not ready, try again"
+});
+}
+next();
 });
 
 // 👤 USER MODEL
@@ -49,6 +68,7 @@ app.post("/api/signup", async (req, res) => {
 try {
 const { email, password } = req.body;
 
+```
 console.log("SIGNUP DATA:", email, password);
 
 if (!email || !password) {
@@ -77,7 +97,7 @@ await User.create({
 console.log("USER CREATED:", email);
 
 res.json({ success: true });
-
+```
 
 } catch (err) {
 console.log("SIGNUP ERROR:", err.message);
@@ -95,6 +115,10 @@ const { email, password } = req.body;
 
 
 console.log("LOGIN ATTEMPT:", email);
+
+if (!email || !password) {
+  return res.json({ error: "Missing credentials" });
+}
 
 const user = await User.findOne({ email });
 if (!user) return res.json({ error: "Invalid login" });
@@ -115,6 +139,7 @@ res.json({
     plan: user.plan
   }
 });
+
 
 } catch (err) {
 console.log("LOGIN ERROR:", err.message);
@@ -144,15 +169,17 @@ res.json({
   plan: user.plan
 });
 
+
 } catch (err) {
 res.json({ error: "Invalid token" });
 }
 });
 
-// 📡 DATA (SAFE)
+// 📡 DATA (SAFE FALLBACK)
 app.get("/api/data", async (req, res) => {
 try {
 const API_KEY = process.env.ODDS_API_KEY;
+
 
 if (!API_KEY) throw new Error("No API key");
 
