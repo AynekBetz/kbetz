@@ -15,7 +15,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Disable buffering
+// Disable buffering (prevents hanging)
 mongoose.set("bufferCommands", false);
 
 // 🔌 CONNECT DB
@@ -46,7 +46,7 @@ app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
 
-// 📝 SIGNUP (WITH FULL DEBUG)
+// 📝 SIGNUP (DEBUG ENABLED)
 app.post("/api/signup", async (req, res) => {
 try {
 const { email, password } = req.body;
