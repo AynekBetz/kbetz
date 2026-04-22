@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import fetch from "node-fetch";
+import Stripe from "stripe";
 
 dotenv.config();
 
@@ -15,10 +16,13 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// 🔌 DB CONNECT
+// 🔥 STRIPE INIT
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// 🔌 DATABASE
 mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log("MongoDB Connected"))
-.catch(err => console.log(err));
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.log(err));
 
 // 👤 USER MODEL
 const UserSchema = new mongoose.Schema({
@@ -117,47 +121,31 @@ app.get("/api/me", async (req, res) => {
   }
 });
 
-// 🎯 ODDS (FIXED + FALLBACK)
+// 📡 DATA (SAFE + FALLBACK)
 app.get("/api/data", async (req, res) => {
   try {
-    console.log("=== /api/data HIT ===");
-
     const API_KEY = process.env.ODDS_API_KEY;
 
     if (!API_KEY) {
-      console.log("NO API KEY → fallback");
-      return res.json({
-        source: "fallback-no-key",
-        games: fallbackGames()
-      });
+      throw new Error("No API key");
     }
 
-    const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=h2h`;
+    const url =
+      `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=h2h`;
 
     const response = await fetch(url);
 
-    const text = await response.text();
-
-    console.log("STATUS:", response.status);
-    console.log("RESPONSE:", text);
-
-    // ❌ API FAIL → USE FALLBACK
     if (!response.ok) {
-      console.log("API FAILED → fallback");
-
-      return res.json({
-        source: "fallback-api-failed",
-        games: fallbackGames()
-      });
+      throw new Error("API failed");
     }
 
-    const data = JSON.parse(text);
+    const data = await response.json();
 
     const games = data.slice(0, 5).map((g, i) => ({
       id: i,
       home: g.home_team,
       away: g.away_team,
-      odds: g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || "LIVE"
+      odds: g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || -110
     }));
 
     res.json({
@@ -166,24 +154,63 @@ app.get("/api/data", async (req, res) => {
     });
 
   } catch (err) {
-    console.log("CRASH:", err);
+    console.log("DATA ERROR:", err.message);
 
     res.json({
-      source: "fallback-error",
-      games: fallbackGames()
+      source: "fallback",
+      games: [
+        { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
+        { id: 2, home: "Celtics", away: "Heat", odds: -105 }
+      ]
     });
   }
 });
 
-// 🔥 SAFE FALLBACK FUNCTION
-function fallbackGames() {
-  return [
-    { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
-    { id: 2, home: "Celtics", away: "Heat", odds: -105 }
-  ];
-}
+// 💳 STRIPE CHECKOUT (FIXED FOR MOBILE)
+app.post("/api/checkout", async (req, res) => {
+  try {
+    const token = req.body.token;
 
-// 🚀 START
+    if (!token) {
+      return res.status(401).json({ error: "No token" });
+    }
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "secret123"
+    );
+
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "subscription",
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      success_url:
+        "https://kbetz-frontend.vercel.app/dashboard?upgrade=success",
+      cancel_url:
+        "https://kbetz-frontend.vercel.app/dashboard",
+      customer_email: user.email,
+    });
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.log("CHECKOUT ERROR:", err.message);
+    res.status(500).json({ error: "Checkout failed" });
+  }
+});
+
+// 🚀 START SERVER
 app.listen(PORT, () => {
   console.log("Server running on port " + PORT);
 });
