@@ -10,236 +10,227 @@ import Stripe from "stripe";
 dotenv.config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Disable mongoose buffering (prevents timeout errors)
+// 🔥 Disable buffering (prevents hanging queries)
 mongoose.set("bufferCommands", false);
 
-// Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-// Start server AFTER DB connects
-async function startServer() {
+// 🔌 CONNECT TO DATABASE FIRST
+async function connectDB() {
 try {
 await mongoose.connect(process.env.MONGO_URI, {
 useNewUrlParser: true,
 useUnifiedTopology: true
 });
-
-```
 console.log("MongoDB Connected");
+} catch (err) {
+console.error("MongoDB Error:", err.message);
+process.exit(1); // crash if DB fails (correct behavior)
+}
+}
 
-// User model
+// 👤 USER MODEL (DEFINED ONCE)
 const UserSchema = new mongoose.Schema({
-  email: String,
-  password: String,
-  plan: { type: String, default: "free" }
+email: String,
+password: String,
+plan: { type: String, default: "free" }
 });
 
 const User = mongoose.model("User", UserSchema);
 
-// Health
+// ❤️ HEALTH CHECK
 app.get("/api/health", (req, res) => {
-  res.json({ status: "OK" });
+res.json({ status: "OK" });
 });
 
-// Signup
+// 📝 SIGNUP
 app.post("/api/signup", async (req, res) => {
-  try {
-    const { email, password } = req.body;
+try {
+const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.json({
-        success: false,
-        message: "Missing email or password"
-      });
-    }
+```
+if (!email || !password) {
+  return res.json({ success: false, message: "Missing fields" });
+}
 
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.json({
-        success: false,
-        message: "User already exists"
-      });
-    }
+const existing = await User.findOne({ email });
+if (existing) {
+  return res.json({ success: false, message: "User exists" });
+}
 
-    const hashed = await bcrypt.hash(password, 10);
+const hashed = await bcrypt.hash(password, 10);
 
-    await User.create({
-      email,
-      password: hashed,
-      plan: "free"
-    });
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.log("SIGNUP ERROR:", err.message);
-    res.json({
-      success: false,
-      message: err.message
-    });
-  }
+await User.create({
+  email,
+  password: hashed,
+  plan: "free"
 });
 
-// Login
+res.json({ success: true });
+```
+
+} catch (err) {
+console.error("Signup error:", err.message);
+res.json({ success: false });
+}
+});
+
+// 🔐 LOGIN
 app.post("/api/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
+try {
+const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.json({ error: "Missing credentials" });
-    }
+```
+const user = await User.findOne({ email });
+if (!user) return res.json({ error: "Invalid login" });
 
-    const user = await User.findOne({ email });
-    if (!user) return res.json({ error: "Invalid login" });
+const valid = await bcrypt.compare(password, user.password);
+if (!valid) return res.json({ error: "Invalid login" });
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.json({ error: "Invalid login" });
+const token = jwt.sign(
+  { id: user._id },
+  process.env.JWT_SECRET || "secret123"
+);
 
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET || "secret123"
-    );
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        email: user.email,
-        plan: user.plan
-      }
-    });
-
-  } catch (err) {
-    console.log("LOGIN ERROR:", err.message);
-    res.json({ error: "Server error" });
+res.json({
+  success: true,
+  token,
+  user: {
+    email: user.email,
+    plan: user.plan
   }
-});
-
-// Me
-app.get("/api/me", async (req, res) => {
-  try {
-    const auth = req.headers.authorization;
-    if (!auth) return res.json({ error: "No token" });
-
-    const token = auth.split(" ")[1];
-
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "secret123"
-    );
-
-    const user = await User.findById(decoded.id);
-    if (!user) return res.json({ error: "User not found" });
-
-    res.json({
-      email: user.email,
-      plan: user.plan
-    });
-
-  } catch {
-    res.json({ error: "Invalid token" });
-  }
-});
-
-// Data
-app.get("/api/data", async (req, res) => {
-  try {
-    const API_KEY = process.env.ODDS_API_KEY;
-
-    if (!API_KEY) throw new Error("No API key");
-
-    const url =
-      "https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=" +
-      API_KEY +
-      "&regions=us&markets=h2h";
-
-    const response = await fetch(url);
-
-    if (!response.ok) throw new Error("API failed");
-
-    const data = await response.json();
-
-    const games = data.slice(0, 5).map((g, i) => ({
-      id: i,
-      home: g.home_team,
-      away: g.away_team,
-      odds:
-        g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || -110
-    }));
-
-    res.json({ source: "real", games });
-
-  } catch (err) {
-    console.log("DATA ERROR:", err.message);
-
-    res.json({
-      source: "fallback",
-      games: [
-        { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
-        { id: 2, home: "Celtics", away: "Heat", odds: -105 }
-      ]
-    });
-  }
-});
-
-// Stripe Checkout
-app.post("/api/checkout", async (req, res) => {
-  try {
-    const token = req.body.token;
-
-    if (!token) {
-      return res.status(401).json({ error: "No token" });
-    }
-
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "secret123"
-    );
-
-    const user = await User.findById(decoded.id);
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "subscription",
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1
-        }
-      ],
-      success_url:
-        "https://kbetz-frontend.vercel.app/dashboard?upgrade=success",
-      cancel_url:
-        "https://kbetz-frontend.vercel.app/dashboard",
-      customer_email: user.email
-    });
-
-    res.json({ url: session.url });
-
-  } catch (err) {
-    console.log("CHECKOUT ERROR:", err.message);
-    res.status(500).json({ error: "Checkout failed" });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
 });
 ```
 
 } catch (err) {
-console.log("STARTUP ERROR:", err.message);
+console.error("Login error:", err.message);
+res.json({ error: "Server error" });
 }
+});
+
+// 👤 CURRENT USER
+app.get("/api/me", async (req, res) => {
+try {
+const auth = req.headers.authorization;
+if (!auth) return res.json({ error: "No token" });
+
+```
+const token = auth.split(" ")[1];
+
+const decoded = jwt.verify(
+  token,
+  process.env.JWT_SECRET || "secret123"
+);
+
+const user = await User.findById(decoded.id);
+if (!user) return res.json({ error: "User not found" });
+
+res.json({
+  email: user.email,
+  plan: user.plan
+});
+```
+
+} catch {
+res.json({ error: "Invalid token" });
+}
+});
+
+// 📡 DATA
+app.get("/api/data", async (req, res) => {
+try {
+const API_KEY = process.env.ODDS_API_KEY;
+
+```
+if (!API_KEY) throw new Error("No API key");
+
+const response = await fetch(
+  "https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=" +
+  API_KEY +
+  "&regions=us&markets=h2h"
+);
+
+if (!response.ok) throw new Error("API failed");
+
+const data = await response.json();
+
+const games = data.slice(0, 5).map((g, i) => ({
+  id: i,
+  home: g.home_team,
+  away: g.away_team,
+  odds:
+    g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || -110
+}));
+
+res.json({ source: "real", games });
+```
+
+} catch (err) {
+console.error("Data error:", err.message);
+
+```
+res.json({
+  source: "fallback",
+  games: [
+    { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
+    { id: 2, home: "Celtics", away: "Heat", odds: -105 }
+  ]
+});
+```
+
+}
+});
+
+// 💳 STRIPE
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+app.post("/api/checkout", async (req, res) => {
+try {
+const token = req.body.token;
+
+```
+const decoded = jwt.verify(
+  token,
+  process.env.JWT_SECRET || "secret123"
+);
+
+const user = await User.findById(decoded.id);
+
+const session = await stripe.checkout.sessions.create({
+  payment_method_types: ["card"],
+  mode: "subscription",
+  line_items: [
+    {
+      price: process.env.STRIPE_PRICE_ID,
+      quantity: 1
+    }
+  ],
+  success_url:
+    "https://kbetz-frontend.vercel.app/dashboard?upgrade=success",
+  cancel_url:
+    "https://kbetz-frontend.vercel.app/dashboard",
+  customer_email: user.email
+});
+
+res.json({ url: session.url });
+```
+
+} catch (err) {
+console.error("Stripe error:", err.message);
+res.status(500).json({ error: "Checkout failed" });
+}
+});
+
+// 🚀 START SERVER (ONLY AFTER DB CONNECTS)
+async function start() {
+await connectDB();
+
+app.listen(PORT, () => {
+console.log("Server running on port " + PORT);
+});
 }
 
-startServer();
+start();
