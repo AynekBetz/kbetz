@@ -16,40 +16,13 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// 🔥 IMPORTANT FIX (prevents timeout issue)
+// 🔥 Disable buffering (prevents timeout errors)
 mongoose.set("bufferCommands", false);
 
-// 🔥 STRIPE INIT
+// 🔥 Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// 🔌 DATABASE STATE
-let isDBConnected = false;
-
-// 🔌 CONNECT TO MONGO (SAFE)
-mongoose.connect(process.env.MONGO_URI, {
-useNewUrlParser: true,
-useUnifiedTopology: true,
-})
-.then(() => {
-console.log("✅ MongoDB Connected");
-isDBConnected = true;
-})
-.catch(err => {
-console.log("❌ MongoDB FAILED");
-console.log(err.message);
-});
-
-// 🛑 BLOCK REQUESTS UNTIL DB READY
-app.use((req, res, next) => {
-if (!isDBConnected) {
-return res.status(503).json({
-error: "Database not ready, try again"
-});
-}
-next();
-});
-
-// 👤 USER MODEL
+// 👤 User Model
 const UserSchema = new mongoose.Schema({
 email: String,
 password: String,
@@ -58,18 +31,18 @@ plan: { type: String, default: "free" }
 
 const User = mongoose.model("User", UserSchema);
 
-// ❤️ HEALTH
+// ❤️ Health
 app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
 
-// 📝 SIGNUP (FIXED)
+// 📝 Signup
 app.post("/api/signup", async (req, res) => {
 try {
 const { email, password } = req.body;
 
 ```
-console.log("SIGNUP DATA:", email, password);
+console.log("SIGNUP:", email);
 
 if (!email || !password) {
   return res.json({
@@ -108,13 +81,13 @@ message: err.message
 }
 });
 
-// 🔐 LOGIN
+// 🔐 Login
 app.post("/api/login", async (req, res) => {
 try {
 const { email, password } = req.body;
 
 
-console.log("LOGIN ATTEMPT:", email);
+console.log("LOGIN:", email);
 
 if (!email || !password) {
   return res.json({ error: "Missing credentials" });
@@ -147,7 +120,7 @@ res.json({ error: "Server error" });
 }
 });
 
-// 👤 ME
+// 👤 Me
 app.get("/api/me", async (req, res) => {
 try {
 const auth = req.headers.authorization;
@@ -170,12 +143,12 @@ res.json({
 });
 
 
-} catch (err) {
+} catch {
 res.json({ error: "Invalid token" });
 }
 });
 
-// 📡 DATA (SAFE FALLBACK)
+// 📡 Data
 app.get("/api/data", async (req, res) => {
 try {
 const API_KEY = process.env.ODDS_API_KEY;
@@ -201,8 +174,10 @@ const games = data.slice(0, 5).map((g, i) => ({
 
 res.json({ source: "real", games });
 
+
 } catch (err) {
 console.log("DATA ERROR:", err.message);
+
 
 res.json({
   source: "fallback",
@@ -212,13 +187,15 @@ res.json({
   ]
 });
 
+
 }
 });
 
-// 💳 STRIPE CHECKOUT
+// 💳 Stripe Checkout
 app.post("/api/checkout", async (req, res) => {
 try {
 const token = req.body.token;
+
 
 if (!token) {
   return res.status(401).json({ error: "No token" });
@@ -230,7 +207,6 @@ const decoded = jwt.verify(
 );
 
 const user = await User.findById(decoded.id);
-
 if (!user) {
   return res.status(404).json({ error: "User not found" });
 }
@@ -241,17 +217,18 @@ const session = await stripe.checkout.sessions.create({
   line_items: [
     {
       price: process.env.STRIPE_PRICE_ID,
-      quantity: 1,
-    },
+      quantity: 1
+    }
   ],
   success_url:
     "https://kbetz-frontend.vercel.app/dashboard?upgrade=success",
   cancel_url:
     "https://kbetz-frontend.vercel.app/dashboard",
-  customer_email: user.email,
+  customer_email: user.email
 });
 
 res.json({ url: session.url });
+
 
 } catch (err) {
 console.log("CHECKOUT ERROR:", err.message);
@@ -259,7 +236,20 @@ res.status(500).json({ error: "Checkout failed" });
 }
 });
 
-// 🚀 START SERVER
+// 🚀 START SERVER ONLY AFTER DB CONNECTS
+mongoose.connect(process.env.MONGO_URI, {
+useNewUrlParser: true,
+useUnifiedTopology: true
+})
+.then(() => {
+console.log("✅ MongoDB Connected");
+
 app.listen(PORT, () => {
-console.log("Server running on port " + PORT);
+console.log("🚀 Server running on port " + PORT);
+});
+
+})
+.catch(err => {
+console.log("❌ MongoDB FAILED");
+console.log(err.message);
 });
