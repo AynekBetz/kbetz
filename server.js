@@ -10,21 +10,18 @@ import Stripe from "stripe";
 dotenv.config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// 🔥 Disable mongoose buffering
+// 🔥 Disable mongoose buffering (prevents hanging queries)
 mongoose.set("bufferCommands", false);
 
-// 🔌 CONNECT TO DATABASE
+// 🔌 CONNECT TO DATABASE (Mongoose v7+ safe)
 async function connectDB() {
 try {
 await mongoose.connect(process.env.MONGO_URI, {
-useNewUrlParser: true,
-useUnifiedTopology: true,
 serverSelectionTimeoutMS: 5000,
 socketTimeoutMS: 45000
 });
@@ -120,7 +117,7 @@ res.json({ error: "Server error" });
 }
 });
 
-// 👤 ME
+// 👤 CURRENT USER
 app.get("/api/me", async (req, res) => {
 try {
 const auth = req.headers.authorization;
@@ -233,7 +230,7 @@ res.status(500).json({ error: "Checkout failed" });
 }
 });
 
-// 🚀 START SERVER ONLY AFTER DB CONNECTS
+// 🚀 START SERVER AFTER DB CONNECTS
 async function start() {
 await connectDB();
 
