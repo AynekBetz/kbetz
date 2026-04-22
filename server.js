@@ -19,15 +19,15 @@ const PORT = process.env.PORT || 10000;
 // 🔥 STRIPE INIT
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// 🔌 DATABASE (FIXED DEBUG VERSION)
+// 🔌 DATABASE (WITH DEBUG)
 mongoose.connect(process.env.MONGO_URI, {
 useNewUrlParser: true,
 useUnifiedTopology: true,
 })
 .then(() => console.log("✅ MongoDB Connected"))
 .catch(err => {
-console.log("❌ MongoDB FAILED TO CONNECT");
-console.log("👉 ERROR:", err.message);
+console.log("❌ MongoDB FAILED");
+console.log(err.message);
 });
 
 // 👤 USER MODEL
@@ -44,15 +44,26 @@ app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
 
-// 📝 SIGNUP
+// 📝 SIGNUP (FIXED)
 app.post("/api/signup", async (req, res) => {
 try {
 const { email, password } = req.body;
 
-```
+console.log("SIGNUP DATA:", email, password);
+
+if (!email || !password) {
+  return res.json({
+    success: false,
+    message: "Missing email or password"
+  });
+}
+
 const existing = await User.findOne({ email });
 if (existing) {
-  return res.json({ success: false, message: "User exists" });
+  return res.json({
+    success: false,
+    message: "User already exists"
+  });
 }
 
 const hashed = await bcrypt.hash(password, 10);
@@ -63,12 +74,17 @@ await User.create({
   plan: "free"
 });
 
+console.log("USER CREATED:", email);
+
 res.json({ success: true });
-```
+
 
 } catch (err) {
 console.log("SIGNUP ERROR:", err.message);
-res.json({ success: false });
+res.json({
+success: false,
+message: err.message
+});
 }
 });
 
@@ -76,6 +92,7 @@ res.json({ success: false });
 app.post("/api/login", async (req, res) => {
 try {
 const { email, password } = req.body;
+
 
 console.log("LOGIN ATTEMPT:", email);
 
@@ -111,6 +128,7 @@ try {
 const auth = req.headers.authorization;
 if (!auth) return res.json({ error: "No token" });
 
+
 const token = auth.split(" ")[1];
 
 const decoded = jwt.verify(
@@ -131,7 +149,7 @@ res.json({ error: "Invalid token" });
 }
 });
 
-// 📡 DATA
+// 📡 DATA (SAFE)
 app.get("/api/data", async (req, res) => {
 try {
 const API_KEY = process.env.ODDS_API_KEY;
@@ -170,12 +188,14 @@ res.json({
 }
 });
 
-// 💳 STRIPE
+// 💳 STRIPE CHECKOUT
 app.post("/api/checkout", async (req, res) => {
 try {
 const token = req.body.token;
 
-if (!token) return res.status(401).json({ error: "No token" });
+if (!token) {
+  return res.status(401).json({ error: "No token" });
+}
 
 const decoded = jwt.verify(
   token,
@@ -184,7 +204,9 @@ const decoded = jwt.verify(
 
 const user = await User.findById(decoded.id);
 
-if (!user) return res.status(404).json({ error: "User not found" });
+if (!user) {
+  return res.status(404).json({ error: "User not found" });
+}
 
 const session = await stripe.checkout.sessions.create({
   payment_method_types: ["card"],
@@ -210,6 +232,7 @@ res.status(500).json({ error: "Checkout failed" });
 }
 });
 
+// 🚀 START SERVER
 app.listen(PORT, () => {
 console.log("Server running on port " + PORT);
 });
