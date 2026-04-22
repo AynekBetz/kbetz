@@ -16,16 +16,15 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Disable mongoose buffering
+// Disable mongoose buffering (prevents timeout errors)
 mongoose.set("bufferCommands", false);
 
 // Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Start server only after DB connects
+// Start server AFTER DB connects
 async function startServer() {
 try {
-// Connect to Mongo FIRST
 await mongoose.connect(process.env.MONGO_URI, {
 useNewUrlParser: true,
 useUnifiedTopology: true
@@ -34,7 +33,7 @@ useUnifiedTopology: true
 ```
 console.log("MongoDB Connected");
 
-// User Model (AFTER connection)
+// User model
 const UserSchema = new mongoose.Schema({
   email: String,
   password: String,
@@ -204,6 +203,7 @@ app.post("/api/checkout", async (req, res) => {
     );
 
     const user = await User.findById(decoded.id);
+
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -232,13 +232,13 @@ app.post("/api/checkout", async (req, res) => {
   }
 });
 
-// Start server LAST
 app.listen(PORT, () => {
   console.log("Server running on port " + PORT);
 });
+```
 
 } catch (err) {
-console.log("STARTUP FAILED:", err.message);
+console.log("STARTUP ERROR:", err.message);
 }
 }
 
