@@ -15,10 +15,10 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// 🔥 Disable mongoose buffering (prevents hanging queries)
+// Disable buffering
 mongoose.set("bufferCommands", false);
 
-// 🔌 CONNECT TO DATABASE (Mongoose v7+ safe)
+// 🔌 CONNECT DB
 async function connectDB() {
 try {
 await mongoose.connect(process.env.MONGO_URI, {
@@ -46,12 +46,14 @@ app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
 
-// 📝 SIGNUP
+// 📝 SIGNUP (WITH FULL DEBUG)
 app.post("/api/signup", async (req, res) => {
 try {
 const { email, password } = req.body;
 
 ```
+console.log("SIGNUP REQUEST:", email);
+
 if (!email || !password) {
   return res.json({
     success: false,
@@ -69,18 +71,27 @@ if (existing) {
 
 const hashed = await bcrypt.hash(password, 10);
 
-await User.create({
+const user = await User.create({
   email,
   password: hashed,
   plan: "free"
 });
 
+console.log("USER CREATED:", user.email);
+
 res.json({ success: true });
 ```
 
 } catch (err) {
-console.error("Signup error:", err.message);
-res.json({ success: false });
+console.error("🔥 SIGNUP ERROR FULL:", err);
+
+```
+res.json({
+  success: false,
+  message: err.message
+});
+```
+
 }
 });
 
@@ -112,12 +123,12 @@ res.json({
 ```
 
 } catch (err) {
-console.error("Login error:", err.message);
+console.error("LOGIN ERROR:", err.message);
 res.json({ error: "Server error" });
 }
 });
 
-// 👤 CURRENT USER
+// 👤 ME
 app.get("/api/me", async (req, res) => {
 try {
 const auth = req.headers.authorization;
@@ -175,7 +186,7 @@ res.json({ source: "real", games });
 ```
 
 } catch (err) {
-console.error("Data error:", err.message);
+console.error("DATA ERROR:", err.message);
 
 ```
 res.json({
@@ -225,12 +236,12 @@ res.json({ url: session.url });
 ```
 
 } catch (err) {
-console.error("Stripe error:", err.message);
+console.error("STRIPE ERROR:", err.message);
 res.status(500).json({ error: "Checkout failed" });
 }
 });
 
-// 🚀 START SERVER AFTER DB CONNECTS
+// 🚀 START SERVER
 async function start() {
 await connectDB();
 
