@@ -10,29 +10,32 @@ import Stripe from "stripe";
 dotenv.config();
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// 🔥 Disable buffering (prevents hanging queries)
+// 🔥 Disable mongoose buffering
 mongoose.set("bufferCommands", false);
 
-// 🔌 CONNECT TO DATABASE FIRST
+// 🔌 CONNECT TO DATABASE
 async function connectDB() {
 try {
 await mongoose.connect(process.env.MONGO_URI, {
 useNewUrlParser: true,
-useUnifiedTopology: true
+useUnifiedTopology: true,
+serverSelectionTimeoutMS: 5000,
+socketTimeoutMS: 45000
 });
 console.log("MongoDB Connected");
 } catch (err) {
 console.error("MongoDB Error:", err.message);
-process.exit(1); // crash if DB fails (correct behavior)
+process.exit(1);
 }
 }
 
-// 👤 USER MODEL (DEFINED ONCE)
+// 👤 USER MODEL
 const UserSchema = new mongoose.Schema({
 email: String,
 password: String,
@@ -41,7 +44,7 @@ plan: { type: String, default: "free" }
 
 const User = mongoose.model("User", UserSchema);
 
-// ❤️ HEALTH CHECK
+// ❤️ HEALTH
 app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
@@ -53,12 +56,18 @@ const { email, password } = req.body;
 
 ```
 if (!email || !password) {
-  return res.json({ success: false, message: "Missing fields" });
+  return res.json({
+    success: false,
+    message: "Missing email or password"
+  });
 }
 
 const existing = await User.findOne({ email });
 if (existing) {
-  return res.json({ success: false, message: "User exists" });
+  return res.json({
+    success: false,
+    message: "User exists"
+  });
 }
 
 const hashed = await bcrypt.hash(password, 10);
@@ -111,7 +120,7 @@ res.json({ error: "Server error" });
 }
 });
 
-// 👤 CURRENT USER
+// 👤 ME
 app.get("/api/me", async (req, res) => {
 try {
 const auth = req.headers.authorization;
@@ -224,7 +233,7 @@ res.status(500).json({ error: "Checkout failed" });
 }
 });
 
-// 🚀 START SERVER (ONLY AFTER DB CONNECTS)
+// 🚀 START SERVER ONLY AFTER DB CONNECTS
 async function start() {
 await connectDB();
 
