@@ -16,240 +16,230 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// 🔥 Disable buffering (prevents timeout errors)
+// Disable mongoose buffering
 mongoose.set("bufferCommands", false);
 
-// 🔥 Stripe
+// Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// 👤 User Model
+// Start server only after DB connects
+async function startServer() {
+try {
+// Connect to Mongo FIRST
+await mongoose.connect(process.env.MONGO_URI, {
+useNewUrlParser: true,
+useUnifiedTopology: true
+});
+
+```
+console.log("MongoDB Connected");
+
+// User Model (AFTER connection)
 const UserSchema = new mongoose.Schema({
-email: String,
-password: String,
-plan: { type: String, default: "free" }
+  email: String,
+  password: String,
+  plan: { type: String, default: "free" }
 });
 
 const User = mongoose.model("User", UserSchema);
 
-// ❤️ Health
+// Health
 app.get("/api/health", (req, res) => {
-res.json({ status: "OK" });
+  res.json({ status: "OK" });
 });
 
-// 📝 Signup
+// Signup
 app.post("/api/signup", async (req, res) => {
-try {
-const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-```
-console.log("SIGNUP:", email);
+    if (!email || !password) {
+      return res.json({
+        success: false,
+        message: "Missing email or password"
+      });
+    }
 
-if (!email || !password) {
-  return res.json({
-    success: false,
-    message: "Missing email or password"
-  });
-}
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.json({
+        success: false,
+        message: "User already exists"
+      });
+    }
 
-const existing = await User.findOne({ email });
-if (existing) {
-  return res.json({
-    success: false,
-    message: "User already exists"
-  });
-}
+    const hashed = await bcrypt.hash(password, 10);
 
-const hashed = await bcrypt.hash(password, 10);
+    await User.create({
+      email,
+      password: hashed,
+      plan: "free"
+    });
 
-await User.create({
-  email,
-  password: hashed,
-  plan: "free"
-});
+    res.json({ success: true });
 
-console.log("USER CREATED:", email);
-
-res.json({ success: true });
-```
-
-} catch (err) {
-console.log("SIGNUP ERROR:", err.message);
-res.json({
-success: false,
-message: err.message
-});
-}
-});
-
-// 🔐 Login
-app.post("/api/login", async (req, res) => {
-try {
-const { email, password } = req.body;
-
-
-console.log("LOGIN:", email);
-
-if (!email || !password) {
-  return res.json({ error: "Missing credentials" });
-}
-
-const user = await User.findOne({ email });
-if (!user) return res.json({ error: "Invalid login" });
-
-const valid = await bcrypt.compare(password, user.password);
-if (!valid) return res.json({ error: "Invalid login" });
-
-const token = jwt.sign(
-  { id: user._id },
-  process.env.JWT_SECRET || "secret123"
-);
-
-res.json({
-  success: true,
-  token,
-  user: {
-    email: user.email,
-    plan: user.plan
+  } catch (err) {
+    console.log("SIGNUP ERROR:", err.message);
+    res.json({
+      success: false,
+      message: err.message
+    });
   }
 });
 
+// Login
+app.post("/api/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-} catch (err) {
-console.log("LOGIN ERROR:", err.message);
-res.json({ error: "Server error" });
-}
-});
-
-// 👤 Me
-app.get("/api/me", async (req, res) => {
-try {
-const auth = req.headers.authorization;
-if (!auth) return res.json({ error: "No token" });
-
-
-const token = auth.split(" ")[1];
-
-const decoded = jwt.verify(
-  token,
-  process.env.JWT_SECRET || "secret123"
-);
-
-const user = await User.findById(decoded.id);
-if (!user) return res.json({ error: "User not found" });
-
-res.json({
-  email: user.email,
-  plan: user.plan
-});
-
-
-} catch {
-res.json({ error: "Invalid token" });
-}
-});
-
-// 📡 Data
-app.get("/api/data", async (req, res) => {
-try {
-const API_KEY = process.env.ODDS_API_KEY;
-
-
-if (!API_KEY) throw new Error("No API key");
-
-const url =
-  `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=h2h`;
-
-const response = await fetch(url);
-
-if (!response.ok) throw new Error("API failed");
-
-const data = await response.json();
-
-const games = data.slice(0, 5).map((g, i) => ({
-  id: i,
-  home: g.home_team,
-  away: g.away_team,
-  odds: g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || -110
-}));
-
-res.json({ source: "real", games });
-
-
-} catch (err) {
-console.log("DATA ERROR:", err.message);
-
-
-res.json({
-  source: "fallback",
-  games: [
-    { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
-    { id: 2, home: "Celtics", away: "Heat", odds: -105 }
-  ]
-});
-
-
-}
-});
-
-// 💳 Stripe Checkout
-app.post("/api/checkout", async (req, res) => {
-try {
-const token = req.body.token;
-
-
-if (!token) {
-  return res.status(401).json({ error: "No token" });
-}
-
-const decoded = jwt.verify(
-  token,
-  process.env.JWT_SECRET || "secret123"
-);
-
-const user = await User.findById(decoded.id);
-if (!user) {
-  return res.status(404).json({ error: "User not found" });
-}
-
-const session = await stripe.checkout.sessions.create({
-  payment_method_types: ["card"],
-  mode: "subscription",
-  line_items: [
-    {
-      price: process.env.STRIPE_PRICE_ID,
-      quantity: 1
+    if (!email || !password) {
+      return res.json({ error: "Missing credentials" });
     }
-  ],
-  success_url:
-    "https://kbetz-frontend.vercel.app/dashboard?upgrade=success",
-  cancel_url:
-    "https://kbetz-frontend.vercel.app/dashboard",
-  customer_email: user.email
+
+    const user = await User.findOne({ email });
+    if (!user) return res.json({ error: "Invalid login" });
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.json({ error: "Invalid login" });
+
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || "secret123"
+    );
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        email: user.email,
+        plan: user.plan
+      }
+    });
+
+  } catch (err) {
+    console.log("LOGIN ERROR:", err.message);
+    res.json({ error: "Server error" });
+  }
 });
 
-res.json({ url: session.url });
+// Me
+app.get("/api/me", async (req, res) => {
+  try {
+    const auth = req.headers.authorization;
+    if (!auth) return res.json({ error: "No token" });
 
+    const token = auth.split(" ")[1];
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "secret123"
+    );
+
+    const user = await User.findById(decoded.id);
+    if (!user) return res.json({ error: "User not found" });
+
+    res.json({
+      email: user.email,
+      plan: user.plan
+    });
+
+  } catch {
+    res.json({ error: "Invalid token" });
+  }
+});
+
+// Data
+app.get("/api/data", async (req, res) => {
+  try {
+    const API_KEY = process.env.ODDS_API_KEY;
+
+    if (!API_KEY) throw new Error("No API key");
+
+    const url =
+      "https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=" +
+      API_KEY +
+      "&regions=us&markets=h2h";
+
+    const response = await fetch(url);
+
+    if (!response.ok) throw new Error("API failed");
+
+    const data = await response.json();
+
+    const games = data.slice(0, 5).map((g, i) => ({
+      id: i,
+      home: g.home_team,
+      away: g.away_team,
+      odds:
+        g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || -110
+    }));
+
+    res.json({ source: "real", games });
+
+  } catch (err) {
+    console.log("DATA ERROR:", err.message);
+
+    res.json({
+      source: "fallback",
+      games: [
+        { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
+        { id: 2, home: "Celtics", away: "Heat", odds: -105 }
+      ]
+    });
+  }
+});
+
+// Stripe Checkout
+app.post("/api/checkout", async (req, res) => {
+  try {
+    const token = req.body.token;
+
+    if (!token) {
+      return res.status(401).json({ error: "No token" });
+    }
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "secret123"
+    );
+
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "subscription",
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1
+        }
+      ],
+      success_url:
+        "https://kbetz-frontend.vercel.app/dashboard?upgrade=success",
+      cancel_url:
+        "https://kbetz-frontend.vercel.app/dashboard",
+      customer_email: user.email
+    });
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.log("CHECKOUT ERROR:", err.message);
+    res.status(500).json({ error: "Checkout failed" });
+  }
+});
+
+// Start server LAST
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
+});
 
 } catch (err) {
-console.log("CHECKOUT ERROR:", err.message);
-res.status(500).json({ error: "Checkout failed" });
+console.log("STARTUP FAILED:", err.message);
 }
-});
+}
 
-// 🚀 START SERVER ONLY AFTER DB CONNECTS
-mongoose.connect(process.env.MONGO_URI, {
-useNewUrlParser: true,
-useUnifiedTopology: true
-})
-.then(() => {
-console.log("✅ MongoDB Connected");
-
-app.listen(PORT, () => {
-console.log("🚀 Server running on port " + PORT);
-});
-
-})
-.catch(err => {
-console.log("❌ MongoDB FAILED");
-console.log(err.message);
-});
+startServer();
