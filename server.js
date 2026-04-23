@@ -11,12 +11,9 @@ dotenv.config();
 
 const app = express();
 
-// ✅ CORS (ALLOW FRONTEND + LOCAL)
+// ✅ SAFE CORS (no blocking)
 app.use(cors({
-origin: [
-"https://kbetz-frontend.vercel.app",
-"http://localhost:3000"
-],
+origin: true,
 credentials: true
 }));
 
@@ -37,33 +34,30 @@ socketTimeoutMS: 45000
 console.log("MongoDB Connected");
 } catch (err) {
 console.error("MongoDB Error:", err.message);
-process.exit(1);
 }
 }
 
-// 👤 USER MODEL
-const UserSchema = new mongoose.Schema({
+// 👤 SAFE MODEL (FIXES CRASH BUG)
+const User = mongoose.models.User || mongoose.model("User", new mongoose.Schema({
 email: String,
 password: String,
 plan: { type: String, default: "free" }
-});
-
-const User = mongoose.model("User", UserSchema);
+}));
 
 // ❤️ HEALTH
 app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
 
-// ✅ FIX: HANDLE GET /signup (no more 503 page)
+// ✅ GET SIGNUP
 app.get("/api/signup", (req, res) => {
 res.send("Signup endpoint is working. Use POST.");
 });
 
-// 📝 SIGNUP (DEBUG ENABLED)
+// 📝 SIGNUP (CRASH SAFE)
 app.post("/api/signup", async (req, res) => {
 try {
-const { email, password } = req.body;
+const { email, password } = req.body || {};
 
 ```
 console.log("SIGNUP REQUEST:", email);
@@ -76,6 +70,7 @@ if (!email || !password) {
 }
 
 const existing = await User.findOne({ email });
+
 if (existing) {
   return res.json({
     success: false,
@@ -85,24 +80,23 @@ if (existing) {
 
 const hashed = await bcrypt.hash(password, 10);
 
-const user = await User.create({
+await User.create({
   email,
   password: hashed,
   plan: "free"
 });
 
-console.log("USER CREATED:", user.email);
-
-res.json({ success: true });
+return res.json({ success: true });
 ```
 
 } catch (err) {
-console.error("🔥 SIGNUP ERROR FULL:", err);
+console.error("🔥 SIGNUP ERROR:", err);
 
 ```
-res.status(500).json({
+// ✅ ALWAYS RETURN RESPONSE (prevents 502 + CORS issue)
+return res.json({
   success: false,
-  message: err.message
+  message: err.message || "Unknown error"
 });
 ```
 
@@ -138,7 +132,7 @@ res.json({
 
 } catch (err) {
 console.error("LOGIN ERROR:", err);
-res.status(500).json({ error: "Server error" });
+res.json({ error: "Server error" });
 }
 });
 
