@@ -10,12 +10,21 @@ import Stripe from "stripe";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// ✅ CORS (ALLOW FRONTEND + LOCAL)
+app.use(cors({
+origin: [
+"https://kbetz-frontend.vercel.app",
+"http://localhost:3000"
+],
+credentials: true
+}));
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Disable buffering (prevents hanging)
+// Disable buffering
 mongoose.set("bufferCommands", false);
 
 // 🔌 CONNECT DB
@@ -44,6 +53,11 @@ const User = mongoose.model("User", UserSchema);
 // ❤️ HEALTH
 app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
+});
+
+// ✅ FIX: HANDLE GET /signup (no more 503 page)
+app.get("/api/signup", (req, res) => {
+res.send("Signup endpoint is working. Use POST.");
 });
 
 // 📝 SIGNUP (DEBUG ENABLED)
@@ -86,7 +100,7 @@ res.json({ success: true });
 console.error("🔥 SIGNUP ERROR FULL:", err);
 
 ```
-res.json({
+res.status(500).json({
   success: false,
   message: err.message
 });
@@ -123,8 +137,8 @@ res.json({
 ```
 
 } catch (err) {
-console.error("LOGIN ERROR:", err.message);
-res.json({ error: "Server error" });
+console.error("LOGIN ERROR:", err);
+res.status(500).json({ error: "Server error" });
 }
 });
 
@@ -236,7 +250,7 @@ res.json({ url: session.url });
 ```
 
 } catch (err) {
-console.error("STRIPE ERROR:", err.message);
+console.error("STRIPE ERROR:", err);
 res.status(500).json({ error: "Checkout failed" });
 }
 });
