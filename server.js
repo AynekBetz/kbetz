@@ -11,11 +11,11 @@ console.log("🚀 NEW VERSION DEPLOYED");
 
 const app = express();
 
-// ✅ FORCE CORS (NO BLOCKING EVER)
+// ✅ HARD CORS FIX (ALWAYS RETURNS HEADERS)
 app.use((req, res, next) => {
-res.header("Access-Control-Allow-Origin", "*");
-res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+res.setHeader("Access-Control-Allow-Origin", "*");
+res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
 if (req.method === "OPTIONS") {
 return res.sendStatus(200);
@@ -42,11 +42,16 @@ console.error("MongoDB Error:", err.message);
 }
 
 // 👤 MODEL
-const User = mongoose.models.User || mongoose.model("User", new mongoose.Schema({
+const User =
+mongoose.models.User ||
+mongoose.model(
+"User",
+new mongoose.Schema({
 email: String,
 password: String,
 plan: { type: String, default: "free" }
-}));
+})
+);
 
 // ❤️ HEALTH
 app.get("/api/health", (req, res) => {
@@ -86,11 +91,18 @@ return res.json({ success: true });
 
 } catch (err) {
 console.log("🔥 SIGNUP ERROR:", err);
-return res.json({ success: false, message: err.message });
+
+```
+return res.json({
+  success: false,
+  message: err.message
+});
+```
+
 }
 });
 
-// 🔐 LOGIN (FULLY SAFE)
+// 🔐 LOGIN (DEBUG ENABLED)
 app.post("/api/login", async (req, res) => {
 console.log("🔥 LOGIN HIT");
 
@@ -102,40 +114,26 @@ if (!email || !password) {
   return res.json({ error: "Missing credentials" });
 }
 
-let user;
-try {
-  user = await User.findOne({ email });
-} catch (err) {
-  console.log("❌ DB ERROR:", err);
-  return res.json({ error: "Database error" });
-}
+const user = await User.findOne({ email });
 
 if (!user) {
   return res.json({ error: "Invalid login - no user" });
 }
 
-let valid = false;
-try {
-  valid = await bcrypt.compare(password, user.password);
-} catch (err) {
-  console.log("❌ BCRYPT ERROR:", err);
-  return res.json({ error: "Password compare failed" });
+if (!user.password) {
+  return res.json({ error: "User has no password stored" });
 }
+
+const valid = await bcrypt.compare(password, user.password);
 
 if (!valid) {
   return res.json({ error: "Invalid login - wrong password" });
 }
 
-let token;
-try {
-  token = jwt.sign(
-    { id: user._id },
-    process.env.JWT_SECRET || "secret123"
-  );
-} catch (err) {
-  console.log("❌ JWT ERROR:", err);
-  return res.json({ error: "Token generation failed" });
-}
+const token = jwt.sign(
+  { id: user._id },
+  process.env.JWT_SECRET || "secret123"
+);
 
 console.log("✅ LOGIN SUCCESS");
 
@@ -150,8 +148,15 @@ return res.json({
 ```
 
 } catch (err) {
-console.log("🔥 LOGIN CRASH:", err);
-return res.json({ error: "Unknown login crash" });
+console.log("🔥 LOGIN CRASH FULL:", err);
+
+```
+return res.json({
+  error: err.message,
+  stack: err.stack
+});
+```
+
 }
 });
 
@@ -183,7 +188,7 @@ res.json({ error: "Invalid token" });
 }
 });
 
-// 📡 DATA (uses built-in fetch)
+// 📡 DATA (SAFE)
 app.get("/api/data", async (req, res) => {
 try {
 const API_KEY = process.env.ODDS_API_KEY;
@@ -193,8 +198,8 @@ if (!API_KEY) throw new Error("No API key");
 
 const response = await fetch(
   "https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=" +
-  API_KEY +
-  "&regions=us&markets=h2h"
+    API_KEY +
+    "&regions=us&markets=h2h"
 );
 
 if (!response.ok) throw new Error("API failed");
@@ -213,7 +218,7 @@ res.json({ source: "real", games });
 ```
 
 } catch (err) {
-console.error("DATA ERROR:", err.message);
+console.log("DATA ERROR:", err.message);
 
 ```
 res.json({
@@ -228,7 +233,7 @@ res.json({
 }
 });
 
-// 💳 STRIPE (SAFE INIT)
+// 💳 STRIPE SAFE INIT
 let stripe;
 try {
 stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -238,9 +243,7 @@ console.log("Stripe disabled:", e.message);
 
 app.post("/api/checkout", async (req, res) => {
 try {
-if (!stripe) {
-return res.json({ error: "Stripe not configured" });
-}
+if (!stripe) return res.json({ error: "Stripe not configured" });
 
 ```
 const token = req.body.token;
@@ -272,7 +275,7 @@ res.json({ url: session.url });
 ```
 
 } catch (err) {
-console.error("STRIPE ERROR:", err);
+console.log("STRIPE ERROR:", err);
 res.json({ error: "Checkout failed" });
 }
 });
