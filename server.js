@@ -7,18 +7,16 @@ import Stripe from "stripe";
 
 dotenv.config();
 
-// 🚀 DEPLOY CHECK
 console.log("🚀 NEW VERSION DEPLOYED");
 
 const app = express();
 
-// 🔥 FULL CORS FIX (THIS IS THE IMPORTANT PART)
+// ✅ FORCE CORS (NO BLOCKING EVER)
 app.use((req, res, next) => {
 res.header("Access-Control-Allow-Origin", "*");
 res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
 res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-// Handle preflight requests
 if (req.method === "OPTIONS") {
 return res.sendStatus(200);
 }
@@ -55,33 +53,22 @@ app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
 
-// ✅ GET SIGNUP
-app.get("/api/signup", (req, res) => {
-res.send("Signup endpoint is working. Use POST.");
-});
-
 // 🔥 SIGNUP
 app.post("/api/signup", async (req, res) => {
 console.log("🔥 SIGNUP HIT");
 
 try {
-const { email, password } = req.body;
+const { email, password } = req.body || {};
 
 ```
 if (!email || !password) {
-  return res.json({
-    success: false,
-    message: "Missing email/password"
-  });
+  return res.json({ success: false, message: "Missing email/password" });
 }
 
 const existing = await User.findOne({ email });
 
 if (existing) {
-  return res.json({
-    success: false,
-    message: "User exists"
-  });
+  return res.json({ success: false, message: "User exists" });
 }
 
 const hashed = await bcrypt.hash(password, 10);
@@ -99,45 +86,60 @@ return res.json({ success: true });
 
 } catch (err) {
 console.log("🔥 SIGNUP ERROR:", err);
-
-```
-return res.json({
-  success: false,
-  message: err.message
-});
-```
-
+return res.json({ success: false, message: err.message });
 }
 });
 
-// 🔐 LOGIN
+// 🔐 LOGIN (FULLY SAFE)
 app.post("/api/login", async (req, res) => {
 console.log("🔥 LOGIN HIT");
 
 try {
-const { email, password } = req.body;
+const { email, password } = req.body || {};
 
 ```
-const user = await User.findOne({ email });
+if (!email || !password) {
+  return res.json({ error: "Missing credentials" });
+}
+
+let user;
+try {
+  user = await User.findOne({ email });
+} catch (err) {
+  console.log("❌ DB ERROR:", err);
+  return res.json({ error: "Database error" });
+}
 
 if (!user) {
   return res.json({ error: "Invalid login - no user" });
 }
 
-const valid = await bcrypt.compare(password, user.password);
+let valid = false;
+try {
+  valid = await bcrypt.compare(password, user.password);
+} catch (err) {
+  console.log("❌ BCRYPT ERROR:", err);
+  return res.json({ error: "Password compare failed" });
+}
 
 if (!valid) {
   return res.json({ error: "Invalid login - wrong password" });
 }
 
-const token = jwt.sign(
-  { id: user._id },
-  process.env.JWT_SECRET || "secret123"
-);
+let token;
+try {
+  token = jwt.sign(
+    { id: user._id },
+    process.env.JWT_SECRET || "secret123"
+  );
+} catch (err) {
+  console.log("❌ JWT ERROR:", err);
+  return res.json({ error: "Token generation failed" });
+}
 
 console.log("✅ LOGIN SUCCESS");
 
-res.json({
+return res.json({
   success: true,
   token,
   user: {
@@ -148,14 +150,8 @@ res.json({
 ```
 
 } catch (err) {
-console.log("🔥 LOGIN ERROR:", err);
-
-```
-res.json({
-  error: err.message
-});
-```
-
+console.log("🔥 LOGIN CRASH:", err);
+return res.json({ error: "Unknown login crash" });
 }
 });
 
@@ -232,14 +228,23 @@ res.json({
 }
 });
 
-// 💳 STRIPE
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// 💳 STRIPE (SAFE INIT)
+let stripe;
+try {
+stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+} catch (e) {
+console.log("Stripe disabled:", e.message);
+}
 
 app.post("/api/checkout", async (req, res) => {
 try {
-const token = req.body.token;
+if (!stripe) {
+return res.json({ error: "Stripe not configured" });
+}
 
 ```
+const token = req.body.token;
+
 const decoded = jwt.verify(
   token,
   process.env.JWT_SECRET || "secret123"
@@ -268,7 +273,7 @@ res.json({ url: session.url });
 
 } catch (err) {
 console.error("STRIPE ERROR:", err);
-res.status(500).json({ error: "Checkout failed" });
+res.json({ error: "Checkout failed" });
 }
 });
 
