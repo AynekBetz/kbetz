@@ -11,7 +11,7 @@ dotenv.config();
 
 const app = express();
 
-// ✅ CORS (safe + allows your frontend)
+// ✅ CORS (frontend + local)
 app.use(cors({
 origin: [
 "https://kbetz-frontend.vercel.app",
@@ -49,12 +49,12 @@ app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
 
-// ✅ GET SIGNUP (prevents browser 503 confusion)
+// ✅ GET SIGNUP
 app.get("/api/signup", (req, res) => {
 res.send("Signup endpoint is working. Use POST.");
 });
 
-// 🔥 CRASH-PROOF SIGNUP
+// 🔥 SIGNUP (FULL DEBUG + REAL ERROR)
 app.post("/api/signup", async (req, res) => {
 console.log("🔥 SIGNUP HIT");
 
@@ -67,7 +67,10 @@ const email = body.email;
 const password = body.password;
 
 if (!email || !password) {
-  return res.json({ success: false, message: "Missing email/password" });
+  return res.json({
+    success: false,
+    message: "Missing email/password"
+  });
 }
 
 let existing = null;
@@ -75,12 +78,19 @@ let existing = null;
 try {
   existing = await User.findOne({ email });
 } catch (e) {
-  console.log("❌ findOne crash:", e.message);
-  return res.json({ success: false, message: "DB find error" });
+  console.log("❌ findOne crash:", e);
+  return res.json({
+    success: false,
+    message: e.message,
+    stack: e.stack
+  });
 }
 
 if (existing) {
-  return res.json({ success: false, message: "User exists" });
+  return res.json({
+    success: false,
+    message: "User exists"
+  });
 }
 
 let hashed;
@@ -88,8 +98,12 @@ let hashed;
 try {
   hashed = await bcrypt.hash(password, 10);
 } catch (e) {
-  console.log("❌ bcrypt crash:", e.message);
-  return res.json({ success: false, message: "Hash error" });
+  console.log("❌ bcrypt crash:", e);
+  return res.json({
+    success: false,
+    message: e.message,
+    stack: e.stack
+  });
 }
 
 try {
@@ -99,8 +113,12 @@ try {
     plan: "free"
   });
 } catch (e) {
-  console.log("❌ create crash:", e.message);
-  return res.json({ success: false, message: "DB create error" });
+  console.log("❌ create crash:", e);
+  return res.json({
+    success: false,
+    message: e.message,
+    stack: e.stack
+  });
 }
 
 console.log("✅ USER CREATED");
@@ -108,8 +126,16 @@ return res.json({ success: true });
 ```
 
 } catch (err) {
-console.log("🔥 UNKNOWN CRASH:", err.message);
-return res.json({ success: false, message: "Unknown crash" });
+console.log("🔥 REAL ERROR:", err);
+
+```
+return res.json({
+  success: false,
+  message: err.message,
+  stack: err.stack
+});
+```
+
 }
 });
 
@@ -141,7 +167,7 @@ res.json({
 ```
 
 } catch (err) {
-console.error("LOGIN ERROR:", err.message);
+console.error("LOGIN ERROR:", err);
 res.json({ error: "Server error" });
 }
 });
@@ -254,7 +280,7 @@ res.json({ url: session.url });
 ```
 
 } catch (err) {
-console.error("STRIPE ERROR:", err.message);
+console.error("STRIPE ERROR:", err);
 res.status(500).json({ error: "Checkout failed" });
 }
 });
