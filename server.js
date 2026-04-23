@@ -11,9 +11,12 @@ dotenv.config();
 
 const app = express();
 
-// ✅ SAFE CORS (no blocking)
+// ✅ CORS (safe + allows your frontend)
 app.use(cors({
-origin: true,
+origin: [
+"https://kbetz-frontend.vercel.app",
+"http://localhost:3000"
+],
 credentials: true
 }));
 
@@ -21,23 +24,20 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Disable buffering
+// Prevent mongoose hanging
 mongoose.set("bufferCommands", false);
 
 // 🔌 CONNECT DB
 async function connectDB() {
 try {
-await mongoose.connect(process.env.MONGO_URI, {
-serverSelectionTimeoutMS: 5000,
-socketTimeoutMS: 45000
-});
+await mongoose.connect(process.env.MONGO_URI);
 console.log("MongoDB Connected");
 } catch (err) {
 console.error("MongoDB Error:", err.message);
 }
 }
 
-// 👤 SAFE MODEL (FIXES CRASH BUG)
+// 👤 SAFE MODEL
 const User = mongoose.models.User || mongoose.model("User", new mongoose.Schema({
 email: String,
 password: String,
@@ -49,57 +49,67 @@ app.get("/api/health", (req, res) => {
 res.json({ status: "OK" });
 });
 
-// ✅ GET SIGNUP
+// ✅ GET SIGNUP (prevents browser 503 confusion)
 app.get("/api/signup", (req, res) => {
 res.send("Signup endpoint is working. Use POST.");
 });
 
-// 📝 SIGNUP (CRASH SAFE)
+// 🔥 CRASH-PROOF SIGNUP
 app.post("/api/signup", async (req, res) => {
+console.log("🔥 SIGNUP HIT");
+
 try {
-const { email, password } = req.body || {};
+const body = req.body || {};
+console.log("BODY:", body);
 
 ```
-console.log("SIGNUP REQUEST:", email);
+const email = body.email;
+const password = body.password;
 
 if (!email || !password) {
-  return res.json({
-    success: false,
-    message: "Missing email or password"
-  });
+  return res.json({ success: false, message: "Missing email/password" });
 }
 
-const existing = await User.findOne({ email });
+let existing = null;
+
+try {
+  existing = await User.findOne({ email });
+} catch (e) {
+  console.log("❌ findOne crash:", e.message);
+  return res.json({ success: false, message: "DB find error" });
+}
 
 if (existing) {
-  return res.json({
-    success: false,
-    message: "User exists"
-  });
+  return res.json({ success: false, message: "User exists" });
 }
 
-const hashed = await bcrypt.hash(password, 10);
+let hashed;
 
-await User.create({
-  email,
-  password: hashed,
-  plan: "free"
-});
+try {
+  hashed = await bcrypt.hash(password, 10);
+} catch (e) {
+  console.log("❌ bcrypt crash:", e.message);
+  return res.json({ success: false, message: "Hash error" });
+}
 
+try {
+  await User.create({
+    email,
+    password: hashed,
+    plan: "free"
+  });
+} catch (e) {
+  console.log("❌ create crash:", e.message);
+  return res.json({ success: false, message: "DB create error" });
+}
+
+console.log("✅ USER CREATED");
 return res.json({ success: true });
 ```
 
 } catch (err) {
-console.error("🔥 SIGNUP ERROR:", err);
-
-```
-// ✅ ALWAYS RETURN RESPONSE (prevents 502 + CORS issue)
-return res.json({
-  success: false,
-  message: err.message || "Unknown error"
-});
-```
-
+console.log("🔥 UNKNOWN CRASH:", err.message);
+return res.json({ success: false, message: "Unknown crash" });
 }
 });
 
@@ -131,7 +141,7 @@ res.json({
 ```
 
 } catch (err) {
-console.error("LOGIN ERROR:", err);
+console.error("LOGIN ERROR:", err.message);
 res.json({ error: "Server error" });
 }
 });
@@ -244,12 +254,12 @@ res.json({ url: session.url });
 ```
 
 } catch (err) {
-console.error("STRIPE ERROR:", err);
+console.error("STRIPE ERROR:", err.message);
 res.status(500).json({ error: "Checkout failed" });
 }
 });
 
-// 🚀 START SERVER
+// 🚀 START
 async function start() {
 await connectDB();
 
