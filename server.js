@@ -4,7 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import fetch from "node-fetch";
+// ❌ REMOVED: import fetch from "node-fetch";
 import Stripe from "stripe";
 
 dotenv.config();
@@ -14,13 +14,9 @@ console.log("🚀 NEW VERSION DEPLOYED");
 
 const app = express();
 
-// ✅ CORS (frontend + local)
+// ✅ TEMP OPEN CORS (so frontend works 100%)
 app.use(cors({
-origin: [
-"https://kbetz-frontend.vercel.app",
-"http://localhost:3000"
-],
-credentials: true
+origin: "*"
 }));
 
 app.use(express.json());
@@ -57,18 +53,16 @@ app.get("/api/signup", (req, res) => {
 res.send("Signup endpoint is working. Use POST.");
 });
 
-// 🔥 SIGNUP (FULL DEBUG)
+// 🔥 SIGNUP
 app.post("/api/signup", async (req, res) => {
 console.log("🔥 SIGNUP HIT");
 
 try {
 const body = req.body || {};
-console.log("BODY:", body);
-
-```
 const email = body.email;
 const password = body.password;
 
+```
 if (!email || !password) {
   return res.json({
     success: false,
@@ -104,7 +98,7 @@ console.log("🔥 REAL ERROR:", err);
 ```
 return res.json({
   success: false,
-  message: "REAL ERROR: " + err.message,
+  message: err.message,
   stack: err.stack
 });
 ```
@@ -173,7 +167,7 @@ res.json({ error: "Invalid token" });
 }
 });
 
-// 📡 DATA
+// 📡 DATA (FIXED — uses built-in fetch)
 app.get("/api/data", async (req, res) => {
 try {
 const API_KEY = process.env.ODDS_API_KEY;
