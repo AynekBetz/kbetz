@@ -9,6 +9,9 @@ import Stripe from "stripe";
 
 dotenv.config();
 
+// 🚀 DEPLOY CHECK
+console.log("🚀 NEW VERSION DEPLOYED");
+
 const app = express();
 
 // ✅ CORS (frontend + local)
@@ -37,7 +40,7 @@ console.error("MongoDB Error:", err.message);
 }
 }
 
-// 👤 SAFE MODEL
+// 👤 MODEL
 const User = mongoose.models.User || mongoose.model("User", new mongoose.Schema({
 email: String,
 password: String,
@@ -54,7 +57,7 @@ app.get("/api/signup", (req, res) => {
 res.send("Signup endpoint is working. Use POST.");
 });
 
-// 🔥 SIGNUP (FULL DEBUG + REAL ERROR)
+// 🔥 SIGNUP (FULL DEBUG)
 app.post("/api/signup", async (req, res) => {
 console.log("🔥 SIGNUP HIT");
 
@@ -73,18 +76,7 @@ if (!email || !password) {
   });
 }
 
-let existing = null;
-
-try {
-  existing = await User.findOne({ email });
-} catch (e) {
-  console.log("❌ findOne crash:", e);
-  return res.json({
-    success: false,
-    message: e.message,
-    stack: e.stack
-  });
-}
+const existing = await User.findOne({ email });
 
 if (existing) {
   return res.json({
@@ -93,35 +85,16 @@ if (existing) {
   });
 }
 
-let hashed;
+const hashed = await bcrypt.hash(password, 10);
 
-try {
-  hashed = await bcrypt.hash(password, 10);
-} catch (e) {
-  console.log("❌ bcrypt crash:", e);
-  return res.json({
-    success: false,
-    message: e.message,
-    stack: e.stack
-  });
-}
-
-try {
-  await User.create({
-    email,
-    password: hashed,
-    plan: "free"
-  });
-} catch (e) {
-  console.log("❌ create crash:", e);
-  return res.json({
-    success: false,
-    message: e.message,
-    stack: e.stack
-  });
-}
+await User.create({
+  email,
+  password: hashed,
+  plan: "free"
+});
 
 console.log("✅ USER CREATED");
+
 return res.json({ success: true });
 ```
 
@@ -131,7 +104,7 @@ console.log("🔥 REAL ERROR:", err);
 ```
 return res.json({
   success: false,
-  message: err.message,
+  message: "REAL ERROR: " + err.message,
   stack: err.stack
 });
 ```
