@@ -66,7 +66,7 @@ res.json({ status: "OK" });
 });
 
 /* =========================
-✅ SIGNUP (SAFE)
+✅ SIGNUP
 ========================= */
 app.post("/api/signup", async (req, res) => {
 try {
@@ -103,15 +103,15 @@ return res.json({ success: false, message: err.message });
 });
 
 /* =========================
-🔥 LOGIN (STABLE + NO CRASH)
+🔐 LOGIN (SECURE + STABLE)
 ========================= */
 app.post("/api/login", async (req, res) => {
 try {
-const { email } = req.body || {};
+const { email, password } = req.body || {};
 
 
-if (!email) {
-  return res.json({ error: "Missing email" });
+if (!email || !password) {
+  return res.json({ error: "Missing credentials" });
 }
 
 const user = await User.findOne({ email });
@@ -120,7 +120,17 @@ if (!user) {
   return res.json({ error: "Invalid login" });
 }
 
-// 🔥 TEMP: skip password check to restore app access
+// 🔥 safety guard (prevents old broken users crashing)
+if (!user.password || typeof user.password !== "string") {
+  return res.json({ error: "User password corrupted - create new account" });
+}
+
+const valid = await bcrypt.compare(password, user.password);
+
+if (!valid) {
+  return res.json({ error: "Invalid login" });
+}
+
 const token = jwt.sign(
   { id: user._id },
   process.env.JWT_SECRET || "secret123"
@@ -142,7 +152,7 @@ return res.json({
 console.log("❌ LOGIN ERROR:", err);
 
 
-// 🔥 NEVER crash → always respond
+// 🔥 NEVER CRASH AGAIN
 return res.json({ error: "Login failed safely" });
 
 
@@ -150,7 +160,7 @@ return res.json({ error: "Login failed safely" });
 });
 
 /* =========================
-✅ ME
+👤 ME
 ========================= */
 app.get("/api/me", async (req, res) => {
 try {
@@ -225,7 +235,7 @@ res.json({
 });
 
 /* =========================
-💳 STRIPE SAFE
+💳 STRIPE
 ========================= */
 let stripe;
 try {
