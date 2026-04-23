@@ -1,10 +1,8 @@
 import express from "express";
 import mongoose from "mongoose";
-import cors from "cors";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-// ❌ REMOVED: import fetch from "node-fetch";
 import Stripe from "stripe";
 
 dotenv.config();
@@ -14,10 +12,19 @@ console.log("🚀 NEW VERSION DEPLOYED");
 
 const app = express();
 
-// ✅ TEMP OPEN CORS (so frontend works 100%)
-app.use(cors({
-origin: "*"
-}));
+// 🔥 FULL CORS FIX (THIS IS THE IMPORTANT PART)
+app.use((req, res, next) => {
+res.header("Access-Control-Allow-Origin", "*");
+res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+// Handle preflight requests
+if (req.method === "OPTIONS") {
+return res.sendStatus(200);
+}
+
+next();
+});
 
 app.use(express.json());
 
@@ -58,9 +65,7 @@ app.post("/api/signup", async (req, res) => {
 console.log("🔥 SIGNUP HIT");
 
 try {
-const body = req.body || {};
-const email = body.email;
-const password = body.password;
+const { email, password } = req.body;
 
 ```
 if (!email || !password) {
@@ -93,13 +98,12 @@ return res.json({ success: true });
 ```
 
 } catch (err) {
-console.log("🔥 REAL ERROR:", err);
+console.log("🔥 SIGNUP ERROR:", err);
 
 ```
 return res.json({
   success: false,
-  message: err.message,
-  stack: err.stack
+  message: err.message
 });
 ```
 
@@ -108,20 +112,30 @@ return res.json({
 
 // 🔐 LOGIN
 app.post("/api/login", async (req, res) => {
+console.log("🔥 LOGIN HIT");
+
 try {
 const { email, password } = req.body;
 
 ```
 const user = await User.findOne({ email });
-if (!user) return res.json({ error: "Invalid login" });
+
+if (!user) {
+  return res.json({ error: "Invalid login - no user" });
+}
 
 const valid = await bcrypt.compare(password, user.password);
-if (!valid) return res.json({ error: "Invalid login" });
+
+if (!valid) {
+  return res.json({ error: "Invalid login - wrong password" });
+}
 
 const token = jwt.sign(
   { id: user._id },
   process.env.JWT_SECRET || "secret123"
 );
+
+console.log("✅ LOGIN SUCCESS");
 
 res.json({
   success: true,
@@ -134,8 +148,14 @@ res.json({
 ```
 
 } catch (err) {
-console.error("LOGIN ERROR:", err);
-res.json({ error: "Server error" });
+console.log("🔥 LOGIN ERROR:", err);
+
+```
+res.json({
+  error: err.message
+});
+```
+
 }
 });
 
@@ -167,7 +187,7 @@ res.json({ error: "Invalid token" });
 }
 });
 
-// 📡 DATA (FIXED — uses built-in fetch)
+// 📡 DATA (uses built-in fetch)
 app.get("/api/data", async (req, res) => {
 try {
 const API_KEY = process.env.ODDS_API_KEY;
