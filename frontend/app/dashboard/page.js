@@ -164,35 +164,39 @@ setGames([
 }
 };
 
-// STRIPE
-const upgrade = async () => {
+// 🔥 UPGRADE (INLINE SAFE VERSION — GUARANTEED CLICK)
+const handleUpgradeClick = () => {
+console.log("UPGRADE CLICKED");
+
 const token = localStorage.getItem("token");
 
 if (!token) {
+alert("No token — redirecting");
 window.location.href = "/login";
 return;
 }
 
-try {
-const res = await fetch(`${API}/api/checkout`, {
+fetch(`${API}/api/checkout`, {
 method: "POST",
 headers: {
 "Content-Type": "application/json"
 },
 body: JSON.stringify({ token })
-});
-
-const data = await res.json();
+})
+.then(res => res.json())
+.then(data => {
+console.log("CHECKOUT RESPONSE:", data);
 
 if (data.url) {
 window.location.href = data.url;
 } else {
-alert("Upgrade failed. Try again.");
+alert("Upgrade failed");
 }
-
-} catch {
-alert("Connection error.");
-}
+})
+.catch(err => {
+console.error("CHECKOUT ERROR:", err);
+alert("Connection error");
+});
 };
 
 // LOADING
@@ -218,7 +222,7 @@ return (
   color: "white",
   padding: "20px",
   fontFamily: "Inter, sans-serif",
-  pointerEvents: "auto" // ✅ FIX CLICK BLOCK
+  pointerEvents: "auto"
 }}>
 
 {/* HEADER */}
@@ -253,12 +257,15 @@ border: "none",
 color: "white",
 cursor: "pointer",
 position: "relative",
-zIndex: 20
+zIndex: 50
 }}>
 Logout </button>
 
+{/* 🔥 WORKING PRO BUTTON */}
 {!isPro && (
-<button onClick={upgrade} style={{
+<button
+onClick={handleUpgradeClick}
+style={{
 background: "linear-gradient(90deg, gold, orange)",
 padding: "10px 18px",
 borderRadius: "8px",
@@ -266,10 +273,31 @@ border: "none",
 fontWeight: "bold",
 cursor: "pointer",
 position: "relative",
-zIndex: 20 // ✅ FORCE CLICK
-}}>
+zIndex: 9999
+}}
+
+>
+
 Upgrade PRO </button>
 )}
+
+{/* 🔥 SIGNUP ACCESS (FROM DASHBOARD TOO) */}
+<button
+onClick={() => window.location.href = "/signup"}
+style={{
+background: "#111",
+padding: "8px 12px",
+borderRadius: "6px",
+border: "1px solid #333",
+color: "#00ff99",
+cursor: "pointer",
+position: "relative",
+zIndex: 50
+}}
+
+>
+
+Sign Up </button>
 
   </div>
 </div>
