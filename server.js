@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Stripe from "stripe";
+import fetch from "node-fetch"; // 🔥 FIXED CRASH
 
 dotenv.config();
 
@@ -12,7 +13,7 @@ console.log("🚀 KBETZ STABLE SERVER STARTING");
 const app = express();
 
 /* =========================
-🔥 STRONG CORS (FIXES PHONE + VERCEL)
+🔥 CORS (PHONE + VERCEL FIX)
 ========================= */
 app.use((req, res, next) => {
 const allowedOrigins = [
@@ -84,7 +85,7 @@ app.post("/api/signup", async (req, res) => {
 try {
 const { email, password } = req.body || {};
 
-```
+
 if (!email || !password) {
   return res.json({ success: false, message: "Missing email/password" });
 }
@@ -106,7 +107,6 @@ await User.create({
 console.log("✅ USER CREATED:", email);
 
 return res.json({ success: true });
-```
 
 } catch (err) {
 console.log("❌ SIGNUP ERROR:", err);
@@ -115,13 +115,13 @@ return res.json({ success: false, message: err.message });
 });
 
 /* =========================
-🔐 LOGIN (FINAL FIXED)
+🔐 LOGIN
 ========================= */
 app.post("/api/login", async (req, res) => {
 try {
 const { email, password } = req.body || {};
 
-```
+
 if (!email || !password) {
   return res.status(400).json({ error: "Missing credentials" });
 }
@@ -130,12 +130,6 @@ const user = await User.findOne({ email });
 
 if (!user) {
   return res.status(401).json({ error: "Invalid login" });
-}
-
-if (!user.password || typeof user.password !== "string") {
-  return res.status(500).json({
-    error: "User password corrupted - create new account"
-  });
 }
 
 const valid = await bcrypt.compare(password, user.password);
@@ -160,11 +154,11 @@ return res.json({
     plan: user.plan
   }
 });
-```
+
 
 } catch (err) {
 console.log("❌ LOGIN ERROR:", err);
-return res.status(500).json({ error: "Login failed safely" });
+return res.status(500).json({ error: "Login failed" });
 }
 });
 
@@ -176,7 +170,7 @@ try {
 const auth = req.headers.authorization;
 if (!auth) return res.status(401).json({ error: "No token" });
 
-```
+
 const token = auth.split(" ")[1];
 
 const decoded = jwt.verify(
@@ -191,7 +185,7 @@ res.json({
   email: user.email,
   plan: user.plan
 });
-```
+
 
 } catch {
 res.status(401).json({ error: "Invalid token" });
@@ -199,19 +193,21 @@ res.status(401).json({ error: "Invalid token" });
 });
 
 /* =========================
-📡 DATA
+📡 DATA (CRASH FIXED)
 ========================= */
 app.get("/api/data", async (req, res) => {
 try {
 const API_KEY = process.env.ODDS_API_KEY;
 
-```
+
 if (!API_KEY) throw new Error("No API key");
 
+if (typeof fetch !== "function") {
+  throw new Error("fetch not available");
+}
+
 const response = await fetch(
-  "https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=" +
-    API_KEY +
-    "&regions=us&markets=h2h"
+  `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=h2h`
 );
 
 const data = await response.json();
@@ -225,12 +221,12 @@ const games = data.slice(0, 5).map((g, i) => ({
 }));
 
 res.json({ source: "real", games });
-```
+
 
 } catch (err) {
 console.log("DATA ERROR:", err.message);
 
-```
+
 res.json({
   source: "fallback",
   games: [
@@ -238,26 +234,31 @@ res.json({
     { id: 2, home: "Celtics", away: "Heat", odds: -105 }
   ]
 });
-```
+
 
 }
 });
 
 /* =========================
-💳 STRIPE
+💳 STRIPE (SAFE)
 ========================= */
 let stripe;
+
+if (process.env.STRIPE_SECRET_KEY) {
 try {
 stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-} catch {
-console.log("Stripe disabled");
+} catch (err) {
+console.log("Stripe init failed:", err.message);
+}
+} else {
+console.log("Stripe not configured");
 }
 
 app.post("/api/checkout", async (req, res) => {
 try {
 if (!stripe) return res.json({ error: "Stripe not configured" });
 
-```
+
 const decoded = jwt.verify(
   req.body.token,
   process.env.JWT_SECRET || "secret123"
@@ -277,7 +278,7 @@ const session = await stripe.checkout.sessions.create({
 });
 
 res.json({ url: session.url });
-```
+
 
 } catch (err) {
 console.log("STRIPE ERROR:", err);
