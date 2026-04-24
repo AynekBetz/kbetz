@@ -9,16 +9,9 @@ export async function login(email, password) {
     body: JSON.stringify({ email, password }),
   });
 
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error("Bad server response");
-  }
+  const data = await res.json();
 
-  if (!res.ok) {
-    throw new Error(data?.error || "Login failed");
-  }
+  if (!res.ok) throw new Error("Login failed");
 
   localStorage.setItem("token", data.token);
   return data;
