@@ -1,186 +1,181 @@
 "use client";
 
 import { useState } from "react";
+import type { CSSProperties } from "react";
 
 const API = "https://kbetz.onrender.com";
 
 export default function Signup() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState("");
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
-    if (loading) return;
+const handleSignup = async (e: any) => {
+e.preventDefault();
+if (loading) return;
 
-    setLoading(true);
-    setError("");
 
-    try {
-      const res = await fetch(`${API}/api/signup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
+setLoading(true);
+setError("");
 
-      let data;
+try {
+  const res = await fetch(`${API}/api/signup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
 
-      try {
-        data = await res.json();
-      } catch {
-        throw new Error("Server response error");
-      }
+  let data;
 
-      console.log("SIGNUP RESPONSE:", data);
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error("Server response error");
+  }
 
-      if (!res.ok) {
-        throw new Error(data?.message || "Signup failed");
-      }
+  console.log("SIGNUP RESPONSE:", data);
 
-      if (!data?.success) {
-        throw new Error(data?.message || "Signup failed");
-      }
+  if (!res.ok || !data?.success) {
+    throw new Error(data?.message || "Signup failed");
+  }
 
-      alert("Account created successfully!");
-      window.location.href = "/login";
+  alert("Account created successfully!");
+  window.location.href = "/login";
 
-    } catch (err) {
-      console.error("SIGNUP ERROR:", err);
-      setError(err.message || "Signup failed");
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div style={styles.page}>
-      <div style={styles.glow}></div>
-
-      <div style={styles.card}>
-        <div style={styles.live}>● LIVE</div>
-
-        <h1 style={styles.title}>KBETZ</h1>
-        <p style={styles.subtitle}>Create Your Account</p>
-
-        <form onSubmit={handleSignup} style={styles.form}>
-          <input
-            type="email"
-            placeholder="Email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-          />
-
-          {error && <div style={styles.error}>{error}</div>}
-
-          <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? "Creating..." : "Create Account"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+} catch (err: any) {
+  console.error("SIGNUP ERROR:", err);
+  setError(err.message || "Signup failed");
+  setLoading(false);
 }
 
-/* =========================
-🎨 STYLES (UNCHANGED LOOK)
-========================= */
 
-const styles = {
-  page: {
-    height: "100vh",
-    background: "#050505",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    color: "white",
-    position: "relative",
-    overflow: "hidden",
-    fontFamily: "Inter, sans-serif",
-  },
+};
 
-  glow: {
-    position: "absolute",
-    width: "700px",
-    height: "700px",
-    background: "radial-gradient(circle, rgba(0,255,150,0.25), transparent)",
-    filter: "blur(140px)",
-  },
+return ( <div style={styles.page}> <div style={styles.glow}></div>
 
-  card: {
-    background: "rgba(255,255,255,0.05)",
-    backdropFilter: "blur(20px)",
-    padding: "40px",
-    borderRadius: "16px",
-    border: "1px solid rgba(255,255,255,0.1)",
-    textAlign: "center",
-    width: "340px",
-    boxShadow: "0 0 50px rgba(0,255,150,0.2)",
-    position: "relative",
-  },
 
-  live: {
-    position: "absolute",
-    top: "10px",
-    right: "15px",
-    fontSize: "12px",
-    color: "#00ff99",
-    fontWeight: "bold",
-  },
+  <div style={styles.card}>
+    <div style={styles.live}>● LIVE</div>
 
-  title: {
-    fontSize: "28px",
-    marginBottom: "5px",
-    letterSpacing: "2px",
-  },
+    <h1 style={styles.title}>KBETZ</h1>
+    <p style={styles.subtitle}>Create Your Account</p>
 
-  subtitle: {
-    fontSize: "12px",
-    opacity: 0.7,
-    marginBottom: "25px",
-  },
+    <form onSubmit={handleSignup} style={styles.form}>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        style={styles.input}
+      />
 
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        style={styles.input}
+      />
 
-  input: {
-    padding: "12px",
-    borderRadius: "8px",
-    border: "1px solid rgba(255,255,255,0.1)",
-    background: "#111",
-    color: "white",
-  },
+      {error && <div style={styles.error}>{error}</div>}
 
-  error: {
-    color: "#ff4d4d",
-    fontSize: "12px",
-  },
+      <button type="submit" disabled={loading} style={styles.button}>
+        {loading ? "Creating..." : "Create Account"}
+      </button>
+    </form>
+  </div>
+</div>
 
-  button: {
-    padding: "12px",
-    borderRadius: "8px",
-    border: "none",
-    background: "linear-gradient(90deg, #00ff99, #00cc66)",
-    color: "black",
-    fontWeight: "bold",
-    cursor: "pointer",
-  },
+
+);
+}
+
+/* ✅ FIXED TYPES */
+
+const styles: Record<string, CSSProperties> = {
+page: {
+height: "100vh",
+background: "#050505",
+display: "flex",
+justifyContent: "center",
+alignItems: "center",
+color: "white",
+position: "relative", // ✅ now valid
+overflow: "hidden",
+fontFamily: "Inter, sans-serif",
+},
+
+glow: {
+position: "absolute",
+width: "700px",
+height: "700px",
+background: "radial-gradient(circle, rgba(0,255,150,0.25), transparent)",
+filter: "blur(140px)",
+pointerEvents: "none",
+},
+
+card: {
+background: "rgba(255,255,255,0.05)",
+backdropFilter: "blur(20px)",
+padding: "40px",
+borderRadius: "16px",
+border: "1px solid rgba(255,255,255,0.1)",
+textAlign: "center",
+width: "340px",
+boxShadow: "0 0 50px rgba(0,255,150,0.2)",
+position: "relative",
+},
+
+live: {
+position: "absolute",
+top: "10px",
+right: "15px",
+fontSize: "12px",
+color: "#00ff99",
+fontWeight: "bold",
+},
+
+title: {
+fontSize: "28px",
+marginBottom: "5px",
+letterSpacing: "2px",
+},
+
+subtitle: {
+fontSize: "12px",
+opacity: 0.7,
+marginBottom: "25px",
+},
+
+form: {
+display: "flex",
+flexDirection: "column",
+gap: "12px",
+},
+
+input: {
+padding: "12px",
+borderRadius: "8px",
+border: "1px solid rgba(255,255,255,0.1)",
+background: "#111",
+color: "white",
+},
+
+error: {
+color: "#ff4d4d",
+fontSize: "12px",
+},
+
+button: {
+padding: "12px",
+borderRadius: "8px",
+border: "none",
+background: "linear-gradient(90deg, #00ff99, #00cc66)",
+color: "black",
+fontWeight: "bold",
+cursor: "pointer",
+},
 };
