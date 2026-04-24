@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://kbetz.onrender.com";
+const API =
+process.env.NEXT_PUBLIC_API_URL || "https://kbetz.onrender.com";
 
 export default function Login() {
-
 const [email, setEmail] = useState("");
 const [password, setPassword] = useState("");
 const [loading, setLoading] = useState(false);
@@ -23,25 +23,33 @@ try {
   const res = await fetch(`${API}/api/login`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password }),
   });
 
-  const data = await res.json();
-
-  if (!data?.token) {
-    setError(data?.error || "Invalid login");
-    setLoading(false);
-    return;
+  if (!res.ok) {
+    throw new Error("Server error");
   }
 
-  localStorage.setItem("token", data.token);
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error("Invalid server response");
+  }
 
-  // redirect into your FULL dashboard system
-  window.location.href = "/dashboard";
+  if (!data?.token) {
+    throw new Error(data?.error || "Invalid login");
+  }
 
+  // safe browser-only storage
+  if (typeof window !== "undefined") {
+    localStorage.setItem("token", data.token);
+    window.location.href = "/dashboard";
+  }
 } catch (err) {
+  console.error("LOGIN ERROR:", err);
   setError("Connection failed");
   setLoading(false);
 }
@@ -53,14 +61,12 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
 
 
   <div style={styles.card}>
-
     <div style={styles.live}>● LIVE</div>
 
     <h1 style={styles.title}>KBETZ</h1>
     <p style={styles.subtitle}>Elite Betting Terminal</p>
 
     <form onSubmit={handleLogin} style={styles.form}>
-
       <input
         type="email"
         placeholder="Email"
@@ -79,16 +85,12 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
         style={styles.input}
       />
 
-      {error && (
-        <div style={styles.error}>{error}</div>
-      )}
+      {error && <div style={styles.error}>{error}</div>}
 
       <button type="submit" disabled={loading} style={styles.button}>
         {loading ? "Entering..." : "Enter Dashboard"}
       </button>
-
     </form>
-
   </div>
 </div>
 
@@ -97,7 +99,7 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
 }
 
 /* =========================
-💎 ELITE UI STYLES
+🎨 STYLES (same look)
 ========================= */
 
 const styles = {
@@ -110,7 +112,7 @@ alignItems: "center",
 color: "white",
 position: "relative",
 overflow: "hidden",
-fontFamily: "Inter, sans-serif"
+fontFamily: "Inter, sans-serif",
 },
 
 glow: {
@@ -118,7 +120,7 @@ position: "absolute",
 width: "700px",
 height: "700px",
 background: "radial-gradient(circle, rgba(0,255,150,0.25), transparent)",
-filter: "blur(140px)"
+filter: "blur(140px)",
 },
 
 card: {
@@ -130,7 +132,7 @@ border: "1px solid rgba(255,255,255,0.1)",
 textAlign: "center",
 width: "340px",
 boxShadow: "0 0 50px rgba(0,255,150,0.2)",
-position: "relative"
+position: "relative",
 },
 
 live: {
@@ -139,25 +141,25 @@ top: "10px",
 right: "15px",
 fontSize: "12px",
 color: "#00ff99",
-fontWeight: "bold"
+fontWeight: "bold",
 },
 
 title: {
 fontSize: "28px",
 marginBottom: "5px",
-letterSpacing: "2px"
+letterSpacing: "2px",
 },
 
 subtitle: {
 fontSize: "12px",
 opacity: 0.7,
-marginBottom: "25px"
+marginBottom: "25px",
 },
 
 form: {
 display: "flex",
 flexDirection: "column",
-gap: "12px"
+gap: "12px",
 },
 
 input: {
@@ -165,12 +167,12 @@ padding: "12px",
 borderRadius: "8px",
 border: "1px solid rgba(255,255,255,0.1)",
 background: "#111",
-color: "white"
+color: "white",
 },
 
 error: {
 color: "#ff4d4d",
-fontSize: "12px"
+fontSize: "12px",
 },
 
 button: {
@@ -180,6 +182,6 @@ border: "none",
 background: "linear-gradient(90deg, #00ff99, #00cc66)",
 color: "black",
 fontWeight: "bold",
-cursor: "pointer"
-}
+cursor: "pointer",
+},
 };
