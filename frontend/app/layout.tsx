@@ -1,28 +1,19 @@
 export const metadata = {
-  title: "KBETZ",
-  description: "KBETZ App",
+title: "KBETZ",
+description: "Elite Betting Terminal",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body
-        style={{
-          margin: 0,
-          padding: 0,
-          background: "#000",
-          color: "#fff",
-          overflow: "hidden"
-        }}
-      >
-        <div style={{ position: "relative", zIndex: 1 }}>
-          {children}
-        </div>
-      </body>
-    </html>
-  );
+export default function RootLayout({ children }) {
+return ( <html lang="en">
+<body
+style={{
+margin: 0,
+padding: 0,
+background: "#050505",
+color: "white",
+fontFamily: "Inter, sans-serif",
+}}
+>
+{children} </body> </html>
+);
 }
