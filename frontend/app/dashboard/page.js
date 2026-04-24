@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const API = "https://kbetz.onrender.com" || "https://kbetz.onrender.com";
+const API = "https://kbetz.onrender.com";
 
 export default function Dashboard() {
 
@@ -22,23 +22,31 @@ window.location.href = "/login";
 
 useEffect(() => {
 
+try {
+if (typeof window !== "undefined") {
 const params = new URLSearchParams(window.location.search);
 
+```
 if (params.get("upgrade") === "success") {
-const token = localStorage.getItem("token");
+  const token = localStorage.getItem("token");
 
-if (token) {
-fetch(`${API}/api/upgrade`, {
-method: "POST",
-headers: {
-"Content-Type": "application/json",
-Authorization: "Bearer " + token
+  if (token) {
+    fetch(`${API}/api/upgrade`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token
+      }
+    }).then(() => {
+      window.location.href = "/dashboard";
+    });
+  }
 }
-}).then(() => {
-window.location.href = "/dashboard";
-});
-}
+```
 
+}
+} catch (err) {
+console.log("Upgrade check skipped:", err);
 }
 
 fetchUser();
@@ -261,7 +269,7 @@ Upgrade PRO </button>
   </div>
 </div>
 
-{/* AI PICKS (PRO LEVEL + LOCK) */}
+{/* AI PICKS */}
 
 <div style={{
   background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
@@ -315,13 +323,11 @@ p.direction === "up"
   </span>
 
 <span style={{
- color: p.confidence > 70 ? "#22c55e" : "#facc15"
+color: p.confidence > 70 ? "#22c55e" : "#facc15"
 }}>
 {p.confidence > 70 ? "HIGH EDGE" : "MED EDGE"} </span>
 
 </div>
-
-{/* LOCKED INSIGHT */}
 
 <div style={{
   marginTop: "8px",
@@ -348,30 +354,6 @@ p.direction === "up"
 
 </div>
 ))}
-
-{!isPro && (
-
-<div style={{
-  marginTop: "15px",
-  padding: "12px",
-  textAlign: "center",
-  background: "rgba(0,0,0,0.4)",
-  borderRadius: "10px"
-}}>
-  Unlock full AI insights & sharp money detection
-  <br /><br />
-  <button onClick={upgrade} style={{
-    background: "linear-gradient(90deg, gold, orange)",
-    padding: "10px 18px",
-    borderRadius: "8px",
-    border: "none",
-    fontWeight: "bold",
-    cursor: "pointer"
-  }}>
-    Upgrade to PRO
-  </button>
-</div>
-)}
 
 </div>
 
