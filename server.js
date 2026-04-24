@@ -12,10 +12,22 @@ console.log("🚀 KBETZ STABLE SERVER STARTING");
 const app = express();
 
 /* =========================
-✅ HARD CORS (NEVER FAIL)
+🔥 STRONG CORS (FIXES PHONE + VERCEL)
 ========================= */
 app.use((req, res, next) => {
+const allowedOrigins = [
+"http://localhost:3000",
+"https://kbetz-frontend.vercel.app"
+];
+
+const origin = req.headers.origin;
+
+if (allowedOrigins.includes(origin)) {
+res.setHeader("Access-Control-Allow-Origin", origin);
+} else {
 res.setHeader("Access-Control-Allow-Origin", "*");
+}
+
 res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
 res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
@@ -72,7 +84,7 @@ app.post("/api/signup", async (req, res) => {
 try {
 const { email, password } = req.body || {};
 
-
+```
 if (!email || !password) {
   return res.json({ success: false, message: "Missing email/password" });
 }
@@ -94,7 +106,7 @@ await User.create({
 console.log("✅ USER CREATED:", email);
 
 return res.json({ success: true });
-
+```
 
 } catch (err) {
 console.log("❌ SIGNUP ERROR:", err);
@@ -103,37 +115,39 @@ return res.json({ success: false, message: err.message });
 });
 
 /* =========================
-🔐 LOGIN (SECURE + STABLE)
+🔐 LOGIN (FINAL FIXED)
 ========================= */
 app.post("/api/login", async (req, res) => {
 try {
 const { email, password } = req.body || {};
 
-
+```
 if (!email || !password) {
-  return res.json({ error: "Missing credentials" });
+  return res.status(400).json({ error: "Missing credentials" });
 }
 
 const user = await User.findOne({ email });
 
 if (!user) {
-  return res.json({ error: "Invalid login" });
+  return res.status(401).json({ error: "Invalid login" });
 }
 
-// 🔥 safety guard (prevents old broken users crashing)
 if (!user.password || typeof user.password !== "string") {
-  return res.json({ error: "User password corrupted - create new account" });
+  return res.status(500).json({
+    error: "User password corrupted - create new account"
+  });
 }
 
 const valid = await bcrypt.compare(password, user.password);
 
 if (!valid) {
-  return res.json({ error: "Invalid login" });
+  return res.status(401).json({ error: "Invalid login" });
 }
 
 const token = jwt.sign(
   { id: user._id },
-  process.env.JWT_SECRET || "secret123"
+  process.env.JWT_SECRET || "secret123",
+  { expiresIn: "7d" }
 );
 
 console.log("✅ LOGIN SUCCESS:", email);
@@ -146,16 +160,11 @@ return res.json({
     plan: user.plan
   }
 });
-
+```
 
 } catch (err) {
 console.log("❌ LOGIN ERROR:", err);
-
-
-// 🔥 NEVER CRASH AGAIN
-return res.json({ error: "Login failed safely" });
-
-
+return res.status(500).json({ error: "Login failed safely" });
 }
 });
 
@@ -165,9 +174,9 @@ return res.json({ error: "Login failed safely" });
 app.get("/api/me", async (req, res) => {
 try {
 const auth = req.headers.authorization;
-if (!auth) return res.json({ error: "No token" });
+if (!auth) return res.status(401).json({ error: "No token" });
 
-
+```
 const token = auth.split(" ")[1];
 
 const decoded = jwt.verify(
@@ -176,16 +185,16 @@ const decoded = jwt.verify(
 );
 
 const user = await User.findById(decoded.id);
-if (!user) return res.json({ error: "User not found" });
+if (!user) return res.status(404).json({ error: "User not found" });
 
 res.json({
   email: user.email,
   plan: user.plan
 });
-
+```
 
 } catch {
-res.json({ error: "Invalid token" });
+res.status(401).json({ error: "Invalid token" });
 }
 });
 
@@ -196,7 +205,7 @@ app.get("/api/data", async (req, res) => {
 try {
 const API_KEY = process.env.ODDS_API_KEY;
 
-
+```
 if (!API_KEY) throw new Error("No API key");
 
 const response = await fetch(
@@ -216,12 +225,12 @@ const games = data.slice(0, 5).map((g, i) => ({
 }));
 
 res.json({ source: "real", games });
-
+```
 
 } catch (err) {
 console.log("DATA ERROR:", err.message);
 
-
+```
 res.json({
   source: "fallback",
   games: [
@@ -229,7 +238,7 @@ res.json({
     { id: 2, home: "Celtics", away: "Heat", odds: -105 }
   ]
 });
-
+```
 
 }
 });
@@ -248,7 +257,7 @@ app.post("/api/checkout", async (req, res) => {
 try {
 if (!stripe) return res.json({ error: "Stripe not configured" });
 
-
+```
 const decoded = jwt.verify(
   req.body.token,
   process.env.JWT_SECRET || "secret123"
@@ -268,7 +277,7 @@ const session = await stripe.checkout.sessions.create({
 });
 
 res.json({ url: session.url });
-
+```
 
 } catch (err) {
 console.log("STRIPE ERROR:", err);
