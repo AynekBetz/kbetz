@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import type { CSSProperties } from "react";
 
 const API = "https://kbetz.onrender.com";
 
@@ -25,7 +24,10 @@ try {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      password,
+    }),
   });
 
   let data;
@@ -67,6 +69,7 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
       <input
         type="email"
         placeholder="Email"
+        autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         style={styles.input}
@@ -75,6 +78,7 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
       <input
         type="password"
         placeholder="Password"
+        autoComplete="new-password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         style={styles.input}
@@ -93,9 +97,11 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
 );
 }
 
-/* ✅ FIXED TYPES */
+/* =========================
+✅ FIXED TYPES (NO ERRORS)
+========================= */
 
-const styles: Record<string, CSSProperties> = {
+const styles = {
 page: {
 height: "100vh",
 background: "#050505",
@@ -103,18 +109,18 @@ display: "flex",
 justifyContent: "center",
 alignItems: "center",
 color: "white",
-position: "relative", // ✅ now valid
+position: "relative" as const,
 overflow: "hidden",
 fontFamily: "Inter, sans-serif",
 },
 
 glow: {
-position: "absolute",
+position: "absolute" as const,
 width: "700px",
 height: "700px",
 background: "radial-gradient(circle, rgba(0,255,150,0.25), transparent)",
 filter: "blur(140px)",
-pointerEvents: "none",
+pointerEvents: "none" as const,
 },
 
 card: {
@@ -123,14 +129,14 @@ backdropFilter: "blur(20px)",
 padding: "40px",
 borderRadius: "16px",
 border: "1px solid rgba(255,255,255,0.1)",
-textAlign: "center",
+textAlign: "center" as const,
 width: "340px",
 boxShadow: "0 0 50px rgba(0,255,150,0.2)",
-position: "relative",
+position: "relative" as const,
 },
 
 live: {
-position: "absolute",
+position: "absolute" as const,
 top: "10px",
 right: "15px",
 fontSize: "12px",
@@ -152,7 +158,7 @@ marginBottom: "25px",
 
 form: {
 display: "flex",
-flexDirection: "column",
+flexDirection: "column" as const,
 gap: "12px",
 },
 
