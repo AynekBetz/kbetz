@@ -1,10 +1,6 @@
-// ONLY ODDS — NO STRIPE ANYWHERE
+const API = "https://kbetz.onrender.com";
 
-export async function getOdds() {
-  try {
-    const res = await fetch(`${"https://kbetz.onrender.com"}/api/odds`);
-    return await res.json();
-  } catch {
-    return [];
-  }
+export async function getData() {
+  const res = await fetch(`${API}/api/data`);
+  return res.json();
 }

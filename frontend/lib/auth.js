@@ -1,33 +1,25 @@
 const API = "https://kbetz.onrender.com";
 
-// 🔐 SAVE TOKEN
-export function setToken(token) {
-  localStorage.setItem("kbetz_token", token);
-}
+export async function login(email, password) {
+  const res = await fetch(`${API}/api/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
 
-// 🔐 GET TOKEN
-export function getToken() {
-  return localStorage.getItem("kbetz_token");
-}
-
-// 🔐 LOGOUT
-export function logout() {
-  localStorage.removeItem("kbetz_token");
-}
-
-// 🔐 GET USER
-export async function getUser() {
-  const token = getToken();
-
-  if (!token) return null;
-
+  let data;
   try {
-    const res = await fetch(`${API}/api/auth/me`, {
-      headers: { Authorization: token }
-    });
-
-    return await res.json();
+    data = await res.json();
   } catch {
-    return null;
+    throw new Error("Bad server response");
   }
+
+  if (!res.ok) {
+    throw new Error(data?.error || "Login failed");
+  }
+
+  localStorage.setItem("token", data.token);
+  return data;
 }
