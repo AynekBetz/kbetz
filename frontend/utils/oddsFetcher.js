@@ -1,7 +1,7 @@
 export async function fetchOdds() {
   try {
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/odds`
+      `${"https://kbetz.onrender.com"}/api/odds`
     );
 
     const data = await res.json();

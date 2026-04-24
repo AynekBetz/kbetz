@@ -11,7 +11,7 @@ export const useUser = () => {
 
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/me`,
+          `${"https://kbetz.onrender.com"}/me`,
           {
             headers: {
               Authorization: "Bearer " + token,

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://kbetz.onrender.com";
+const API = "https://kbetz.onrender.com" || "https://kbetz.onrender.com";
 
 export default function Dashboard() {
 

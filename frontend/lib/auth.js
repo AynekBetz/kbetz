@@ -1,4 +1,4 @@
-const API = process.env.NEXT_PUBLIC_API_URL;
+const API = "https://kbetz.onrender.com";
 
 // 🔐 SAVE TOKEN
 export function setToken(token) {
