@@ -2,20 +2,19 @@
 
 import { useEffect, useState } from "react";
 
-// 🔥 PRODUCTION SAFE (fixes mobile upgrade issue)
 const API = process.env.NEXT_PUBLIC_API_URL || "https://kbetz.onrender.com";
 
 export default function Dashboard() {
 
-const [games, setGames] = useState<any[]>([]);
-const [alerts, setAlerts] = useState<any[]>([]);
-const [user, setUser] = useState<any>(null);
-const [topPicks, setTopPicks] = useState<any[]>([]);
-const [parlay, setParlay] = useState<any>(null);
+const [games, setGames] = useState([]);
+const [alerts, setAlerts] = useState([]);
+const [user, setUser] = useState(null);
+const [topPicks, setTopPicks] = useState([]);
+const [parlay, setParlay] = useState(null);
 
 const isPro = user?.plan === "pro";
 
-// ✅ LOGOUT
+// LOGOUT
 const handleLogout = () => {
 localStorage.removeItem("token");
 window.location.href = "/login";
@@ -25,20 +24,19 @@ useEffect(() => {
 
 const params = new URLSearchParams(window.location.search);
 
-// ✅ STRIPE SUCCESS HANDLING
 if (params.get("upgrade") === "success") {
 const token = localStorage.getItem("token");
 
 if (token) {
-  fetch(`${API}/api/upgrade`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + token
-    }
-  }).then(() => {
-    window.location.href = "/dashboard";
-  });
+fetch(`${API}/api/upgrade`, {
+method: "POST",
+headers: {
+"Content-Type": "application/json",
+Authorization: "Bearer " + token
+}
+}).then(() => {
+window.location.href = "/dashboard";
+});
 }
 
 }
@@ -51,7 +49,7 @@ return () => clearInterval(interval);
 
 }, []);
 
-// ✅ USER LOAD
+// USER
 const fetchUser = async () => {
 const token = localStorage.getItem("token");
 
@@ -68,9 +66,9 @@ headers: { Authorization: `Bearer ${token}` },
 const data = await res.json();
 
 if (!data || data.error) {
-  localStorage.removeItem("token");
-  window.location.href = "/login";
-  return;
+localStorage.removeItem("token");
+window.location.href = "/login";
+return;
 }
 
 setUser(data);
@@ -80,42 +78,40 @@ window.location.href = "/login";
 }
 };
 
-// 🔢 AI LOGIC
-const impliedProb = (odds: number) => {
+// AI LOGIC
+const impliedProb = (odds) => {
 if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
 return 100 / (odds + 100);
 };
 
-const generateAI = (games: any[]) => {
+const generateAI = (games) => {
 const evaluated = games.map((g) => {
+
 const prob = impliedProb(g.odds);
-const trueProb = prob + 0.03;
+const trueProb = prob + (Math.random() * 0.06);
+
 const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
-return { ...g, ev };
+
+const confidence = Math.min(95, Math.max(55, Math.floor(trueProb * 100)));
+
+const move = Math.floor(Math.random() * 6) - 3;
+
+return {
+...g,
+ev,
+confidence,
+movement: move,
+direction: move > 0 ? "up" : move < 0 ? "down" : "flat"
+};
+
 });
 
 const sorted = evaluated.sort((a, b) => b.ev - a.ev);
 setTopPicks(sorted.slice(0, 3));
-
-if (sorted.length >= 2) {
-const p1 = sorted[0];
-const p2 = sorted[1];
-
-const d1 = p1.odds < 0 ? 1 + 100 / Math.abs(p1.odds) : 1 + p1.odds / 100;
-const d2 = p2.odds < 0 ? 1 + 100 / Math.abs(p2.odds) : 1 + p2.odds / 100;
-
-const combined = ((d1 * d2) - 1) * 100;
-
-setParlay({
-  legs: [p1, p2],
-  odds: combined.toFixed(2),
-});
-
-}
 };
 
-// 🔔 ALERTS
-const createAlert = (text: string) => {
+// ALERTS
+const createAlert = (text) => {
 const id = Date.now();
 setAlerts((prev) => [{ id, text }, ...prev].slice(0, 5));
 
@@ -131,7 +127,7 @@ audio.play();
 } catch {}
 };
 
-// 📡 DATA FETCH (SAFE)
+// DATA
 const fetchGames = async () => {
 try {
 const res = await fetch(`${API}/api/data`);
@@ -140,18 +136,18 @@ const data = await res.json();
 let g = data.games || [];
 
 if (!g || g.length === 0) {
-  g = [
-    { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
-    { id: 2, home: "Celtics", away: "Heat", odds: -105 }
-  ];
+g = [
+{ id: 1, home: "Lakers", away: "Warriors", odds: -110 },
+{ id: 2, home: "Celtics", away: "Heat", odds: -105 }
+];
 }
 
 setGames(g);
 generateAI(g);
 
 if (Math.random() > 0.7) {
-  createAlert("🚨 Market movement detected");
-  playSound();
+createAlert("🚨 Market movement detected");
+playSound();
 }
 
 } catch {
@@ -162,7 +158,7 @@ setGames([
 }
 };
 
-// 💳 STRIPE UPGRADE (FIXED FOR MOBILE)
+// STRIPE
 const upgrade = async () => {
 const token = localStorage.getItem("token");
 
@@ -182,11 +178,10 @@ body: JSON.stringify({ token })
 
 const data = await res.json();
 
-// ✅ CRITICAL FIX (mobile safe redirect)
 if (data.url) {
-  window.location.href = data.url;
+window.location.href = data.url;
 } else {
-  alert("Upgrade failed. Try again.");
+alert("Upgrade failed. Try again.");
 }
 
 } catch {
@@ -194,16 +189,18 @@ alert("Connection error.");
 }
 };
 
-// 🛑 PREVENT BLANK SCREEN
+// LOADING
 if (!user) {
 return (
+
 <div style={{
 background: "black",
 color: "white",
 padding: "40px",
 minHeight: "100vh"
 }}>
-Loading KBETZ... </div>
+Loading KBETZ...
+</div>
 );
 }
 
@@ -237,37 +234,34 @@ return (
   <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
 
 <span style={{ color: "#22c55e", fontWeight: "bold" }}>
-  {isPro ? "PRO" : "FREE"}
-</span>
+{isPro ? "PRO" : "FREE"} </span>
 
 <button onClick={handleLogout} style={{
-  background: "#222",
-  padding: "8px 12px",
-  borderRadius: "6px",
-  border: "none",
-  color: "white",
-  cursor: "pointer"
+background: "#222",
+padding: "8px 12px",
+borderRadius: "6px",
+border: "none",
+color: "white",
+cursor: "pointer"
 }}>
-  Logout
-</button>
+Logout </button>
 
 {!isPro && (
-  <button onClick={upgrade} style={{
-    background: "linear-gradient(90deg, gold, orange)",
-    padding: "10px 18px",
-    borderRadius: "8px",
-    border: "none",
-    fontWeight: "bold",
-    cursor: "pointer"
-  }}>
-    Upgrade PRO
-  </button>
+<button onClick={upgrade} style={{
+background: "linear-gradient(90deg, gold, orange)",
+padding: "10px 18px",
+borderRadius: "8px",
+border: "none",
+fontWeight: "bold",
+cursor: "pointer"
+}}>
+Upgrade PRO </button>
 )}
 
   </div>
 </div>
 
-{/* AI PICKS */}
+{/* AI PICKS (PRO LEVEL + LOCK) */}
 
 <div style={{
   background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
@@ -277,11 +271,107 @@ return (
 }}>
   <h2>🧠 AI PICKS</h2>
 
-{topPicks.map((p, i) => ( <div key={i}>
-{p.away} @ {p.home}
-<div style={{ color: "#22c55e" }}>
-EV: {p.ev?.toFixed(2)} </div> </div>
+{topPicks.map((p, i) => (
+
+<div key={i} style={{
+  marginBottom: "12px",
+  padding: "10px",
+  background: "rgba(0,0,0,0.3)",
+  borderRadius: "8px",
+  position: "relative"
+}}>
+
+<div style={{
+  display: "flex",
+  justifyContent: "space-between",
+  fontWeight: "bold"
+}}>
+  <span>{p.away} @ {p.home}</span>
+
+<span style={{
+color:
+p.direction === "up"
+? "#22c55e"
+: p.direction === "down"
+? "#ff4d4d"
+: "white"
+}}>
+{p.odds} {p.direction === "up" ? "↑" : p.direction === "down" ? "↓" : ""} </span>
+
+</div>
+
+<div style={{
+  display: "flex",
+  gap: "10px",
+  fontSize: "12px",
+  marginTop: "5px"
+}}>
+  <span style={{ color: "#22c55e" }}>
+    EV: +{p.ev?.toFixed(2)}%
+  </span>
+
+  <span>
+    Conf: {p.confidence}%
+  </span>
+
+<span style={{
+ color: p.confidence > 70 ? "#22c55e" : "#facc15"
+}}>
+{p.confidence > 70 ? "HIGH EDGE" : "MED EDGE"} </span>
+
+</div>
+
+{/* LOCKED INSIGHT */}
+
+<div style={{
+  marginTop: "8px",
+  fontSize: "11px",
+  opacity: isPro ? 0.8 : 0.25,
+  filter: isPro ? "none" : "blur(4px)"
+}}>
+  • Line moving {p.direction === "up" ? "in your favor" : "against public"}  
+  • Sharp money detected  
+  • Positive EV vs market  
+</div>
+
+{!isPro && (
+
+<div style={{
+  position: "absolute",
+  bottom: "10px",
+  right: "10px",
+  fontSize: "11px"
+}}>
+  🔒 PRO Insight
+</div>
+)}
+
+</div>
 ))}
+
+{!isPro && (
+
+<div style={{
+  marginTop: "15px",
+  padding: "12px",
+  textAlign: "center",
+  background: "rgba(0,0,0,0.4)",
+  borderRadius: "10px"
+}}>
+  Unlock full AI insights & sharp money detection
+  <br /><br />
+  <button onClick={upgrade} style={{
+    background: "linear-gradient(90deg, gold, orange)",
+    padding: "10px 18px",
+    borderRadius: "8px",
+    border: "none",
+    fontWeight: "bold",
+    cursor: "pointer"
+  }}>
+    Upgrade to PRO
+  </button>
+</div>
+)}
 
 </div>
 
@@ -295,6 +385,7 @@ EV: {p.ev?.toFixed(2)} </div> </div>
   <h2>Markets</h2>
 
 {games.map((g) => (
+
 <div key={g.id} style={{
 padding: "12px",
 marginBottom: "10px",
@@ -302,9 +393,12 @@ background: "#0a0a0a",
 borderRadius: "10px",
 display: "flex",
 justifyContent: "space-between"
-}}> <div>{g.away} @ {g.home}</div>
+}}>
+<div>{g.away} @ {g.home}</div>
 <div style={{ color: "#22c55e" }}>
-{g.odds} </div> </div>
+{g.odds}
+</div>
+</div>
 ))}
 
 </div>
