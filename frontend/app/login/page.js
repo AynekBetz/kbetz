@@ -20,37 +20,44 @@ setLoading(true);
 setError("");
 
 try {
+  // 🔥 Wake backend (Render cold start fix)
+  await fetch(`${API}/api/health`);
+
   const res = await fetch(`${API}/api/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      password,
+    }),
   });
 
-  if (!res.ok) {
-    throw new Error("Server error");
-  }
-
   let data;
+
   try {
     data = await res.json();
   } catch {
-    throw new Error("Invalid server response");
+    throw new Error("Server response error");
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.error || "Login failed");
   }
 
   if (!data?.token) {
-    throw new Error(data?.error || "Invalid login");
+    throw new Error("No token returned");
   }
 
-  // safe browser-only storage
+  // ✅ Safe browser storage
   if (typeof window !== "undefined") {
     localStorage.setItem("token", data.token);
     window.location.href = "/dashboard";
   }
 } catch (err) {
   console.error("LOGIN ERROR:", err);
-  setError("Connection failed");
+  setError(err.message || "Connection failed");
   setLoading(false);
 }
 
@@ -99,7 +106,7 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
 }
 
 /* =========================
-🎨 STYLES (same look)
+🎨 STYLES (UNCHANGED LOOK)
 ========================= */
 
 const styles = {
