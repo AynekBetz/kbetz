@@ -26,23 +26,21 @@ try {
 if (typeof window !== "undefined") {
 const params = new URLSearchParams(window.location.search);
 
-```
 if (params.get("upgrade") === "success") {
-  const token = localStorage.getItem("token");
+const token = localStorage.getItem("token");
 
-  if (token) {
-    fetch(`${API}/api/upgrade`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + token
-      }
-    }).then(() => {
-      window.location.href = "/dashboard";
-    });
-  }
+if (token) {
+fetch(`${API}/api/upgrade`, {
+method: "POST",
+headers: {
+"Content-Type": "application/json",
+Authorization: "Bearer " + token
 }
-```
+}).then(() => {
+window.location.href = "/dashboard";
+});
+}
+}
 
 }
 } catch (err) {
@@ -219,7 +217,8 @@ return (
   minHeight: "100vh",
   color: "white",
   padding: "20px",
-  fontFamily: "Inter, sans-serif"
+  fontFamily: "Inter, sans-serif",
+  pointerEvents: "auto" // ✅ FIX CLICK BLOCK
 }}>
 
 {/* HEADER */}
@@ -228,7 +227,9 @@ return (
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: "25px"
+  marginBottom: "25px",
+  position: "relative",
+  zIndex: 10
 }}>
   <h1 style={{
     fontSize: "28px",
@@ -250,7 +251,9 @@ padding: "8px 12px",
 borderRadius: "6px",
 border: "none",
 color: "white",
-cursor: "pointer"
+cursor: "pointer",
+position: "relative",
+zIndex: 20
 }}>
 Logout </button>
 
@@ -261,7 +264,9 @@ padding: "10px 18px",
 borderRadius: "8px",
 border: "none",
 fontWeight: "bold",
-cursor: "pointer"
+cursor: "pointer",
+position: "relative",
+zIndex: 20 // ✅ FORCE CLICK
 }}>
 Upgrade PRO </button>
 )}
