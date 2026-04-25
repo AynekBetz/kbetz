@@ -40,10 +40,20 @@ try {
 
   console.log("SIGNUP RESPONSE:", data);
 
+  // 🔥 SMART HANDLING
   if (!res.ok || !data?.success) {
+
+    // 👉 If account already exists → redirect to login
+    if (data?.message?.toLowerCase().includes("exists")) {
+      alert("Account already exists — please log in");
+      window.location.href = "/login";
+      return;
+    }
+
     throw new Error(data?.message || "Signup failed");
   }
 
+  // ✅ SUCCESS
   alert("Account created successfully!");
   window.location.href = "/login";
 
@@ -90,6 +100,14 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
         {loading ? "Creating..." : "Create Account"}
       </button>
     </form>
+
+    {/* 🔥 OPTIONAL NICE UX (keeps your design style) */}
+    <p style={{ marginTop: 12, fontSize: 12, opacity: 0.7 }}>
+      Already have an account?{" "}
+      <a href="/login" style={{ color: "#00ff99" }}>
+        Log in
+      </a>
+    </p>
   </div>
 </div>
 
@@ -98,7 +116,7 @@ return ( <div style={styles.page}> <div style={styles.glow}></div>
 }
 
 /* =========================
-✅ FIXED TYPES (NO ERRORS)
+STYLES (UNCHANGED)
 ========================= */
 
 const styles = {
