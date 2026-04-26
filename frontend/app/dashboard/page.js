@@ -12,11 +12,13 @@ const [user, setUser] = useState(null);
 const [topPicks, setTopPicks] = useState([]);
 const [parlay, setParlay] = useState(null);
 
-const isPro = user?.plan === "pro";
+// 🔥 FIXED PRO DETECTION
+const isPro = user?.isPro === true || user?.plan === "pro";
 
 // LOGOUT
 const handleLogout = () => {
 localStorage.removeItem("token");
+localStorage.removeItem("email");
 window.location.href = "/login";
 };
 
@@ -41,7 +43,6 @@ window.location.href = "/dashboard";
 });
 }
 }
-
 }
 } catch (err) {
 console.log("Upgrade check skipped:", err);
@@ -78,6 +79,11 @@ return;
 }
 
 setUser(data);
+
+// 🔥 SAVE EMAIL FOR STRIPE
+if (data.email) {
+localStorage.setItem("email", data.email);
+}
 
 } catch {
 window.location.href = "/login";
@@ -164,24 +170,24 @@ setGames([
 }
 };
 
-// 🔥 UPGRADE (INLINE SAFE VERSION — GUARANTEED CLICK)
+// 🔥 FIXED UPGRADE CLICK
 const handleUpgradeClick = () => {
-console.log("UPGRADE CLICKED");
+console.log("🔥 UPGRADE CLICKED");
 
-const token = localStorage.getItem("token");
+const email = localStorage.getItem("email");
 
-if (!token) {
-alert("No token — redirecting");
+if (!email) {
+alert("Missing email — login again");
 window.location.href = "/login";
 return;
 }
 
-fetch(`${API}/api/checkout`, {
+fetch(`${API}/api/stripe/checkout`, {
 method: "POST",
 headers: {
 "Content-Type": "application/json"
 },
-body: JSON.stringify({ token })
+body: JSON.stringify({ email }) // ✅ FIXED
 })
 .then(res => res.json())
 .then(data => {
@@ -202,7 +208,6 @@ alert("Connection error");
 // LOADING
 if (!user) {
 return (
-
 <div style={{
 background: "black",
 color: "white",
@@ -217,37 +222,38 @@ Loading KBETZ...
 return (
 
 <div style={{
-  background: "linear-gradient(135deg, #050505, #0a0a0a)",
-  minHeight: "100vh",
-  color: "white",
-  padding: "20px",
-  fontFamily: "Inter, sans-serif",
-  pointerEvents: "auto"
+background: "linear-gradient(135deg, #050505, #0a0a0a)",
+minHeight: "100vh",
+color: "white",
+padding: "20px",
+fontFamily: "Inter, sans-serif"
 }}>
 
 {/* HEADER */}
 
 <div style={{
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: "25px",
-  position: "relative",
-  zIndex: 10
+display: "flex",
+justifyContent: "space-between",
+alignItems: "center",
+marginBottom: "25px",
+position: "relative",
+zIndex: 100
 }}>
-  <h1 style={{
-    fontSize: "28px",
-    background: "linear-gradient(90deg, #a855f7, #22c55e)",
-    WebkitBackgroundClip: "text",
-    color: "transparent"
-  }}>
-    KBETZ TERMINAL
-  </h1>
 
-  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+<h1 style={{
+fontSize: "28px",
+background: "linear-gradient(90deg, #a855f7, #22c55e)",
+WebkitBackgroundClip: "text",
+color: "transparent"
+}}>
+KBETZ TERMINAL
+</h1>
+
+<div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
 
 <span style={{ color: "#22c55e", fontWeight: "bold" }}>
-{isPro ? "PRO" : "FREE"} </span>
+{isPro ? "PRO" : "FREE"} 
+</span>
 
 <button onClick={handleLogout} style={{
 background: "#222",
@@ -256,13 +262,14 @@ borderRadius: "6px",
 border: "none",
 color: "white",
 cursor: "pointer",
-position: "relative",
 zIndex: 50
 }}>
-Logout </button>
+Logout 
+</button>
 
-{/* 🔥 WORKING PRO BUTTON */}
+{/* 🔥 FIXED CLICKABLE BUTTON */}
 {!isPro && (
+<div style={{ position: "relative", zIndex: 99999 }}>
 <button
 onClick={handleUpgradeClick}
 style={{
@@ -272,16 +279,15 @@ borderRadius: "8px",
 border: "none",
 fontWeight: "bold",
 cursor: "pointer",
-position: "relative",
-zIndex: 9999
+zIndex: 99999,
+position: "relative"
 }}
-
 >
-
-Upgrade PRO </button>
+Upgrade PRO
+</button>
+</div>
 )}
 
-{/* 🔥 SIGNUP ACCESS (FROM DASHBOARD TOO) */}
 <button
 onClick={() => window.location.href = "/signup"}
 style={{
@@ -290,44 +296,40 @@ padding: "8px 12px",
 borderRadius: "6px",
 border: "1px solid #333",
 color: "#00ff99",
-cursor: "pointer",
-position: "relative",
-zIndex: 50
+cursor: "pointer"
 }}
-
 >
+Sign Up
+</button>
 
-Sign Up </button>
-
-  </div>
+</div>
 </div>
 
 {/* AI PICKS */}
 
 <div style={{
-  background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
-  padding: "20px",
-  borderRadius: "16px",
-  marginBottom: "20px"
+background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
+padding: "20px",
+borderRadius: "16px",
+marginBottom: "20px"
 }}>
-  <h2>🧠 AI PICKS</h2>
+<h2>🧠 AI PICKS</h2>
 
 {topPicks.map((p, i) => (
 
 <div key={i} style={{
-  marginBottom: "12px",
-  padding: "10px",
-  background: "rgba(0,0,0,0.3)",
-  borderRadius: "8px",
-  position: "relative"
+marginBottom: "12px",
+padding: "10px",
+background: "rgba(0,0,0,0.3)",
+borderRadius: "8px"
 }}>
 
 <div style={{
-  display: "flex",
-  justifyContent: "space-between",
-  fontWeight: "bold"
+display: "flex",
+justifyContent: "space-between",
+fontWeight: "bold"
 }}>
-  <span>{p.away} @ {p.home}</span>
+<span>{p.away} @ {p.home}</span>
 
 <span style={{
 color:
@@ -337,82 +339,27 @@ p.direction === "up"
 ? "#ff4d4d"
 : "white"
 }}>
-{p.odds} {p.direction === "up" ? "↑" : p.direction === "down" ? "↓" : ""} </span>
+{p.odds}
+</span>
 
 </div>
 
 <div style={{
-  display: "flex",
-  gap: "10px",
-  fontSize: "12px",
-  marginTop: "5px"
-}}>
-  <span style={{ color: "#22c55e" }}>
-    EV: +{p.ev?.toFixed(2)}%
-  </span>
-
-  <span>
-    Conf: {p.confidence}%
-  </span>
-
-<span style={{
-color: p.confidence > 70 ? "#22c55e" : "#facc15"
-}}>
-{p.confidence > 70 ? "HIGH EDGE" : "MED EDGE"} </span>
-
-</div>
-
-<div style={{
-  marginTop: "8px",
-  fontSize: "11px",
-  opacity: isPro ? 0.8 : 0.25,
-  filter: isPro ? "none" : "blur(4px)"
-}}>
-  • Line moving {p.direction === "up" ? "in your favor" : "against public"}  
-  • Sharp money detected  
-  • Positive EV vs market  
-</div>
-
-{!isPro && (
-
-<div style={{
-  position: "absolute",
-  bottom: "10px",
-  right: "10px",
-  fontSize: "11px"
-}}>
-  🔒 PRO Insight
-</div>
-)}
-
-</div>
-))}
-
-</div>
-
-{/* MARKETS */}
-
-<div style={{
-  background: "rgba(255,255,255,0.05)",
-  padding: "15px",
-  borderRadius: "12px"
-}}>
-  <h2>Markets</h2>
-
-{games.map((g) => (
-
-<div key={g.id} style={{
-padding: "12px",
-marginBottom: "10px",
-background: "#0a0a0a",
-borderRadius: "10px",
 display: "flex",
-justifyContent: "space-between"
+gap: "10px",
+fontSize: "12px",
+marginTop: "5px"
 }}>
-<div>{g.away} @ {g.home}</div>
-<div style={{ color: "#22c55e" }}>
-{g.odds}
+<span style={{ color: "#22c55e" }}>
+EV: +{p.ev?.toFixed(2)}%
+</span>
+
+<span>
+Conf: {p.confidence}%
+</span>
+
 </div>
+
 </div>
 ))}
 
