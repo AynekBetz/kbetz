@@ -63,7 +63,7 @@ async function connectDB() {
 }
 
 /* =========================
-✅ MODEL (UPDATED)
+✅ MODEL
 ========================= */
 const User =
   mongoose.models.User ||
@@ -72,8 +72,8 @@ const User =
     new mongoose.Schema({
       email: String,
       password: String,
-      plan: { type: String, default: "free" }, // keep old
-      isPro: { type: Boolean, default: false } // 🔥 NEW
+      plan: { type: String, default: "free" },
+      isPro: { type: Boolean, default: false }
     })
   );
 
@@ -96,7 +96,6 @@ app.post("/api/signup", async (req, res) => {
     }
 
     const existing = await User.findOne({ email });
-
     if (existing) {
       return res.json({ success: false, message: "User exists" });
     }
@@ -109,8 +108,6 @@ app.post("/api/signup", async (req, res) => {
       plan: "free",
       isPro: false
     });
-
-    console.log("✅ USER CREATED:", email);
 
     return res.json({ success: true });
 
@@ -128,7 +125,6 @@ app.post("/api/login", async (req, res) => {
     const { email, password } = req.body || {};
 
     const user = await User.findOne({ email });
-
     if (!user) return res.status(401).json({ error: "Invalid login" });
 
     const valid = await bcrypt.compare(password, user.password);
@@ -139,8 +135,6 @@ app.post("/api/login", async (req, res) => {
       process.env.JWT_SECRET || "secret123",
       { expiresIn: "7d" }
     );
-
-    console.log("✅ LOGIN SUCCESS:", email);
 
     return res.json({
       success: true,
@@ -158,7 +152,7 @@ app.post("/api/login", async (req, res) => {
 });
 
 /* =========================
-👤 ME (UPDATED)
+👤 ME
 ========================= */
 app.get("/api/me", async (req, res) => {
   try {
@@ -166,11 +160,7 @@ app.get("/api/me", async (req, res) => {
     if (!auth) return res.status(401).json({ error: "No token" });
 
     const token = auth.split(" ")[1];
-
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "secret123"
-    );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret123");
 
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -186,7 +176,7 @@ app.get("/api/me", async (req, res) => {
 });
 
 /* =========================
-📡 DATA (SAFE)
+📡 DATA
 ========================= */
 app.get("/api/data", async (req, res) => {
   try {
@@ -200,8 +190,6 @@ app.get("/api/data", async (req, res) => {
 
     const data = await response.json();
 
-    if (!Array.isArray(data)) throw new Error("Invalid API data");
-
     const games = data.slice(0, 5).map((g, i) => ({
       id: i,
       home: g.home_team,
@@ -212,9 +200,7 @@ app.get("/api/data", async (req, res) => {
 
     res.json({ source: "real", games });
 
-  } catch (err) {
-    console.log("DATA ERROR:", err.message);
-
+  } catch {
     res.json({
       source: "fallback",
       games: [
@@ -226,34 +212,44 @@ app.get("/api/data", async (req, res) => {
 });
 
 /* =========================
-💳 STRIPE SETUP
+💳 STRIPE
 ========================= */
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 /* =========================
-💳 CHECKOUT (UPDATED)
+💳 CHECKOUT (FIXED)
 ========================= */
+const createCheckoutSession = async (email) => {
+  return await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    mode: "subscription",
+    line_items: [
+      { price: process.env.STRIPE_PRICE_ID, quantity: 1 }
+    ],
+    customer_email: email,
+    success_url: "https://kbetz.vercel.app/dashboard?upgrade=success",
+    cancel_url: "https://kbetz.vercel.app/dashboard"
+  });
+};
+
+// ORIGINAL ROUTE (UNCHANGED)
 app.post("/api/stripe/checkout", async (req, res) => {
   try {
     const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "Email required" });
-    }
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "subscription",
-      line_items: [
-        { price: process.env.STRIPE_PRICE_ID, quantity: 1 }
-      ],
-      customer_email: email,
-      success_url: "https://kbetz.vercel.app/dashboard?upgrade=success",
-      cancel_url: "https://kbetz.vercel.app/dashboard"
-    });
-
+    const session = await createCheckoutSession(email);
     res.json({ url: session.url });
+  } catch (err) {
+    console.log("CHECKOUT ERROR:", err.message);
+    res.status(500).json({ error: "Checkout failed" });
+  }
+});
 
+// 🔥 NEW ROUTE (FIXES YOUR FRONTEND)
+app.post("/api/checkout", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const session = await createCheckoutSession(email);
+    res.json({ url: session.url });
   } catch (err) {
     console.log("CHECKOUT ERROR:", err.message);
     res.status(500).json({ error: "Checkout failed" });
@@ -261,7 +257,7 @@ app.post("/api/stripe/checkout", async (req, res) => {
 });
 
 /* =========================
-🔥 STRIPE WEBHOOK (PRO UNLOCK)
+🔥 WEBHOOK
 ========================= */
 app.post("/api/stripe/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
@@ -274,17 +270,13 @@ app.post("/api/stripe/webhook", async (req, res) => {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
-  } catch (err) {
-    console.log("❌ Webhook signature failed");
+  } catch {
     return res.sendStatus(400);
   }
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-
     const email = session.customer_email;
-
-    console.log("💰 PAYMENT SUCCESS:", email);
 
     const user = await User.findOne({ email });
 
@@ -292,8 +284,6 @@ app.post("/api/stripe/webhook", async (req, res) => {
       user.isPro = true;
       user.plan = "pro";
       await user.save();
-
-      console.log("✅ USER UPGRADED TO PRO");
     }
   }
 
