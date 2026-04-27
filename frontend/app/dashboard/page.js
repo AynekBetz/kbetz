@@ -12,7 +12,7 @@ const [user, setUser] = useState(null);
 const [topPicks, setTopPicks] = useState([]);
 const [parlay, setParlay] = useState(null);
 
-// ✅ FIXED PRO DETECTION (no breaking change)
+// 🔥 FIXED PRO DETECTION
 const isPro = user?.isPro === true || user?.plan === "pro";
 
 // LOGOUT
@@ -80,7 +80,7 @@ return;
 
 setUser(data);
 
-// ✅ SAVE EMAIL FOR STRIPE (needed)
+// SAVE EMAIL FOR STRIPE
 if (data.email) {
 localStorage.setItem("email", data.email);
 }
@@ -170,7 +170,7 @@ setGames([
 }
 };
 
-// 🔥 FIXED UPGRADE CLICK (correct route + payload)
+// 🔥 ONLY CHANGE IS HERE (ROUTE FIX)
 const handleUpgradeClick = () => {
 console.log("🔥 UPGRADE CLICKED");
 
@@ -182,7 +182,7 @@ window.location.href = "/login";
 return;
 }
 
-fetch(`${API}/api/stripe/checkout`, {
+fetch(`${API}/api/checkout`, { // ✅ FIXED
 method: "POST",
 headers: {
 "Content-Type": "application/json"
@@ -191,13 +191,18 @@ body: JSON.stringify({ email })
 })
 .then(res => res.json())
 .then(data => {
+console.log("CHECKOUT RESPONSE:", data);
+
 if (data.url) {
 window.location.href = data.url;
 } else {
 alert("Upgrade failed");
 }
 })
-.catch(() => alert("Connection error"));
+.catch(err => {
+console.error("CHECKOUT ERROR:", err);
+alert("Connection error");
+});
 };
 
 // LOADING
@@ -259,7 +264,6 @@ cursor: "pointer"
 Logout 
 </button>
 
-{/* 🔥 CLICK FIX APPLIED HERE */}
 {!isPro && (
 <button
 onClick={handleUpgradeClick}
@@ -269,9 +273,7 @@ padding: "10px 18px",
 borderRadius: "8px",
 border: "none",
 fontWeight: "bold",
-cursor: "pointer",
-position: "relative",
-zIndex: 10
+cursor: "pointer"
 }}
 >
 Upgrade PRO
@@ -301,8 +303,7 @@ Sign Up
 background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
 padding: "20px",
 borderRadius: "16px",
-marginBottom: "20px",
-pointerEvents: "none" // 🔥 FIX: prevents overlay blocking
+marginBottom: "20px"
 }}>
 <h2>🧠 AI PICKS</h2>
 
@@ -312,8 +313,7 @@ pointerEvents: "none" // 🔥 FIX: prevents overlay blocking
 marginBottom: "12px",
 padding: "10px",
 background: "rgba(0,0,0,0.3)",
-borderRadius: "8px",
-pointerEvents: "auto" // 🔥 re-enable click inside
+borderRadius: "8px"
 }}>
 
 <div style={{
