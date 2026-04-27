@@ -12,7 +12,7 @@ const [user, setUser] = useState(null);
 const [topPicks, setTopPicks] = useState([]);
 const [parlay, setParlay] = useState(null);
 
-// 🔥 FIXED PRO DETECTION
+// ✅ FIXED PRO DETECTION (no breaking change)
 const isPro = user?.isPro === true || user?.plan === "pro";
 
 // LOGOUT
@@ -80,7 +80,7 @@ return;
 
 setUser(data);
 
-// 🔥 SAVE EMAIL FOR STRIPE
+// ✅ SAVE EMAIL FOR STRIPE (needed)
 if (data.email) {
 localStorage.setItem("email", data.email);
 }
@@ -170,7 +170,7 @@ setGames([
 }
 };
 
-// 🔥 FIXED UPGRADE CLICK
+// 🔥 FIXED UPGRADE CLICK (correct route + payload)
 const handleUpgradeClick = () => {
 console.log("🔥 UPGRADE CLICKED");
 
@@ -187,22 +187,17 @@ method: "POST",
 headers: {
 "Content-Type": "application/json"
 },
-body: JSON.stringify({ email }) // ✅ FIXED
+body: JSON.stringify({ email })
 })
 .then(res => res.json())
 .then(data => {
-console.log("CHECKOUT RESPONSE:", data);
-
 if (data.url) {
 window.location.href = data.url;
 } else {
 alert("Upgrade failed");
 }
 })
-.catch(err => {
-console.error("CHECKOUT ERROR:", err);
-alert("Connection error");
-});
+.catch(() => alert("Connection error"));
 };
 
 // LOADING
@@ -235,9 +230,7 @@ fontFamily: "Inter, sans-serif"
 display: "flex",
 justifyContent: "space-between",
 alignItems: "center",
-marginBottom: "25px",
-position: "relative",
-zIndex: 100
+marginBottom: "25px"
 }}>
 
 <h1 style={{
@@ -261,15 +254,13 @@ padding: "8px 12px",
 borderRadius: "6px",
 border: "none",
 color: "white",
-cursor: "pointer",
-zIndex: 50
+cursor: "pointer"
 }}>
 Logout 
 </button>
 
-{/* 🔥 FIXED CLICKABLE BUTTON */}
+{/* 🔥 CLICK FIX APPLIED HERE */}
 {!isPro && (
-<div style={{ position: "relative", zIndex: 99999 }}>
 <button
 onClick={handleUpgradeClick}
 style={{
@@ -279,13 +270,12 @@ borderRadius: "8px",
 border: "none",
 fontWeight: "bold",
 cursor: "pointer",
-zIndex: 99999,
-position: "relative"
+position: "relative",
+zIndex: 10
 }}
 >
 Upgrade PRO
 </button>
-</div>
 )}
 
 <button
@@ -311,7 +301,8 @@ Sign Up
 background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
 padding: "20px",
 borderRadius: "16px",
-marginBottom: "20px"
+marginBottom: "20px",
+pointerEvents: "none" // 🔥 FIX: prevents overlay blocking
 }}>
 <h2>🧠 AI PICKS</h2>
 
@@ -321,7 +312,8 @@ marginBottom: "20px"
 marginBottom: "12px",
 padding: "10px",
 background: "rgba(0,0,0,0.3)",
-borderRadius: "8px"
+borderRadius: "8px",
+pointerEvents: "auto" // 🔥 re-enable click inside
 }}>
 
 <div style={{
