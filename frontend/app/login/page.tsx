@@ -10,7 +10,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e: any) => {
     e.preventDefault();
     if (loading) return;
 
@@ -18,7 +18,6 @@ export default function Login() {
     setError("");
 
     try {
-      // Wake backend
       await fetch(`${API}/api/health`);
 
       const res = await fetch(`${API}/api/login`, {
@@ -45,10 +44,9 @@ export default function Login() {
       }
 
       localStorage.setItem("token", data.token);
-
       window.location.href = "/dashboard";
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("LOGIN ERROR:", err);
       setError(err.message || "Connection failed");
       setLoading(false);
@@ -101,18 +99,18 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     color: "white",
-    position: "relative",
+    position: "relative" as const, // ✅ FIX
     overflow: "hidden",
     fontFamily: "Inter, sans-serif",
   },
 
   glow: {
-    position: "absolute",
+    position: "absolute" as const, // ✅ FIX
     width: "700px",
     height: "700px",
     background: "radial-gradient(circle, rgba(0,255,150,0.25), transparent)",
     filter: "blur(140px)",
-    pointerEvents: "none",
+    pointerEvents: "none" as const, // ✅ FIX
   },
 
   card: {
@@ -121,14 +119,14 @@ const styles = {
     padding: "40px",
     borderRadius: "16px",
     border: "1px solid rgba(255,255,255,0.1)",
-    textAlign: "center",
+    textAlign: "center" as const,
     width: "340px",
     boxShadow: "0 0 50px rgba(0,255,150,0.2)",
-    position: "relative",
+    position: "relative" as const, // ✅ FIX
   },
 
   live: {
-    position: "absolute",
+    position: "absolute" as const, // ✅ FIX
     top: "10px",
     right: "15px",
     fontSize: "12px",
@@ -150,7 +148,7 @@ const styles = {
 
   form: {
     display: "flex",
-    flexDirection: "column",
+    flexDirection: "column" as const, // ✅ FIX
     gap: "12px",
   },
 
