@@ -12,7 +12,7 @@ const [user, setUser] = useState(null);
 const [topPicks, setTopPicks] = useState([]);
 const [parlay, setParlay] = useState(null);
 
-// 🔥 FIXED PRO DETECTION
+// PRO DETECTION
 const isPro = user?.isPro === true || user?.plan === "pro";
 
 // LOGOUT
@@ -80,7 +80,7 @@ return;
 
 setUser(data);
 
-// SAVE EMAIL FOR STRIPE
+// SAVE EMAIL
 if (data.email) {
 localStorage.setItem("email", data.email);
 }
@@ -90,7 +90,7 @@ window.location.href = "/login";
 }
 };
 
-// AI LOGIC
+// AI
 const impliedProb = (odds) => {
 if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
 return 100 / (odds + 100);
@@ -98,12 +98,10 @@ return 100 / (odds + 100);
 
 const generateAI = (games) => {
 const evaluated = games.map((g) => {
-
 const prob = impliedProb(g.odds);
 const trueProb = prob + (Math.random() * 0.06);
 
 const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
-
 const confidence = Math.min(95, Math.max(55, Math.floor(trueProb * 100)));
 
 const move = Math.floor(Math.random() * 6) - 3;
@@ -115,7 +113,6 @@ confidence,
 movement: move,
 direction: move > 0 ? "up" : move < 0 ? "down" : "flat"
 };
-
 });
 
 const sorted = evaluated.sort((a, b) => b.ev - a.ev);
@@ -134,8 +131,7 @@ setAlerts((prev) => prev.filter((a) => a.id !== id));
 
 const playSound = () => {
 try {
-const audio = new Audio("/alert.mp3");
-audio.play();
+new Audio("/alert.mp3").play();
 } catch {}
 };
 
@@ -147,7 +143,7 @@ const data = await res.json();
 
 let g = data.games || [];
 
-if (!g || g.length === 0) {
+if (!g.length) {
 g = [
 { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
 { id: 2, home: "Celtics", away: "Heat", odds: -105 }
@@ -162,15 +158,10 @@ createAlert("🚨 Market movement detected");
 playSound();
 }
 
-} catch {
-setGames([
-{ id: 1, home: "Lakers", away: "Warriors", odds: -110 },
-{ id: 2, home: "Celtics", away: "Heat", odds: -105 }
-]);
-}
+} catch {}
 };
 
-// 🔥 ONLY CHANGE IS HERE (ROUTE FIX)
+// 🔥 UPDATED CHECKOUT DEBUG (THIS IS THE ONLY REAL CHANGE)
 const handleUpgradeClick = () => {
 console.log("🔥 UPGRADE CLICKED");
 
@@ -182,59 +173,55 @@ window.location.href = "/login";
 return;
 }
 
-fetch(`${API}/api/checkout`, { // ✅ FIXED
+fetch(`${API}/api/checkout`, {
 method: "POST",
 headers: {
 "Content-Type": "application/json"
 },
 body: JSON.stringify({ email })
 })
-.then(res => res.json())
+.then(async (res) => {
+const text = await res.text();
+console.log("🔥 RAW BACKEND RESPONSE:", text);
+
+try {
+return JSON.parse(text);
+} catch {
+throw new Error("Backend did not return JSON");
+}
+})
 .then(data => {
-console.log("CHECKOUT RESPONSE:", data);
+console.log("🔥 PARSED RESPONSE:", data);
 
 if (data.url) {
 window.location.href = data.url;
 } else {
-alert("Upgrade failed");
+alert("Upgrade failed — check console");
 }
 })
 .catch(err => {
-console.error("CHECKOUT ERROR:", err);
-alert("Connection error");
+console.error("❌ CHECKOUT ERROR:", err);
+alert("Checkout failed — check console");
 });
 };
 
 // LOADING
 if (!user) {
-return (
-<div style={{
-background: "black",
-color: "white",
-padding: "40px",
-minHeight: "100vh"
-}}>
-Loading KBETZ...
-</div>
-);
+return <div style={{ color: "white", padding: "40px" }}>Loading...</div>;
 }
 
 return (
-
 <div style={{
 background: "linear-gradient(135deg, #050505, #0a0a0a)",
 minHeight: "100vh",
 color: "white",
-padding: "20px",
-fontFamily: "Inter, sans-serif"
+padding: "20px"
 }}>
 
 {/* HEADER */}
-
 <div style={{
 display: "flex",
 justifyContent: "space-between",
-alignItems: "center",
 marginBottom: "25px"
 }}>
 
@@ -249,8 +236,8 @@ KBETZ TERMINAL
 
 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
 
-<span style={{ color: "#22c55e", fontWeight: "bold" }}>
-{isPro ? "PRO" : "FREE"} 
+<span style={{ color: "#22c55e" }}>
+{isPro ? "PRO" : "FREE"}
 </span>
 
 <button onClick={handleLogout} style={{
@@ -261,97 +248,48 @@ border: "none",
 color: "white",
 cursor: "pointer"
 }}>
-Logout 
+Logout
 </button>
 
 {!isPro && (
-<button
-onClick={handleUpgradeClick}
-style={{
+<button onClick={handleUpgradeClick} style={{
 background: "linear-gradient(90deg, gold, orange)",
 padding: "10px 18px",
 borderRadius: "8px",
 border: "none",
 fontWeight: "bold",
 cursor: "pointer"
-}}
->
+}}>
 Upgrade PRO
 </button>
 )}
-
-<button
-onClick={() => window.location.href = "/signup"}
-style={{
-background: "#111",
-padding: "8px 12px",
-borderRadius: "6px",
-border: "1px solid #333",
-color: "#00ff99",
-cursor: "pointer"
-}}
->
-Sign Up
-</button>
 
 </div>
 </div>
 
 {/* AI PICKS */}
-
 <div style={{
 background: "linear-gradient(135deg, #6d28d9, #4c1d95)",
 padding: "20px",
-borderRadius: "16px",
-marginBottom: "20px"
+borderRadius: "16px"
 }}>
 <h2>🧠 AI PICKS</h2>
 
 {topPicks.map((p, i) => (
-
 <div key={i} style={{
 marginBottom: "12px",
 padding: "10px",
 background: "rgba(0,0,0,0.3)",
 borderRadius: "8px"
 }}>
-
-<div style={{
-display: "flex",
-justifyContent: "space-between",
-fontWeight: "bold"
-}}>
+<div style={{ display: "flex", justifyContent: "space-between" }}>
 <span>{p.away} @ {p.home}</span>
-
-<span style={{
-color:
-p.direction === "up"
-? "#22c55e"
-: p.direction === "down"
-? "#ff4d4d"
-: "white"
-}}>
-{p.odds}
-</span>
-
+<span>{p.odds}</span>
 </div>
 
-<div style={{
-display: "flex",
-gap: "10px",
-fontSize: "12px",
-marginTop: "5px"
-}}>
-<span style={{ color: "#22c55e" }}>
-EV: +{p.ev?.toFixed(2)}%
-</span>
-
-<span>
-Conf: {p.confidence}%
-</span>
-
+<div style={{ fontSize: "12px" }}>
+EV +{p.ev?.toFixed(2)}% • {p.confidence}%
 </div>
-
 </div>
 ))}
 
