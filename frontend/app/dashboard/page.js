@@ -46,7 +46,7 @@ console.error("USER ERROR:", err);
 };
 
 /* =========================
-REAL EV MODEL (SAFE)
+REAL EV MODEL (NO RANDOM)
 ========================= */
 const impliedProb = (odds) => {
 if (!odds) return 0;
@@ -55,8 +55,7 @@ return 100 / (odds + 100);
 };
 
 const fairProb = (odds) => {
-const p = impliedProb(odds);
-return p * 0.97;
+return impliedProb(odds) * 0.97;
 };
 
 const calcEV = (odds) => {
@@ -70,7 +69,6 @@ const decimal = odds > 0
 
 const ev = ((p * decimal) - 1) * 100;
 
-// 🔥 prevent NaN crash
 return isNaN(ev) ? 0 : ev;
 };
 
@@ -102,11 +100,10 @@ setAlerts(prev => [
 };
 
 /* =========================
-DATA (SAFE)
+DATA
 ========================= */
 const fetchGames = async () => {
 try {
-
 const res = await fetch(`${API}/api/data`);
 const data = await res.json();
 
@@ -135,8 +132,6 @@ signal
 };
 });
 
-detectMovement(data.games);
-
 setGames(enriched);
 generateAI(enriched);
 
@@ -151,24 +146,6 @@ return updated;
 } catch (err) {
 console.error("FETCH ERROR:", err);
 }
-};
-
-/* =========================
-ODDS MOVEMENT
-========================= */
-const detectMovement = (games) => {
-const now = Date.now();
-
-games.forEach(g => {
-const prev = lastOdds[g.id];
-
-if (prev && prev !== g.odds) {
-if (now - lastSoundTime > 2000) {
-try { new Audio("/alert.mp3").play(); } catch {}
-setLastSoundTime(now);
-}
-}
-});
 };
 
 /* =========================
@@ -239,6 +216,7 @@ return (
 
 <div style={styles.page}>
 
+{/* ALERTS */}
 <div style={styles.alertBox}>
 {alerts.map(a => (
 <div key={a.id} style={styles.alert}>
@@ -249,6 +227,7 @@ return (
 
 <div style={{flex:1}}>
 
+{/* HEADER */}
 <div style={styles.header}>
 <h1 style={styles.logo}>KBETZ ELITE</h1>
 
@@ -263,6 +242,7 @@ Upgrade
 </div>
 </div>
 
+{/* AI PARLAY */}
 <div style={styles.card}>
 <h2>🧠 AI PARLAY</h2>
 
@@ -278,6 +258,7 @@ Add AI Parlay
 </button>
 </div>
 
+{/* LIVE MARKETS */}
 <div style={styles.card}>
 <h2>📈 LIVE MARKETS</h2>
 
@@ -324,6 +305,7 @@ signal === "STRONG BUY"
 
 </div>
 
+{/* BET SLIP */}
 <div style={styles.slip}>
 <h3>🧾 Bet Slip</h3>
 
@@ -359,6 +341,83 @@ Place Bet
 }
 
 /* =========================
-STYLES (UNCHANGED)
+STYLES
 ========================= */
-const styles = { /* keep your original styles exactly */ };
+const styles = {
+
+page:{ display:"flex", background:"#050505", color:"white", minHeight:"100vh", padding:"20px", fontFamily:"Inter" },
+
+header:{ display:"flex", justifyContent:"space-between", marginBottom:"20px" },
+
+logo:{ fontSize:"28px", background:"linear-gradient(90deg,#00ff99,#00cc66)", WebkitBackgroundClip:"text", color:"transparent" },
+
+right:{ display:"flex", gap:"10px" },
+
+card:{
+background:"linear-gradient(135deg,#1a1a1a,#0a0a0a)",
+padding:"20px",
+borderRadius:"14px",
+border:"1px solid rgba(0,255,100,0.1)",
+boxShadow:"0 0 20px rgba(0,255,100,0.1)",
+marginBottom:"20px"
+},
+
+marketRow:{
+display:"flex",
+justifyContent:"space-between",
+padding:"10px",
+borderBottom:"1px solid #222"
+},
+
+oddsBtn:{
+background:"#111",
+border:"1px solid #333",
+padding:"6px 10px",
+cursor:"pointer"
+},
+
+slip:{
+width:"320px",
+background:"linear-gradient(180deg,#0a0a0a,#050505)",
+padding:"15px",
+borderRadius:"12px",
+boxShadow:"0 0 25px rgba(0,255,100,0.15)",
+position:"sticky",
+top:"20px"
+},
+
+slipItem:{ display:"flex", justifyContent:"space-between" },
+
+input:{ marginTop:"10px", width:"100%", background:"#111", color:"white" },
+
+placeBtn:{ marginTop:"10px", background:"#00ff99", border:"none", padding:"10px", width:"100%" },
+
+btnPro:{ background:"gold", border:"none", padding:"8px 12px" },
+
+aiBtn:{
+marginTop:"10px",
+background:"linear-gradient(90deg,#00ff99,#00cc66)",
+border:"none",
+padding:"10px",
+borderRadius:"8px",
+fontWeight:"bold",
+cursor:"pointer"
+},
+
+alertBox:{
+position:"fixed",
+top:"20px",
+right:"20px",
+zIndex:100
+},
+
+alert:{
+background:"#111",
+padding:"10px",
+marginBottom:"8px",
+borderRadius:"6px",
+color:"#00ff99",
+boxShadow:"0 0 10px rgba(0,255,100,0.3)"
+}
+
+};
