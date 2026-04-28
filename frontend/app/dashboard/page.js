@@ -14,8 +14,6 @@ const [stake, setStake] = useState(100);
 const [lastOdds, setLastOdds] = useState({});
 const [aiParlay, setAiParlay] = useState([]);
 const [lastSoundTime, setLastSoundTime] = useState(0);
-
-// 🔥 NEW
 const [alerts, setAlerts] = useState([]);
 
 const isPro = user?.isPro === true || user?.plan === "pro";
@@ -69,7 +67,6 @@ ALERT SYSTEM
 const triggerAlert = (msg) => {
 const now = Date.now();
 
-// sound cooldown
 if (now - lastSoundTime > 2000) {
 try { new Audio("/alert.mp3").play(); } catch {}
 setLastSoundTime(now);
@@ -89,7 +86,6 @@ const res = await fetch(`${API}/api/data`);
 const data = await res.json();
 const g = data.games || [];
 
-// 🔥 NEW ENRICHMENT
 const enriched = g.map(game => {
 
 const ev = calcEV(game.odds);
@@ -100,7 +96,6 @@ if (prev) move = game.odds - prev;
 
 const signal = getSignal(move, ev);
 
-// 🔥 TRIGGER ALERT
 if (signal === "STRONG BUY") {
 triggerAlert(`🔥 Sharp action on ${game.away}`);
 }
@@ -117,7 +112,6 @@ detectMovement(g);
 setGames(enriched);
 generateAI(enriched);
 
-// update odds memory
 setLastOdds(prev => {
 const updated = {...prev};
 g.forEach(game => updated[game.id] = game.odds);
@@ -126,7 +120,7 @@ return updated;
 };
 
 /* =========================
-ODDS MOVEMENT SOUND
+ODDS MOVEMENT
 ========================= */
 const detectMovement = (games) => {
 const now = Date.now();
@@ -182,9 +176,6 @@ const payout = (stakeAmount = 100) => {
 return (stakeAmount * parlayOdds()).toFixed(2);
 };
 
-/* =========================
-AI PARLAY
-========================= */
 const addAiParlay = () => {
 setBetSlip(aiParlay);
 };
@@ -286,15 +277,25 @@ transition: "0.2s"
 
 {/* EV */}
 <span style={{
-color: g.ev > 0 ? "#00ff99" : "#ff4d4d",
-fontSize:"12px"
+fontWeight:"bold",
+fontSize:"14px",
+color: g.ev > 3 ? "#00ff99" : g.ev > 0 ? "#22c55e" : "#ff4d4d"
 }}>
-{g.ev?.toFixed(2)}%
+{g.ev > 0 ? "+" : ""}{g.ev.toFixed(2)}%
 </span>
 
 {/* SIGNAL */}
 <span style={{
-fontSize:"10px",
+fontSize:"11px",
+fontWeight:"bold",
+padding:"4px 8px",
+borderRadius:"6px",
+background:
+g.signal === "STRONG BUY"
+? "rgba(0,255,100,0.15)"
+: g.signal === "FADE"
+? "rgba(255,50,50,0.15)"
+: "rgba(255,255,255,0.05)",
 color:
 g.signal === "STRONG BUY"
 ? "#00ff99"
@@ -363,13 +364,28 @@ logo:{ fontSize:"28px", background:"linear-gradient(90deg,#00ff99,#00cc66)", Web
 
 right:{ display:"flex", gap:"10px" },
 
-card:{ background:"rgba(255,255,255,0.05)", padding:"15px", borderRadius:"12px", marginBottom:"20px" },
+card:{
+background:"linear-gradient(135deg,#1a1a1a,#0a0a0a)",
+padding:"20px",
+borderRadius:"14px",
+border:"1px solid rgba(0,255,100,0.1)",
+boxShadow:"0 0 20px rgba(0,255,100,0.1)",
+marginBottom:"20px"
+},
 
 marketRow:{ display:"flex", justifyContent:"space-between", padding:"10px", borderBottom:"1px solid #222" },
 
 oddsBtn:{ background:"#111", border:"1px solid #333", padding:"6px 10px", cursor:"pointer" },
 
-slip:{ width:"300px", background:"#0a0a0a", padding:"15px", borderRadius:"12px" },
+slip:{
+width:"320px",
+background:"linear-gradient(180deg,#0a0a0a,#050505)",
+padding:"15px",
+borderRadius:"12px",
+boxShadow:"0 0 25px rgba(0,255,100,0.15)",
+position:"sticky",
+top:"20px"
+},
 
 slipItem:{ display:"flex", justifyContent:"space-between" },
 
@@ -379,7 +395,15 @@ placeBtn:{ marginTop:"10px", background:"#00ff99", border:"none", padding:"10px"
 
 btnPro:{ background:"gold", border:"none", padding:"8px 12px" },
 
-aiBtn:{ marginTop:"10px", background:"#00ff99", border:"none", padding:"8px" },
+aiBtn:{
+marginTop:"10px",
+background:"linear-gradient(90deg,#00ff99,#00cc66)",
+border:"none",
+padding:"10px",
+borderRadius:"8px",
+fontWeight:"bold",
+cursor:"pointer"
+},
 
 alertBox:{
 position:"fixed",
