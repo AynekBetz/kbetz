@@ -19,6 +19,7 @@ const [alerts, setAlerts] = useState([]);
 const [betHistory, setBetHistory] = useState([]);
 
 const [alertSound, setAlertSound] = useState(null);
+const [tickSound, setTickSound] = useState(null);
 const [lastSoundTime, setLastSoundTime] = useState(0);
 
 /* ========================= INIT ========================= */
@@ -37,6 +38,25 @@ useEffect(() => {
 const sound = new Audio("/alert.mp3");
 sound.volume = 0.7;
 setAlertSound(sound);
+
+const tick = new Audio("/tick.mp3");
+tick.volume = 0.3;
+setTickSound(tick);
+}, []);
+
+/* ========================= ANIMATION KEYFRAMES ========================= */
+useEffect(() => {
+const style = document.createElement("style");
+style.innerHTML = `
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes tickerMove {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}`;
+document.head.appendChild(style);
 }, []);
 
 /* ========================= AUTH ========================= */
@@ -52,13 +72,9 @@ setUser(data);
 };
 
 /* ========================= UTILS ========================= */
-const toDecimal = (odds) =>
-odds > 0 ? (odds / 100) + 1 : (100 / Math.abs(odds)) + 1;
-
+const toDecimal = (odds) => odds > 0 ? (odds/100)+1 : (100/Math.abs(odds))+1;
 const impliedProb = (odds) =>
-odds < 0
-? Math.abs(odds)/(Math.abs(odds)+100)
-: 100/(odds+100);
+odds < 0 ? Math.abs(odds)/(Math.abs(odds)+100) : 100/(odds+100);
 
 /* ========================= EV ========================= */
 const calcEV = (odds) => {
@@ -90,11 +106,14 @@ const prev = lastOdds[g.id] ?? g.odds;
 const move = g.odds - prev;
 const ev = calcEV(g.odds);
 
-// sharp/public
+if (move !== 0 && tickSound) {
+tickSound.currentTime = 0;
+tickSound.play().catch(()=>{});
+}
+
 const sharp = Math.floor(Math.random()*100);
 const publicPct = 100 - sharp;
 
-// line tracking
 setLineHistory(prevHist => {
 const updated = {...prevHist};
 if (!updated[g.id]) updated[g.id] = [];
@@ -171,6 +190,15 @@ if (!user) return <div style={{color:"white"}}>Loading...</div>;
 return (
 <div style={styles.page}>
 
+{/* LIVE TICKER */}
+<div style={styles.ticker}>
+{games.slice(0,10).map(g=>(
+<span key={g.id} style={{marginRight:"40px"}}>
+{g.away} {g.odds}
+</span>
+))}
+</div>
+
 {/* ALERTS */}
 <div style={styles.alertBox}>
 {alerts.map(a=>(
@@ -178,12 +206,10 @@ return (
 ))}
 </div>
 
-{/* LEFT SIDE */}
+{/* LEFT */}
 <div style={styles.left}>
-
 <h1 style={styles.logo}>KBETZ ELITE</h1>
 
-{/* PERFORMANCE */}
 <div style={styles.card}>
 <h2>📊 Performance</h2>
 <div>Bets: {betHistory.length}</div>
@@ -191,7 +217,6 @@ return (
 <div>ROI: {roi}%</div>
 </div>
 
-{/* HEATMAP */}
 <div style={styles.card}>
 <h2>🔥 Heatmap</h2>
 <div style={styles.heatmap}>
@@ -206,13 +231,10 @@ background:g.ev>2?"#00ff99":g.ev>0?"#14532d":"#220000"
 </div>
 </div>
 
-{/* MARKETS */}
 <div style={styles.card}>
 <h2>📈 Markets</h2>
-
 {games.map(g=>(
 <div key={g.id} style={styles.marketRow}>
-
 <div>
 <div>{g.away} @ {g.home}</div>
 <div style={styles.sub}>DK: {g.books?.[0]?.odds} | FD: {g.books?.[1]?.odds}</div>
@@ -223,7 +245,12 @@ background:g.ev>2?"#00ff99":g.ev>0?"#14532d":"#220000"
 onClick={()=>addToSlip(g)}
 style={{
 ...styles.oddsBtn,
-background:g.move<0?"#002211":"#220000"
+background:g.move<0?"#002211":"#220000",
+transform:g.move!==0?"scale(1.08)":"scale(1)",
+transition:"0.25s",
+boxShadow:g.move<0
+?"0 0 12px rgba(0,255,100,0.8)"
+:"0 0 12px rgba(255,0,0,0.6)"
 }}
 >
 {g.odds}
@@ -239,17 +266,13 @@ background:g.move<0?"#002211":"#220000"
 ))}
 </div>
 
-{/* AI PARLAY */}
 <div style={styles.card}>
 <h2>🧠 AI Parlay</h2>
-{aiParlay.map((g,i)=>(
-<div key={i}>{g.away}</div>
-))}
+{aiParlay.map((g,i)=>(<div key={i}>{g.away}</div>))}
 </div>
 
-{/* HISTORY */}
 <div style={styles.card}>
-<h2>🧾 Bet History</h2>
+<h2>🧾 History</h2>
 {betHistory.map(b=>(
 <div key={b.id}>
 {b.stake} → {b.payout}
@@ -261,9 +284,8 @@ background:g.move<0?"#002211":"#220000"
 
 </div>
 
-{/* RIGHT PANEL */}
+{/* RIGHT */}
 <div style={styles.right}>
-
 <h3>Bet Slip</h3>
 
 {betSlip.map(b=>(
@@ -293,7 +315,7 @@ Place Bet
 
 /* ========================= STYLES ========================= */
 const styles = {
-page:{display:"flex",background:"#050505",color:"white",fontFamily:"Inter"},
+page:{display:"flex",background:"#050505",color:"white",fontFamily:"Inter",paddingTop:"50px"},
 left:{flex:1,padding:"20px"},
 right:{width:"300px",background:"#0a0a0a",padding:"20px"},
 logo:{fontSize:"28px",marginBottom:"20px",color:"#00ff99"},
@@ -305,6 +327,25 @@ heatmap:{display:"flex",flexWrap:"wrap"},
 heatTile:{padding:"5px",margin:"2px",fontSize:"10px"},
 input:{width:"100%",padding:"8px",marginTop:"10px",background:"#111",color:"white"},
 placeBtn:{marginTop:"10px",width:"100%",padding:"10px",background:"#00ff99",border:"none"},
-alertBox:{position:"fixed",top:"20px",right:"20px"},
-alert:{background:"#111",padding:"10px",marginBottom:"5px"}
+alertBox:{position:"fixed",top:"60px",right:"20px"},
+alert:{
+background:"#111",
+padding:"10px",
+marginBottom:"5px",
+borderRadius:"6px",
+animation:"slideIn 0.4s ease"
+},
+ticker:{
+position:"fixed",
+top:0,
+left:0,
+width:"100%",
+background:"#000",
+color:"#00ff99",
+padding:"8px",
+whiteSpace:"nowrap",
+overflow:"hidden",
+zIndex:1000,
+animation:"tickerMove 20s linear infinite"
+}
 };
