@@ -7,7 +7,7 @@ const API = "https://kbetz.onrender.com";
 
 export default function Dashboard() {
 
-/* ========================= STATE ========================= */
+/* ================= STATE ================= */
 const [games, setGames] = useState([]);
 const [user, setUser] = useState(null);
 const [betSlip, setBetSlip] = useState([]);
@@ -15,6 +15,7 @@ const [stake, setStake] = useState(100);
 const [lastOdds, setLastOdds] = useState({});
 const [lineHistory, setLineHistory] = useState({});
 const [aiParlay, setAiParlay] = useState([]);
+const [aiPicks, setAiPicks] = useState([]);
 const [alerts, setAlerts] = useState([]);
 const [betHistory, setBetHistory] = useState([]);
 
@@ -22,7 +23,12 @@ const [alertSound, setAlertSound] = useState(null);
 const [tickSound, setTickSound] = useState(null);
 const [lastSoundTime, setLastSoundTime] = useState(0);
 
-/* ========================= INIT ========================= */
+const [loadingUpgrade, setLoadingUpgrade] = useState(false);
+
+/* ================= PRO ================= */
+const isPro = false; // change later
+
+/* ================= INIT ================= */
 useEffect(() => {
 fetchUser();
 fetchGames();
@@ -35,34 +41,19 @@ return () => clearInterval(interval);
 }, []);
 
 useEffect(() => {
-const sound = new Audio("/alert.mp3");
-sound.volume = 0.7;
-setAlertSound(sound);
+const alert = new Audio("/alert.mp3");
+alert.volume = 0.7;
+setAlertSound(alert);
 
 const tick = new Audio("/tick.mp3");
-tick.volume = 0.3;
+tick.volume = 0.25;
 setTickSound(tick);
 }, []);
 
-/* ========================= ANIMATION KEYFRAMES ========================= */
-useEffect(() => {
-const style = document.createElement("style");
-style.innerHTML = `
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-@keyframes tickerMove {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}`;
-document.head.appendChild(style);
-}, []);
-
-/* ========================= AUTH ========================= */
+/* ================= AUTH ================= */
 const fetchUser = async () => {
 const token = localStorage.getItem("token");
-if (!token) return (window.location.href = "/login");
+if (!token) return;
 
 const res = await fetch(`${API}/api/me`, {
 headers: { Authorization: `Bearer ${token}` }
@@ -71,96 +62,119 @@ const data = await res.json();
 setUser(data);
 };
 
-/* ========================= UTILS ========================= */
-const toDecimal = (odds) => odds > 0 ? (odds/100)+1 : (100/Math.abs(odds))+1;
-const impliedProb = (odds) =>
-odds < 0 ? Math.abs(odds)/(Math.abs(odds)+100) : 100/(odds+100);
-
-/* ========================= EV ========================= */
-const calcEV = (odds) => {
-const p = impliedProb(odds) * 0.97;
-return ((p * toDecimal(odds)) - 1) * 100;
+const handleLogout = () => {
+localStorage.removeItem("token");
+window.location.href = "/login";
 };
 
-/* ========================= ALERT ========================= */
-const triggerAlert = (msg) => {
-const now = Date.now();
-
-if (alertSound && now - lastSoundTime > 2000) {
-alertSound.currentTime = 0;
-alertSound.play().catch(()=>{});
-setLastSoundTime(now);
-}
-
-setAlerts(prev => [{ id: now, msg }, ...prev.slice(0, 4)]);
+const handleUpgrade = async () => {
+setLoadingUpgrade(true);
+const res = await fetch(`${API}/api/checkout`, { method:"POST" });
+const data = await res.json();
+if (data.url) window.location.href = data.url;
+setLoadingUpgrade(false);
 };
 
-/* ========================= DATA ========================= */
-const fetchGames = async () => {
+/* ================= PRO LOCK ================= */
+const ProLock = ({ children }) => {
+if (isPro) return children;
+
+return (
+<div style={{ position:"relative" }}>
+<div style={styles.blur}>{children}</div>
+
+<div style={styles.lockOverlay}>
+<div style={styles.lockBox}>
+<h3>🔒 PRO Feature</h3>
+<button onClick={handleUpgrade} style={styles.upgradeBtn}>
+Upgrade
+</button>
+</div>
+</div>
+</div>
+);
+};
+
+/* ================= UTILS ================= */
+const toDecimal = (o)=> o>0 ? (o/100)+1 : (100/Math.abs(o))+1;
+
+const calcEV = (odds)=>{
+const p = 1/toDecimal(odds)*0.97;
+return ((p*toDecimal(odds))-1)*100;
+};
+
+/* ================= DATA ================= */
+const fetchGames = async ()=>{
 const res = await fetch(`${API}/api/data`);
 const data = await res.json();
 
-const enriched = data.games.map(g => {
+const enriched = data.games.map(g=>{
 
 const prev = lastOdds[g.id] ?? g.odds;
 const move = g.odds - prev;
-const ev = calcEV(g.odds);
 
-if (move !== 0 && tickSound) {
-tickSound.currentTime = 0;
+if(move!==0 && tickSound){
+tickSound.currentTime=0;
 tickSound.play().catch(()=>{});
 }
 
-const sharp = Math.floor(Math.random()*100);
-const publicPct = 100 - sharp;
+const ev = calcEV(g.odds);
 
-setLineHistory(prevHist => {
-const updated = {...prevHist};
-if (!updated[g.id]) updated[g.id] = [];
-updated[g.id] = [...updated[g.id], { odds: g.odds }].slice(-12);
-return updated;
+const sharp = Math.floor(Math.random()*100);
+const publicPct = 100-sharp;
+
+setLineHistory(prev=>{
+const h={...prev};
+if(!h[g.id]) h[g.id]=[];
+h[g.id]=[...h[g.id],{odds:g.odds}].slice(-12);
+return h;
 });
 
-if (ev > 2 && move < -3) {
-triggerAlert(`🔥 ${g.away}`);
+if(ev>2 && move<-3){
+if(alertSound && Date.now()-lastSoundTime>2000){
+alertSound.play().catch(()=>{});
+setLastSoundTime(Date.now());
+setAlerts(a=>[{msg:`🔥 ${g.away} sharp move`},...a.slice(0,4)]);
+}
 }
 
-return {...g, ev, move, sharp, public: publicPct};
+return {...g,move,ev,sharp,public:publicPct};
 });
 
 setGames(enriched);
 setAiParlay(enriched.slice(0,2));
+setAiPicks(enriched.slice(0,3));
 
 setLastOdds(prev=>{
-const updated = {...prev};
-enriched.forEach(g => updated[g.id] = g.odds);
-return updated;
+const o={...prev};
+enriched.forEach(g=>o[g.id]=g.odds);
+return o;
 });
 };
 
-/* ========================= BET ========================= */
-const addToSlip = (g)=>{
-if (betSlip.find(b=>b.id===g.id)) return;
+/* ================= BET ================= */
+const addToSlip = g=>{
+if(betSlip.find(b=>b.id===g.id)) return;
 setBetSlip([...betSlip,g]);
 };
 
-const removeBet = (id)=>{
+const removeBet = id=>{
 setBetSlip(betSlip.filter(b=>b.id!==id));
 };
 
 const parlayOdds = ()=> betSlip.reduce((a,b)=>a*toDecimal(b.odds),1);
-const payout = ()=> (stake * parlayOdds()).toFixed(2);
+const payout = ()=> (stake*parlayOdds()).toFixed(2);
 
-/* ========================= HISTORY ========================= */
+/* ================= HISTORY ================= */
 const placeBet = ()=>{
 if(!betSlip.length) return;
 
-const newBet = {
-id: Date.now(),
-bets: betSlip,
+const newBet={
+id:Date.now(),
+bets:betSlip,
 stake,
-payout: payout(),
-result: "pending"
+payout:payout(),
+result:"pending"
 };
 
 const updated=[newBet,...betHistory];
@@ -169,13 +183,13 @@ localStorage.setItem("kbetz_history",JSON.stringify(updated));
 setBetSlip([]);
 };
 
-const gradeBet = (id,res)=>{
-const updated = betHistory.map(b=>b.id===id?{...b,result:res}:b);
+const gradeBet=(id,res)=>{
+const updated=betHistory.map(b=>b.id===id?{...b,result:res}:b);
 setBetHistory(updated);
 localStorage.setItem("kbetz_history",JSON.stringify(updated));
 };
 
-/* ========================= STATS ========================= */
+/* ================= STATS ================= */
 let staked=0,returned=0;
 betHistory.forEach(b=>{
 staked+=b.stake;
@@ -184,31 +198,38 @@ if(b.result==="win") returned+=parseFloat(b.payout);
 const profit=returned-staked;
 const roi=staked?((profit/staked)*100).toFixed(2):0;
 
-/* ========================= UI ========================= */
-if (!user) return <div style={{color:"white"}}>Loading...</div>;
-
+/* ================= UI ================= */
 return (
 <div style={styles.page}>
 
-{/* LIVE TICKER */}
+{/* TICKER */}
 <div style={styles.ticker}>
 {games.slice(0,10).map(g=>(
-<span key={g.id} style={{marginRight:"40px"}}>
-{g.away} {g.odds}
-</span>
+<span key={g.id}>{g.away} {g.odds} | </span>
 ))}
 </div>
 
-{/* ALERTS */}
-<div style={styles.alertBox}>
-{alerts.map(a=>(
-<div key={a.id} style={styles.alert}>{a.msg}</div>
-))}
+{/* HEADER */}
+<div style={styles.header}>
+<h1 style={styles.logo}>KBETZ ELITE</h1>
+
+<div style={styles.account}>
+<span>{isPro?"PRO":"FREE"}</span>
+
+{!isPro && (
+<button onClick={handleUpgrade} style={styles.upgradeBtn}>
+{loadingUpgrade?"Loading":"Upgrade"}
+</button>
+)}
+
+<button onClick={handleLogout} style={styles.logoutBtn}>
+Logout
+</button>
+</div>
 </div>
 
 {/* LEFT */}
 <div style={styles.left}>
-<h1 style={styles.logo}>KBETZ ELITE</h1>
 
 <div style={styles.card}>
 <h2>📊 Performance</h2>
@@ -217,59 +238,29 @@ return (
 <div>ROI: {roi}%</div>
 </div>
 
-<div style={styles.card}>
-<h2>🔥 Heatmap</h2>
-<div style={styles.heatmap}>
-{games.map(g=>(
-<div key={g.id} style={{
-...styles.heatTile,
-background:g.ev>2?"#00ff99":g.ev>0?"#14532d":"#220000"
-}}>
-{g.away}
-</div>
-))}
-</div>
-</div>
-
+<ProLock>
 <div style={styles.card}>
 <h2>📈 Markets</h2>
 {games.map(g=>(
-<div key={g.id} style={styles.marketRow}>
-<div>
-<div>{g.away} @ {g.home}</div>
-<div style={styles.sub}>DK: {g.books?.[0]?.odds} | FD: {g.books?.[1]?.odds}</div>
-<div style={styles.sub}>Sharp {g.sharp}% / Public {g.public}%</div>
-</div>
-
-<button
-onClick={()=>addToSlip(g)}
-style={{
-...styles.oddsBtn,
-background:g.move<0?"#002211":"#220000",
-transform:g.move!==0?"scale(1.08)":"scale(1)",
-transition:"0.25s",
-boxShadow:g.move<0
-?"0 0 12px rgba(0,255,100,0.8)"
-:"0 0 12px rgba(255,0,0,0.6)"
-}}
->
-{g.odds}
-</button>
-
-<ResponsiveContainer width={120} height={50}>
-<LineChart data={lineHistory[g.id] || []}>
-<Line dataKey="odds" stroke="#00ff99" dot={false}/>
-</LineChart>
-</ResponsiveContainer>
-
+<div key={g.id} style={styles.row}>
+<div>{g.away}</div>
+<button onClick={()=>addToSlip(g)}>{g.odds}</button>
 </div>
 ))}
 </div>
+</ProLock>
 
+<div style={styles.card}>
+<h2>🎯 AI Picks</h2>
+{aiPicks.map((g,i)=>(<div key={i}>{g.away}</div>))}
+</div>
+
+<ProLock>
 <div style={styles.card}>
 <h2>🧠 AI Parlay</h2>
 {aiParlay.map((g,i)=>(<div key={i}>{g.away}</div>))}
 </div>
+</ProLock>
 
 <div style={styles.card}>
 <h2>🧾 History</h2>
@@ -295,57 +286,48 @@ boxShadow:g.move<0
 </div>
 ))}
 
-<input
-value={stake}
-onChange={e=>setStake(Number(e.target.value))}
-style={styles.input}
-/>
-
+<input value={stake} onChange={e=>setStake(e.target.value)} />
 <div>Payout: ${payout()}</div>
 
-<button onClick={placeBet} style={styles.placeBtn}>
-Place Bet
-</button>
+<button onClick={placeBet}>Place Bet</button>
+</div>
 
+{/* ALERTS */}
+<div style={styles.alertBox}>
+{alerts.map((a,i)=>(
+<div key={i} style={styles.alert}>{a.msg}</div>
+))}
 </div>
 
 </div>
 );
 }
 
-/* ========================= STYLES ========================= */
+/* ================= STYLES ================= */
 const styles = {
-page:{display:"flex",background:"#050505",color:"white",fontFamily:"Inter",paddingTop:"50px"},
+page:{display:"flex",background:"#050505",color:"white",paddingTop:"30px"},
 left:{flex:1,padding:"20px"},
 right:{width:"300px",background:"#0a0a0a",padding:"20px"},
-logo:{fontSize:"28px",marginBottom:"20px",color:"#00ff99"},
-card:{background:"#111",padding:"15px",borderRadius:"10px",marginBottom:"15px"},
-marketRow:{display:"flex",justifyContent:"space-between",marginBottom:"10px"},
-sub:{fontSize:"11px",opacity:0.7},
-oddsBtn:{padding:"6px 12px",borderRadius:"6px"},
-heatmap:{display:"flex",flexWrap:"wrap"},
-heatTile:{padding:"5px",margin:"2px",fontSize:"10px"},
-input:{width:"100%",padding:"8px",marginTop:"10px",background:"#111",color:"white"},
-placeBtn:{marginTop:"10px",width:"100%",padding:"10px",background:"#00ff99",border:"none"},
-alertBox:{position:"fixed",top:"60px",right:"20px"},
-alert:{
-background:"#111",
-padding:"10px",
-marginBottom:"5px",
-borderRadius:"6px",
-animation:"slideIn 0.4s ease"
+header:{display:"flex",justifyContent:"space-between",padding:"20px"},
+logo:{color:"#00ff99"},
+account:{display:"flex",gap:"10px"},
+upgradeBtn:{background:"#00ff99",padding:"6px"},
+logoutBtn:{background:"#222",padding:"6px"},
+card:{background:"#111",padding:"15px",marginBottom:"15px"},
+row:{display:"flex",justifyContent:"space-between"},
+ticker:{position:"fixed",top:0,width:"100%",background:"#000",padding:"5px"},
+alertBox:{position:"fixed",top:"40px",right:"20px"},
+alert:{background:"#111",padding:"10px",marginBottom:"5px"},
+blur:{filter:"blur(6px)"},
+lockOverlay:{
+position:"absolute",top:0,left:0,width:"100%",height:"100%",
+display:"flex",justifyContent:"center",alignItems:"center",pointerEvents:"none"
 },
-ticker:{
-position:"fixed",
-top:0,
-left:0,
-width:"100%",
-background:"#000",
-color:"#00ff99",
-padding:"8px",
-whiteSpace:"nowrap",
-overflow:"hidden",
-zIndex:1000,
-animation:"tickerMove 20s linear infinite"
+lockBox:{
+background:"rgba(0,0,0,0.85)",
+padding:"20px",
+borderRadius:"10px",
+border:"1px solid #00ff99",
+pointerEvents:"auto"
 }
 };
