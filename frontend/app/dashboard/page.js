@@ -7,78 +7,38 @@ const API = "https://kbetz.onrender.com";
 export default function Dashboard() {
 
 const [games, setGames] = useState([]);
-const [alerts, setAlerts] = useState([]);
 const [user, setUser] = useState(null);
 const [topPicks, setTopPicks] = useState([]);
+const [betSlip, setBetSlip] = useState([]);
+const [stake, setStake] = useState(100);
 
 const isPro = user?.isPro === true || user?.plan === "pro";
 
 /* =========================
 AUTH
 ========================= */
-const handleLogout = () => {
-localStorage.removeItem("token");
-localStorage.removeItem("email");
-window.location.href = "/login";
-};
-
 useEffect(() => {
 fetchUser();
 fetchGames();
-
 const interval = setInterval(fetchGames, 5000);
 return () => clearInterval(interval);
 }, []);
 
 const fetchUser = async () => {
 const token = localStorage.getItem("token");
-
 if (!token) return (window.location.href = "/login");
 
 const res = await fetch(`${API}/api/me`, {
 headers: { Authorization: `Bearer ${token}` }
 });
-
 const data = await res.json();
-
-if (!data || data.error) {
-localStorage.removeItem("token");
-window.location.href = "/login";
-return;
-}
-
 setUser(data);
 
-if (data.email) {
-localStorage.setItem("email", data.email);
-}
+if (data.email) localStorage.setItem("email", data.email);
 };
 
 /* =========================
-AI
-========================= */
-const impliedProb = (odds) => {
-if (odds < 0) return Math.abs(odds) / (Math.abs(odds) + 100);
-return 100 / (odds + 100);
-};
-
-const generateAI = (games) => {
-const evaluated = games.map((g) => {
-const prob = impliedProb(g.odds);
-const trueProb = prob + (Math.random() * 0.06);
-
-const ev = (trueProb * 100) - (1 - trueProb) * Math.abs(g.odds);
-const confidence = Math.min(95, Math.max(55, Math.floor(trueProb * 100)));
-
-return { ...g, ev, confidence };
-});
-
-const sorted = evaluated.sort((a, b) => b.ev - a.ev);
-setTopPicks(sorted.slice(0, 3));
-};
-
-/* =========================
-DATA
+DATA + AI
 ========================= */
 const fetchGames = async () => {
 try {
@@ -92,21 +52,56 @@ generateAI(g);
 } catch {}
 };
 
+const generateAI = (games) => {
+setTopPicks(games.slice(0,3));
+};
+
+/* =========================
+BET SLIP
+========================= */
+
+const addToSlip = (game) => {
+const exists = betSlip.find(b => b.id === game.id);
+if (exists) return;
+
+setBetSlip([...betSlip, game]);
+};
+
+const removeBet = (id) => {
+setBetSlip(betSlip.filter(b => b.id !== id));
+};
+
+const americanToDecimal = (odds) => {
+if (odds > 0) return (odds / 100) + 1;
+return (100 / Math.abs(odds)) + 1;
+};
+
+const parlayOdds = () => {
+if (!betSlip.length) return 0;
+
+return betSlip.reduce((acc, bet) => {
+return acc * americanToDecimal(bet.odds);
+}, 1);
+};
+
+const payout = (stakeAmount = 100) => {
+return (stakeAmount * parlayOdds()).toFixed(2);
+};
+
 /* =========================
 UPGRADE
 ========================= */
-const handleUpgradeClick = () => {
+const handleUpgradeClick = async () => {
 const email = localStorage.getItem("email");
 
-fetch(`${API}/api/checkout`, {
+const res = await fetch(`${API}/api/checkout`, {
 method: "POST",
 headers: { "Content-Type": "application/json" },
 body: JSON.stringify({ email })
-})
-.then(res => res.json())
-.then(data => {
-if (data.url) window.location.href = data.url;
 });
+
+const data = await res.json();
+if (data.url) window.location.href = data.url;
 };
 
 /* =========================
@@ -118,40 +113,29 @@ return (
 
 <div style={styles.page}>
 
+{/* LEFT SIDE */}
+<div style={{flex:1}}>
+
 {/* HEADER */}
 <div style={styles.header}>
 <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
 <div style={styles.right}>
-<span style={{color:"#22c55e"}}>
-{isPro ? "PRO" : "FREE"}
-</span>
-
-<button onClick={handleLogout} style={styles.btnDark}>
-Logout
-</button>
+<span>{isPro ? "PRO" : "FREE"}</span>
 
 {!isPro && (
 <button onClick={handleUpgradeClick} style={styles.btnPro}>
-Upgrade PRO
+Upgrade
 </button>
 )}
-
 </div>
 </div>
 
-{/* =========================
-🔥 AI PICKS (UPDATED WITH BLUR)
-========================= */}
-
-<div style={{
-...styles.card,
-position: "relative"
-}}>
+{/* AI PICKS */}
+<div style={{...styles.card, position:"relative"}}>
 
 <h2>🧠 AI PICKS</h2>
 
-{/* BLUR CONTENT */}
 <div style={{
 filter: !isPro ? "blur(6px)" : "none",
 pointerEvents: !isPro ? "none" : "auto"
@@ -162,11 +146,14 @@ pointerEvents: !isPro ? "none" : "auto"
 
 <div style={styles.row}>
 <span>{p.away} @ {p.home}</span>
-<span style={{color:"#00ff99"}}>{p.odds}</span>
-</div>
 
-<div style={{fontSize:"12px"}}>
-EV +{p.ev?.toFixed(2)}% • {p.confidence}%
+<button
+onClick={()=>addToSlip(p)}
+style={styles.oddsBtn}
+>
+{p.odds}
+</button>
+
 </div>
 
 </div>
@@ -174,17 +161,94 @@ EV +{p.ev?.toFixed(2)}% • {p.confidence}%
 
 </div>
 
-{/* PRO OVERLAY */}
 {!isPro && (
 <div style={styles.overlay}>
-<div style={{fontSize:"18px",marginBottom:"10px"}}>
-🔒 PRO ONLY
-</div>
-
-<button onClick={handleUpgradeClick} style={styles.unlockBtn}>
-Unlock AI Picks
+<div>🔒 PRO ONLY</div>
+<button onClick={handleUpgradeClick}>
+Unlock
 </button>
 </div>
+)}
+
+</div>
+
+{/* LIVE MARKETS */}
+<div style={styles.card}>
+<h2>📈 LIVE MARKETS</h2>
+
+{games.map(g=>(
+<div key={g.id} style={styles.marketRow}>
+
+<span>{g.away} @ {g.home}</span>
+
+<button
+onClick={()=>addToSlip(g)}
+style={styles.oddsBtn}
+>
+{g.odds}
+</button>
+
+</div>
+))}
+
+</div>
+
+</div>
+
+{/* BET SLIP */}
+<div style={styles.slip}>
+
+<h3>🧾 Bet Slip</h3>
+
+{betSlip.length === 0 && <p>No bets yet</p>}
+
+{betSlip.map((b)=>(
+<div key={b.id} style={styles.slipItem}>
+
+<span>{b.away} @ {b.home}</span>
+
+<div>
+<span>{b.odds}</span>
+
+<button onClick={()=>removeBet(b.id)}>
+✖
+</button>
+</div>
+
+</div>
+))}
+
+{betSlip.length > 0 && (
+<>
+<hr/>
+
+<input
+type="number"
+value={stake}
+onChange={(e)=>setStake(Number(e.target.value))}
+style={styles.stakeInput}
+/>
+
+<div>
+Parlay Odds: {parlayOdds().toFixed(2)}x
+</div>
+
+<div style={{fontSize:"18px", fontWeight:"bold"}}>
+Payout: ${payout(stake)}
+</div>
+
+<button style={styles.placeBtn}>
+Place Bet
+</button>
+
+<button
+onClick={()=>setBetSlip([])}
+style={styles.clearBtn}
+>
+Clear Slip
+</button>
+
+</>
 )}
 
 </div>
@@ -200,6 +264,7 @@ STYLES
 const styles = {
 
 page:{
+display:"flex",
 background:"#050505",
 color:"white",
 minHeight:"100vh",
@@ -222,40 +287,21 @@ color:"transparent"
 
 right:{
 display:"flex",
-gap:"10px",
-alignItems:"center"
-},
-
-btnDark:{
-background:"#222",
-padding:"8px 12px",
-borderRadius:"6px",
-border:"none",
-color:"white",
-cursor:"pointer"
-},
-
-btnPro:{
-background:"linear-gradient(90deg,gold,orange)",
-padding:"10px 18px",
-borderRadius:"8px",
-border:"none",
-fontWeight:"bold",
-cursor:"pointer"
+gap:"10px"
 },
 
 card:{
 background:"rgba(255,255,255,0.05)",
-padding:"20px",
-borderRadius:"14px",
+padding:"15px",
+borderRadius:"12px",
 marginBottom:"20px"
 },
 
 pick:{
 padding:"10px",
 marginBottom:"10px",
-background:"#0a0a0a",
-borderRadius:"10px"
+background:"#111",
+borderRadius:"8px"
 },
 
 row:{
@@ -263,23 +309,74 @@ display:"flex",
 justifyContent:"space-between"
 },
 
-overlay:{
-position:"absolute",
-top:0,
-left:0,
-right:0,
-bottom:0,
-display:"flex",
-flexDirection:"column",
-justifyContent:"center",
-alignItems:"center",
-background:"rgba(0,0,0,0.7)",
-borderRadius:"14px"
+oddsBtn:{
+background:"#111",
+border:"1px solid #333",
+color:"#00ff99",
+padding:"6px 10px",
+cursor:"pointer"
 },
 
-unlockBtn:{
+marketRow:{
+display:"flex",
+justifyContent:"space-between",
+padding:"10px",
+borderBottom:"1px solid #222"
+},
+
+overlay:{
+position:"absolute",
+top:0,left:0,right:0,bottom:0,
+display:"flex",
+justifyContent:"center",
+alignItems:"center",
+flexDirection:"column",
+background:"rgba(0,0,0,0.7)"
+},
+
+slip:{
+width:"300px",
+background:"#0a0a0a",
+padding:"15px",
+borderRadius:"12px"
+},
+
+slipItem:{
+display:"flex",
+justifyContent:"space-between",
+marginBottom:"10px"
+},
+
+placeBtn:{
 marginTop:"10px",
 background:"#00ff99",
+border:"none",
+padding:"10px",
+width:"100%",
+cursor:"pointer"
+},
+
+clearBtn:{
+marginTop:"8px",
+background:"#222",
+border:"none",
+padding:"8px",
+width:"100%",
+color:"#ccc",
+cursor:"pointer"
+},
+
+stakeInput:{
+marginTop:"10px",
+padding:"8px",
+width:"100%",
+background:"#111",
+border:"1px solid #333",
+color:"white"
+},
+
+btnPro:{
+background:"gold",
 border:"none",
 padding:"8px 12px",
 cursor:"pointer"
