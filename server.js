@@ -1,304 +1,419 @@
-import express from "express";
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import Stripe from "stripe";
-import fetch from "node-fetch";
+"use client";
 
-dotenv.config();
+import { useEffect, useMemo, useState } from "react";
+import { LineChart, Line, ResponsiveContainer } from "recharts";
 
-console.log("🚀 KBETZ STABLE SERVER STARTING");
+const API = "https://kbetz.onrender.com";
 
-const app = express();
-const PORT = process.env.PORT || 10000;
+/* ================= UTILS ================= */
+const toDecimal = (o)=> o>0 ? (o/100)+1 : (100/Math.abs(o))+1;
 
-/* =========================
-🔥 STRIPE WEBHOOK (MUST BE FIRST)
-========================= */
-app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
+// 💰 Hedge / Cashout calculator (same market or cross-market approximation)
+const calcHedge = (oddsA, oddsB, stakeA=100) => {
+  const d1 = toDecimal(oddsA);
+  const d2 = toDecimal(oddsB);
 
-/* =========================
-🔥 CORS
-========================= */
-app.use((req, res, next) => {
-  const allowedOrigins = [
-    "http://localhost:3000",
-    "https://kbetz-frontend.vercel.app",
-    "https://kbetz.vercel.app"
-  ];
+  // balance payouts so either side returns ~same
+  const stakeB = (stakeA * d1) / d2;
+  const payout = stakeA * d1; // approx equalized
+  const totalStake = stakeA + stakeB;
+  const profit = payout - totalStake;
 
-  const origin = req.headers.origin;
+  return {
+    stakeA: Number(stakeA.toFixed(2)),
+    stakeB: Number(stakeB.toFixed(2)),
+    payout: Number(payout.toFixed(2)),
+    profit: Number(profit.toFixed(2)),
+    roi: Number(((profit/totalStake)*100).toFixed(2))
+  };
+};
 
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  } else {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+// 🎯 Auto bet suggestion score (uses your backend fields)
+const suggestionScore = (g) => {
+  let s = 0;
+  s += (g.ev || 0) * 2;
+  if (g.steam) s += 10;
+  if (g.steamStrength === "strong") s += 10;
+  if (g.arb) s += 20;
+  if (g.confidence) s += g.confidence / 5;
+  return s;
+};
+
+export default function Dashboard() {
+
+/* ================= STATE ================= */
+const [games, setGames] = useState([]);
+const [activeTab, setActiveTab] = useState("NBA");
+const [betSlip, setBetSlip] = useState([]);
+const [stake, setStake] = useState(100);
+const [lastOdds, setLastOdds] = useState({});
+const [ticker, setTicker] = useState("");
+const [tickSound, setTickSound] = useState(null);
+
+const [historyMap, setHistoryMap] = useState({});
+const [steamAlerts, setSteamAlerts] = useState([]);
+const [notifications, setNotifications] = useState([]);
+const [permission, setPermission] = useState("default");
+
+// hedge panel state
+const [hedgeGame, setHedgeGame] = useState(null);
+const [hedgeStake, setHedgeStake] = useState(100);
+
+/* ================= INIT ================= */
+useEffect(() => {
+  fetchAll();
+  const interval = setInterval(fetchAll, 6000);
+  return () => clearInterval(interval);
+}, [activeTab]);
+
+useEffect(() => {
+  const tick = new Audio("/tick.mp3");
+  tick.volume = 0.25;
+  setTickSound(tick);
+
+  // ask for browser notifications once
+  if ("Notification" in window) {
+    Notification.requestPermission().then(p => setPermission(p));
   }
+}, []);
 
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+/* ================= FETCH ================= */
+const fetchAll = async () => {
+  await Promise.all([fetchGames(), fetchSteam()]);
+};
 
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
+const fetchGames = async () => {
+  const sportMap = {
+    NBA: "basketball_nba",
+    NFL: "americanfootball_nfl",
+    PROPS: "basketball_nba"
+  };
 
-  next();
-});
+  const res = await fetch(`${API}/api/data?sport=${sportMap[activeTab]}`);
+  const data = await res.json();
 
-app.use(express.json());
+  let tickerText = "";
 
-/* =========================
-✅ DATABASE
-========================= */
-mongoose.set("bufferCommands", false);
+  const updated = (data.games || []).map(g => {
+    const prev = lastOdds[g.id] ?? g.homeOdds;
+    const move = (g.homeOdds ?? 0) - prev;
 
-async function connectDB() {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ MongoDB Connected");
-  } catch (err) {
-    console.error("❌ MongoDB Error:", err.message);
-  }
-}
-
-/* =========================
-✅ MODEL
-========================= */
-const User =
-  mongoose.models.User ||
-  mongoose.model(
-    "User",
-    new mongoose.Schema({
-      email: String,
-      password: String,
-      plan: { type: String, default: "free" },
-      isPro: { type: Boolean, default: false }
-    })
-  );
-
-/* =========================
-✅ HEALTH
-========================= */
-app.get("/api/health", (req, res) => {
-  res.json({ status: "OK" });
-});
-
-/* =========================
-✅ SIGNUP
-========================= */
-app.post("/api/signup", async (req, res) => {
-  try {
-    const { email, password } = req.body || {};
-
-    if (!email || !password) {
-      return res.json({ success: false, message: "Missing email/password" });
+    // 🔊 sound on meaningful move
+    if (Math.abs(move) >= 5 && tickSound) {
+      tickSound.currentTime = 0;
+      tickSound.play().catch(()=>{});
     }
 
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.json({ success: false, message: "User exists" });
+    // 🔔 create in-app + browser notification on strong signals
+    if (Math.abs(move) >= 5 || g.steamStrength === "strong" || g.arb) {
+      const msg = `${g.away} @ ${g.home} | move ${move} | ${g.arb ? "ARB" : g.steamStrength || ""}`;
+      pushNotification(msg);
     }
 
-    const hashed = await bcrypt.hash(password, 10);
+    tickerText += `${g.home} ${g.homeOdds} | `;
+    return { ...g, move };
+  });
 
-    await User.create({
-      email,
-      password: hashed,
-      plan: "free",
-      isPro: false
-    });
+  setTicker(tickerText);
+  setGames(updated);
 
-    return res.json({ success: true });
+  setLastOdds(prev => {
+    const copy = { ...prev };
+    updated.forEach(g => (copy[g.id] = g.homeOdds));
+    return copy;
+  });
 
-  } catch (err) {
-    console.log("❌ SIGNUP ERROR:", err);
-    return res.json({ success: false, message: err.message });
-  }
-});
-
-/* =========================
-🔐 LOGIN
-========================= */
-app.post("/api/login", async (req, res) => {
-  try {
-    const { email, password } = req.body || {};
-
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ error: "Invalid login" });
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: "Invalid login" });
-
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET || "secret123",
-      { expiresIn: "7d" }
-    );
-
-    return res.json({
-      success: true,
-      token,
-      user: {
-        email: user.email,
-        isPro: user.isPro
-      }
-    });
-
-  } catch (err) {
-    console.log("❌ LOGIN ERROR:", err);
-    return res.status(500).json({ error: "Login failed" });
-  }
-});
-
-/* =========================
-👤 ME
-========================= */
-app.get("/api/me", async (req, res) => {
-  try {
-    const auth = req.headers.authorization;
-    if (!auth) return res.status(401).json({ error: "No token" });
-
-    const token = auth.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret123");
-
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    res.json({
-      email: user.email,
-      isPro: user.isPro
-    });
-
-  } catch {
-    res.status(401).json({ error: "Invalid token" });
-  }
-});
-
-/* =========================
-📡 DATA
-========================= */
-app.get("/api/data", async (req, res) => {
-  try {
-    const API_KEY = process.env.ODDS_API_KEY;
-
-    if (!API_KEY) throw new Error("No API key");
-
-    const response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=h2h`
-    );
-
-    const data = await response.json();
-
-    const games = data.slice(0, 5).map((g, i) => ({
-      id: i,
-      home: g.home_team,
-      away: g.away_team,
-      odds:
-        g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || -110
-    }));
-
-    res.json({ source: "real", games });
-
-  } catch {
-    res.json({
-      source: "fallback",
-      games: [
-        { id: 1, home: "Lakers", away: "Warriors", odds: -110 },
-        { id: 2, home: "Celtics", away: "Heat", odds: -105 }
-      ]
-    });
-  }
-});
-
-/* =========================
-💳 STRIPE
-========================= */
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-/* =========================
-💳 CHECKOUT (FIXED)
-========================= */
-const createCheckoutSession = async (email) => {
-  return await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    mode: "subscription",
-    line_items: [
-      { price: process.env.STRIPE_PRICE_ID, quantity: 1 }
-    ],
-    customer_email: email,
-    success_url: "https://kbetz.vercel.app/dashboard?upgrade=success",
-    cancel_url: "https://kbetz.vercel.app/dashboard"
+  // 📈 history for top games
+  updated.slice(0,5).forEach(async g => {
+    if (!historyMap[g.id]) {
+      const h = await fetch(`${API}/api/history/${g.id}`);
+      const json = await h.json();
+      setHistoryMap(prev => ({ ...prev, [g.id]: json }));
+    }
   });
 };
 
-// ORIGINAL ROUTE (UNCHANGED)
-app.post("/api/stripe/checkout", async (req, res) => {
+const fetchSteam = async () => {
   try {
-    const { email } = req.body;
-    const session = await createCheckoutSession(email);
-    res.json({ url: session.url });
-  } catch (err) {
-    console.log("CHECKOUT ERROR:", err.message);
-    res.status(500).json({ error: "Checkout failed" });
-  }
-});
+    const res = await fetch(`${API}/api/steam`);
+    const data = await res.json();
+    setSteamAlerts(data || []);
+  } catch {}
+};
 
-// 🔥 NEW ROUTE (FIXES YOUR FRONTEND)
-app.post("/api/checkout", async (req, res) => {
-  try {
-    const { email } = req.body;
-    const session = await createCheckoutSession(email);
-    res.json({ url: session.url });
-  } catch (err) {
-    console.log("CHECKOUT ERROR:", err.message);
-    res.status(500).json({ error: "Checkout failed" });
-  }
-});
-
-/* =========================
-🔥 WEBHOOK
-========================= */
-app.post("/api/stripe/webhook", async (req, res) => {
-  const sig = req.headers["stripe-signature"];
-
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch {
-    return res.sendStatus(400);
-  }
-
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const email = session.customer_email;
-
-    const user = await User.findOne({ email });
-
-    if (user) {
-      user.isPro = true;
-      user.plan = "pro";
-      await user.save();
-    }
-  }
-
-  res.json({ received: true });
-});
-
-/* =========================
-🚀 START
-========================= */
-async function start() {
-  await connectDB();
-
-  app.listen(PORT, () => {
-    console.log("🚀 Server running on port " + PORT);
+/* ================= NOTIFICATIONS ================= */
+const pushNotification = (text) => {
+  setNotifications(prev => {
+    // avoid spam duplicates in short window
+    if (prev[0]?.text === text) return prev;
+    return [{ id: Date.now(), text }, ...prev].slice(0, 20);
   });
+
+  if ("Notification" in window && permission === "granted") {
+    try { new Notification("KBETZ Alert", { body: text }); } catch {}
+  }
+};
+
+/* ================= AI / SUGGESTIONS ================= */
+const aiPicks = useMemo(() => {
+  return [...games]
+    .sort((a,b)=>(b.confidence||0)-(a.confidence||0))
+    .slice(0,3);
+}, [games]);
+
+const autoSuggestions = useMemo(() => {
+  return [...games]
+    .sort((a,b)=>suggestionScore(b)-suggestionScore(a))
+    .slice(0,5);
+}, [games]);
+
+const buildParlay = () => setBetSlip(aiPicks);
+
+/* ================= BET ================= */
+const addToSlip = (g, odds, book="AI") => {
+  setBetSlip([...betSlip, { ...g, odds, book }]);
+};
+
+const payout = () => {
+  const odds = betSlip.reduce((a,b)=>a*toDecimal(b.homeOdds||-110),1);
+  return (stake * odds).toFixed(2);
+};
+
+/* ================= UI ================= */
+return (
+<div style={styles.page}>
+
+  {/* TICKER */}
+  <div style={styles.ticker}>
+    <div style={styles.tickerMove}>{ticker}</div>
+  </div>
+
+  <h1 style={styles.logo}>KBETZ TERMINAL</h1>
+
+  {/* TABS */}
+  <div style={styles.tabs}>
+    {["NBA","NFL","PROPS"].map(t=>(
+      <button
+        key={t}
+        style={{
+          ...styles.tab,
+          background:activeTab===t?"#00ff99":"#111",
+          color:activeTab===t?"#000":"#fff"
+        }}
+        onClick={()=>setActiveTab(t)}
+      >
+        {t}
+      </button>
+    ))}
+  </div>
+
+  {/* 🔔 NOTIFICATIONS PANEL */}
+  <div style={styles.card}>
+    <h3>🔔 Notifications</h3>
+    {notifications.length === 0 && <div style={styles.sub}>No alerts yet</div>}
+    {notifications.map(n=>(
+      <div key={n.id} style={styles.alert}>{n.text}</div>
+    ))}
+  </div>
+
+  {/* 🔥 STEAM ALERTS */}
+  <div style={styles.card}>
+    <h3>🔥 Steam Alerts</h3>
+    {steamAlerts.map((s,i)=>(
+      <div key={i} style={styles.alert}>
+        Game: {s.gameId} | Move: {s.move} ({s.strength})
+      </div>
+    ))}
+  </div>
+
+  {/* 🧠 AI PICKS */}
+  <div style={styles.card}>
+    <h3>🧠 AI Picks</h3>
+    {aiPicks.map(p=>(
+      <div key={p.id} style={styles.row}>
+        {p.away} @ {p.home}
+        <span style={styles.green}>{p.confidence || 70}%</span>
+      </div>
+    ))}
+    <button style={styles.btn} onClick={buildParlay}>
+      Build AI Parlay
+    </button>
+  </div>
+
+  {/* 🎯 AUTO SUGGESTIONS */}
+  <div style={styles.card}>
+    <h3>🎯 Auto Bet Suggestions</h3>
+    {autoSuggestions.map(g=>(
+      <div key={g.id} style={styles.row}>
+        <div>{g.away} @ {g.home}</div>
+        <div style={styles.sub}>EV {Number(g.ev||0).toFixed(2)}%</div>
+        <button style={styles.smallBtn} onClick={()=>addToSlip(g, g.homeOdds, "AUTO")}>
+          Add
+        </button>
+      </div>
+    ))}
+  </div>
+
+  {/* 📈 MARKETS + CHARTS */}
+  <div style={styles.market}>
+    <div style={styles.header}>
+      <span>Game</span>
+      <span>DK</span>
+      <span>FD</span>
+      <span>Best</span>
+      <span>Hedge</span>
+    </div>
+
+    {games.map(g=>{
+      const dk=g.books?.[0];
+      const fd=g.books?.[1];
+      const best = dk?.home > fd?.home ? dk : fd;
+
+      return(
+        <div key={g.id} style={styles.marketRow}>
+
+          <div>
+            <div>{g.away}</div>
+            <div style={styles.sub}>{g.home}</div>
+
+            {/* 📈 CHART */}
+            <div style={{height:50}}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={historyMap[g.id] || []}>
+                  <Line dataKey="odds" stroke="#00ff99" dot={false}/>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <button style={styles.odds} onClick={()=>addToSlip(g,dk?.home,"DK")}>
+            {dk?.home}
+          </button>
+
+          <button style={styles.odds} onClick={()=>addToSlip(g,fd?.home,"FD")}>
+            {fd?.home}
+          </button>
+
+          <button style={styles.best} onClick={()=>addToSlip(g,best?.home,"BEST")}>
+            {best?.home}
+          </button>
+
+          {/* 🛡 Hedge trigger */}
+          <button
+            style={styles.smallBtn}
+            onClick={()=>setHedgeGame(g)}
+          >
+            Hedge
+          </button>
+
+        </div>
+      );
+    })}
+  </div>
+
+  {/* 🛡 HEDGE ENGINE PANEL */}
+  {hedgeGame && (
+    <div style={styles.hedgePanel}>
+      <h3>🛡 Hedge Engine</h3>
+
+      <div>{hedgeGame.away} @ {hedgeGame.home}</div>
+
+      <input
+        value={hedgeStake}
+        onChange={e=>setHedgeStake(Number(e.target.value))}
+        style={styles.input}
+      />
+
+      {(() => {
+        const dk = hedgeGame.books?.[0];
+        const fd = hedgeGame.books?.[1];
+        if (!dk || !fd) return <div style={styles.sub}>Need 2 books</div>;
+
+        const h = calcHedge(dk.home, fd.away, hedgeStake);
+        return (
+          <div style={{marginTop:10}}>
+            <div>Bet A: ${h.stakeA}</div>
+            <div>Bet B: ${h.stakeB}</div>
+            <div style={styles.green}>Profit: ${h.profit} ({h.roi}%)</div>
+          </div>
+        );
+      })()}
+
+      <button style={styles.btn} onClick={()=>setHedgeGame(null)}>
+        Close
+      </button>
+    </div>
+  )}
+
+  {/* 💰 BET SLIP */}
+  <div style={styles.slip}>
+    <h3>Bet Slip</h3>
+
+    {betSlip.map((b,i)=>(
+      <div key={i}>{b.home} ({b.book})</div>
+    ))}
+
+    <input
+      value={stake}
+      onChange={e=>setStake(Number(e.target.value))}
+      style={styles.input}
+    />
+
+    <div>Payout: ${payout()}</div>
+
+    <button style={styles.btn}>Place Bet</button>
+  </div>
+
+</div>
+);
 }
 
-start();
+/* ================= STYLES ================= */
+const styles={
+page:{background:"#0b0b0b",color:"white",padding:"20px"},
+logo:{fontSize:"28px"},
+
+tabs:{display:"flex",gap:"10px",marginBottom:"10px"},
+tab:{padding:"8px 12px",border:"none"},
+
+ticker:{overflow:"hidden",whiteSpace:"nowrap",borderBottom:"1px solid #222",marginBottom:"8px"},
+tickerMove:{display:"inline-block",animation:"scroll 25s linear infinite"},
+
+card:{background:"#111",padding:"15px",marginBottom:"10px",borderRadius:"8px"},
+alert:{color:"orange",padding:"4px 0"},
+
+market:{background:"#111",borderRadius:"8px"},
+header:{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr",padding:"10px",borderBottom:"1px solid #222"},
+marketRow:{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr 1fr",padding:"10px",borderBottom:"1px solid #222"},
+
+odds:{background:"#1a1a1a",color:"#00ff99",padding:"6px",borderRadius:"6px"},
+best:{background:"#1a1a1a",border:"1px solid #00ff99",padding:"6px",borderRadius:"6px"},
+
+row:{display:"flex",justifyContent:"space-between",alignItems:"center"},
+green:{color:"#00ff99"},
+sub:{color:"#aaa"},
+
+slip:{position:"fixed",right:"20px",top:"120px",width:"260px",background:"#000",padding:"10px",borderRadius:"8px"},
+btn:{background:"#00ff99",color:"#000",padding:"8px",border:"none",marginTop:"10px"},
+smallBtn:{background:"#222",color:"#fff",padding:"6px",border:"none",borderRadius:"6px"},
+
+hedgePanel:{
+position:"fixed",
+left:"20px",
+top:"120px",
+width:"260px",
+background:"#000",
+padding:"15px",
+borderRadius:"8px",
+border:"1px solid #00ff99"
+},
+
+input:{
+width:"100%",
+padding:"6px",
+marginTop:"10px",
+background:"#111",
+color:"#fff",
+border:"1px solid #333"
+}
+};
