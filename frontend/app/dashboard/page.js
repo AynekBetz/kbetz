@@ -23,10 +23,14 @@ const fetchGames = async () => {
     const res = await fetch(`${API}/api/data`);
     const data = await res.json();
 
-    let list = data.games;
+    let list = [];
 
-    // 🔥 fallback so UI ALWAYS shows something
-    if (!list || list.length === 0) {
+    if (data && Array.isArray(data.games) && data.games.length > 0) {
+      list = data.games;
+      console.log("REAL DATA:", list);
+    } else {
+      console.log("USING FALLBACK DATA");
+
       list = [
         {
           id:"1",
@@ -58,7 +62,22 @@ const fetchGames = async () => {
     setGames(list);
 
   } catch (err) {
-    console.log(err);
+    console.log("FETCH ERROR → USING FALLBACK");
+
+    setGames([
+      {
+        id:"1",
+        home:"Fallback Lakers",
+        away:"Fallback Warriors",
+        homeOdds:-110,
+        ev:8,
+        confidence:60,
+        books:[
+          {name:"DK",home:-110},
+          {name:"FD",home:-105}
+        ]
+      }
+    ]);
   }
 };
 
@@ -79,9 +98,9 @@ const aiPicks = games.slice(0,2);
 return (
 <div style={styles.page}>
 
-  {/* 🔴 TEST BUILD (DO NOT REMOVE YET) */}
-  <div style={{color:"red", fontSize:"22px", marginBottom:"10px"}}>
-    TEST BUILD
+  {/* 🔴 DEBUG (remove later) */}
+  <div style={{color:"red", marginBottom:"10px"}}>
+    UI LIVE
   </div>
 
   <h1 style={styles.logo}>KBETZ TERMINAL</h1>
@@ -98,7 +117,7 @@ return (
 
           <div style={styles.meta}>
             EV: +{g.ev}% &nbsp;
-            Conf: {g.confidence}% &nbsp;
+            Conf: {g.confidence}%
           </div>
         </div>
 
@@ -165,20 +184,33 @@ return (
 
 const styles = {
 
-page:{background:"#000",color:"white",padding:"20px"},
+page:{
+  background:"#000",
+  color:"white",
+  padding:"20px",
+  minHeight:"100vh"
+},
 
-logo:{color:"#00ff99",textShadow:"0 0 10px #00ff99"},
+logo:{
+  color:"#00ff99",
+  textShadow:"0 0 10px #00ff99",
+  marginBottom:"10px"
+},
 
 aiHero:{
   background:"linear-gradient(135deg,#6b21a8,#3b0764)",
   padding:"20px",
   borderRadius:"12px",
-  marginBottom:"20px"
+  marginBottom:"20px",
+  boxShadow:"0 0 30px rgba(168,85,247,0.4)"
 },
 
 aiRow:{
   display:"flex",
   justifyContent:"space-between",
+  padding:"10px",
+  background:"rgba(0,0,0,0.3)",
+  borderRadius:"10px",
   marginBottom:"10px"
 },
 
@@ -201,8 +233,19 @@ marketRow:{
   borderRadius:"6px"
 },
 
-odds:{color:"#00ff99",border:"none",background:"transparent"},
-best:{background:"#00ff99",color:"#000",padding:"5px"},
+odds:{
+  color:"#00ff99",
+  border:"none",
+  background:"transparent",
+  cursor:"pointer"
+},
+
+best:{
+  background:"#00ff99",
+  color:"#000",
+  padding:"5px",
+  borderRadius:"4px"
+},
 
 slip:{
   position:"fixed",
@@ -214,6 +257,12 @@ slip:{
   padding:"10px"
 },
 
-betBtn:{background:"#00ff99",color:"#000",padding:"8px"}
+betBtn:{
+  background:"#00ff99",
+  color:"#000",
+  padding:"8px",
+  marginTop:"10px",
+  cursor:"pointer"
+}
 
 };
