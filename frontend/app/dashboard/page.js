@@ -8,7 +8,6 @@ const API = "https://kbetz-backend.onrender.com";
 
 export default function Dashboard() {
 
-/* ================= STATE ================= */
 const [games, setGames] = useState([]);
 const [betSlip, setBetSlip] = useState([]);
 const [stake, setStake] = useState(100);
@@ -25,12 +24,9 @@ const fetchGames = async () => {
 
     let list = [];
 
-    if (data && Array.isArray(data.games) && data.games.length > 0) {
+    if (data?.games?.length > 0) {
       list = data.games;
-      console.log("REAL DATA:", list);
     } else {
-      console.log("USING FALLBACK DATA");
-
       list = [
         {
           id:"1",
@@ -62,16 +58,14 @@ const fetchGames = async () => {
     setGames(list);
 
   } catch (err) {
-    console.log("FETCH ERROR → USING FALLBACK");
+    console.log("FETCH ERROR", err);
 
     setGames([
       {
-        id:"1",
+        id:"fallback",
         home:"Fallback Lakers",
         away:"Fallback Warriors",
         homeOdds:-110,
-        ev:8,
-        confidence:60,
         books:[
           {name:"DK",home:-110},
           {name:"FD",home:-105}
@@ -82,12 +76,12 @@ const fetchGames = async () => {
 };
 
 /* ================= BET ================= */
-const addToSlip = (g) => setBetSlip([...betSlip, g]);
+const addToSlip = (g) => setBetSlip(prev => [...prev, g]);
 
 const toDecimal = (o)=> o>0 ? (o/100)+1 : (100/Math.abs(o))+1;
 
 const payout = () => {
-  const odds = betSlip.reduce((a,b)=>a*toDecimal(b.homeOdds||-110),1);
+  const odds = betSlip.reduce((a,b)=>a*toDecimal(b?.homeOdds || -110),1);
   return (stake * odds).toFixed(2);
 };
 
@@ -98,10 +92,7 @@ const aiPicks = games.slice(0,2);
 return (
 <div style={styles.page}>
 
-  {/* 🔴 DEBUG (remove later) */}
-  <div style={{color:"red", marginBottom:"10px"}}>
-    UI LIVE
-  </div>
+  <div style={{color:"red"}}>UI LIVE</div>
 
   <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
@@ -113,16 +104,15 @@ return (
       <div key={g.id} style={styles.aiRow}>
 
         <div>
-          <div style={styles.game}>{g.away} @ {g.home}</div>
+          <div>{g?.away} @ {g?.home}</div>
 
           <div style={styles.meta}>
-            EV: +{g.ev}% &nbsp;
-            Conf: {g.confidence}%
+            EV: +{g?.ev ?? 0}% | Conf: {g?.confidence ?? 0}%
           </div>
         </div>
 
         <div style={styles.oddsRed}>
-          {g.homeOdds}
+          {g?.homeOdds ?? "-"}
         </div>
 
       </div>
@@ -133,32 +123,35 @@ return (
   <div style={styles.marketBox}>
     <h3>Markets</h3>
 
-    {games.map(g=>{
+    {games.map((g)=>{
 
-      const dk=g.books?.[0];
-      const fd=g.books?.[1];
-      const best = dk?.home > fd?.home ? dk : fd;
+      const dk = g?.books?.[0];
+      const fd = g?.books?.[1];
+
+      const best =
+        (dk?.home ?? -999) > (fd?.home ?? -999) ? dk : fd;
 
       return(
         <div key={g.id} style={styles.marketRow}>
 
-          <span>{g.away} @ {g.home}</span>
+          <span>{g?.away} @ {g?.home}</span>
 
           <button style={styles.odds} onClick={()=>addToSlip(g)}>
-            {dk?.home}
+            {dk?.home ?? "-"}
           </button>
 
           <button style={styles.odds} onClick={()=>addToSlip(g)}>
-            {fd?.home}
+            {fd?.home ?? "-"}
           </button>
 
           <button style={styles.best} onClick={()=>addToSlip(g)}>
-            {best?.home}
+            {best?.home ?? "-"}
           </button>
 
         </div>
       );
     })}
+
   </div>
 
   {/* BET SLIP */}
@@ -166,7 +159,7 @@ return (
     <h3>Bet Slip</h3>
 
     {betSlip.map((b,i)=>(
-      <div key={i}>{b.home}</div>
+      <div key={i}>{b?.home}</div>
     ))}
 
     <input value={stake} onChange={e=>setStake(e.target.value)} />
@@ -183,46 +176,26 @@ return (
 /* ================= STYLES ================= */
 
 const styles = {
-
-page:{
-  background:"#000",
-  color:"white",
-  padding:"20px",
-  minHeight:"100vh"
-},
-
-logo:{
-  color:"#00ff99",
-  textShadow:"0 0 10px #00ff99",
-  marginBottom:"10px"
-},
+page:{background:"#000",color:"white",padding:"20px"},
+logo:{color:"#00ff99",textShadow:"0 0 10px #00ff99"},
 
 aiHero:{
   background:"linear-gradient(135deg,#6b21a8,#3b0764)",
   padding:"20px",
   borderRadius:"12px",
-  marginBottom:"20px",
-  boxShadow:"0 0 30px rgba(168,85,247,0.4)"
+  marginBottom:"20px"
 },
 
 aiRow:{
   display:"flex",
   justifyContent:"space-between",
-  padding:"10px",
-  background:"rgba(0,0,0,0.3)",
-  borderRadius:"10px",
   marginBottom:"10px"
 },
 
-game:{fontWeight:"bold"},
 meta:{fontSize:"12px",color:"#ccc"},
-oddsRed:{color:"red",fontWeight:"bold"},
+oddsRed:{color:"red"},
 
-marketBox:{
-  background:"#0a0a0a",
-  padding:"15px",
-  borderRadius:"10px"
-},
+marketBox:{background:"#0a0a0a",padding:"15px",borderRadius:"10px"},
 
 marketRow:{
   display:"flex",
@@ -233,19 +206,8 @@ marketRow:{
   borderRadius:"6px"
 },
 
-odds:{
-  color:"#00ff99",
-  border:"none",
-  background:"transparent",
-  cursor:"pointer"
-},
-
-best:{
-  background:"#00ff99",
-  color:"#000",
-  padding:"5px",
-  borderRadius:"4px"
-},
+odds:{color:"#00ff99",background:"transparent",border:"none"},
+best:{background:"#00ff99",color:"#000",padding:"5px"},
 
 slip:{
   position:"fixed",
@@ -257,12 +219,5 @@ slip:{
   padding:"10px"
 },
 
-betBtn:{
-  background:"#00ff99",
-  color:"#000",
-  padding:"8px",
-  marginTop:"10px",
-  cursor:"pointer"
-}
-
+betBtn:{background:"#00ff99",color:"#000",padding:"8px"}
 };
