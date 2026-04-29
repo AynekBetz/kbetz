@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
 
 const API = "https://kbetz-backend.onrender.com";
 
@@ -14,11 +13,14 @@ const [stake, setStake] = useState(100);
 const [lastOdds, setLastOdds] = useState({});
 const [ticker, setTicker] = useState("");
 const [sound, setSound] = useState(null);
+const [isPro, setIsPro] = useState(false);
 
 /* ================= INIT ================= */
 useEffect(() => {
   fetchGames();
-  const interval = setInterval(fetchGames, 6000);
+  checkPro();
+
+  const interval = setInterval(fetchGames, 5000);
   return () => clearInterval(interval);
 }, []);
 
@@ -59,10 +61,28 @@ const fetchGames = async () => {
   });
 };
 
-/* ================= BET ================= */
-const addToSlip = (g) => {
-  setBetSlip([...betSlip, g]);
+/* ================= PRO ================= */
+const checkPro = async () => {
+  try {
+    const res = await fetch(`${API}/api/me?email=test@test.com`);
+    const data = await res.json();
+    setIsPro(data.isPro);
+  } catch {}
 };
+
+const upgrade = async () => {
+  const res = await fetch(`${API}/api/checkout`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ email:"test@test.com" })
+  });
+
+  const data = await res.json();
+  window.location.href = data.url;
+};
+
+/* ================= BET ================= */
+const addToSlip = (g) => setBetSlip([...betSlip, g]);
 
 const toDecimal = (o)=> o>0 ? (o/100)+1 : (100/Math.abs(o))+1;
 
@@ -80,6 +100,59 @@ const aiPicks = [...games]
 return (
 <div style={styles.page}>
 
+{/* GLOBAL STYLES */}
+<style>{`
+
+@keyframes scroll {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 5px #00ff99; }
+  50% { box-shadow: 0 0 20px #00ff99; }
+  100% { box-shadow: 0 0 5px #00ff99; }
+}
+
+@keyframes flashUp {
+  0% { background: rgba(0,255,153,0.3); }
+  100% { background: transparent; }
+}
+
+@keyframes flashDown {
+  0% { background: rgba(255,0,0,0.3); }
+  100% { background: transparent; }
+}
+
+/* GLASS */
+.glass {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,255,153,0.15);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+}
+
+/* 3D */
+.card3d {
+  transform-style: preserve-3d;
+  transition: 0.2s;
+}
+
+.card3d:hover {
+  transform: translateY(-4px) scale(1.01);
+}
+
+/* SAFE BLUR */
+.blurOverlay {
+  position:absolute;
+  inset:0;
+  backdrop-filter:blur(6px);
+  background:rgba(0,0,0,0.4);
+  pointer-events:none;
+}
+
+`}</style>
+
 {/* TICKER */}
 <div style={styles.ticker}>
   <div style={styles.tickerMove}>{ticker}</div>
@@ -88,7 +161,7 @@ return (
 <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
 {/* AI PICKS */}
-<div style={styles.card}>
+<div style={styles.card} className="glass card3d">
   <h3>🧠 AI PICKS</h3>
 
   {aiPicks.map(p=>(
@@ -100,25 +173,20 @@ return (
 </div>
 
 {/* MARKETS */}
-<div style={styles.market}>
-
-<div style={styles.header}>
-  <span>Game</span>
-  <span>DK</span>
-  <span>FD</span>
-  <span>Best</span>
-</div>
+<div style={styles.market} className="glass">
 
 {games.map(g=>{
   const dk=g.books?.[0];
   const fd=g.books?.[1];
   const best = dk?.home > fd?.home ? dk : fd;
 
+  const flash =
+    g.move > 0 ? { animation:"flashUp 0.5s" } :
+    g.move < 0 ? { animation:"flashDown 0.5s" } :
+    {};
+
   return(
-    <div key={g.id} style={{
-      ...styles.marketRow,
-      boxShadow: g.move > 0 ? "0 0 10px #00ff99" : g.move < 0 ? "0 0 10px red" : "none"
-    }}>
+    <div key={g.id} style={{...styles.marketRow,...flash}} className="card3d">
 
       <div>
         <div>{g.away}</div>
@@ -143,18 +211,33 @@ return (
 
 </div>
 
+{/* PRO SECTION */}
+<div style={{position:"relative",marginTop:"20px"}}>
+
+{!isPro && <div className="blurOverlay" />}
+
+<div style={{position:"relative",zIndex:2}}>
+
+<h3>🔥 PRO FEATURES</h3>
+<div>Advanced AI + Steam + Arbitrage</div>
+
+<button onClick={upgrade} style={styles.btn}>
+  Upgrade to PRO
+</button>
+
+</div>
+
+</div>
+
 {/* BET SLIP */}
-<div style={styles.slip}>
+<div style={styles.slip} className="glass card3d">
 <h3>Bet Slip</h3>
 
 {betSlip.map((b,i)=>(
   <div key={i}>{b.home}</div>
 ))}
 
-<input
-value={stake}
-onChange={e=>setStake(e.target.value)}
-/>
+<input value={stake} onChange={e=>setStake(e.target.value)} />
 
 <div>Payout: ${payout()}</div>
 
@@ -178,50 +261,27 @@ page:{
 
 logo:{
   color:"#00ff99",
-  fontSize:"28px",
   textShadow:"0 0 15px #00ff99"
 },
 
-ticker:{
-  overflow:"hidden",
-  borderBottom:"1px solid #222"
-},
-
+ticker:{overflow:"hidden"},
 tickerMove:{
   animation:"scroll 25s linear infinite",
   color:"#00ff99"
 },
 
-card:{
-  background:"rgba(255,255,255,0.03)",
-  backdropFilter:"blur(10px)",
-  border:"1px solid rgba(0,255,153,0.2)",
-  padding:"15px",
-  borderRadius:"10px",
-  marginBottom:"15px"
-},
+card:{padding:"15px",marginBottom:"15px",borderRadius:"10px"},
 
-market:{
-  background:"#111",
-  borderRadius:"10px"
-},
-
-header:{
-  display:"grid",
-  gridTemplateColumns:"2fr 1fr 1fr 1fr",
-  padding:"10px"
-},
+market:{borderRadius:"10px"},
 
 marketRow:{
   display:"grid",
   gridTemplateColumns:"2fr 1fr 1fr 1fr",
   padding:"10px",
-  borderBottom:"1px solid #222",
-  transition:"0.2s"
+  borderBottom:"1px solid #222"
 },
 
 odds:{
-  background:"#111",
   border:"1px solid #00ff99",
   color:"#00ff99",
   padding:"6px",
@@ -231,22 +291,15 @@ odds:{
 best:{
   background:"#00ff99",
   color:"#000",
-  padding:"6px"
+  padding:"6px",
+  animation:"pulse 2s infinite"
 },
 
-row:{
-  display:"flex",
-  justifyContent:"space-between"
-},
+row:{display:"flex",justifyContent:"space-between"},
 
-glow:{
-  color:"#00ff99",
-  textShadow:"0 0 10px #00ff99"
-},
+glow:{color:"#00ff99",textShadow:"0 0 10px #00ff99"},
 
-sub:{
-  color:"#777"
-},
+sub:{color:"#777"},
 
 slip:{
   position:"fixed",
@@ -261,7 +314,8 @@ btn:{
   background:"#00ff99",
   color:"#000",
   padding:"8px",
-  marginTop:"10px"
+  marginTop:"10px",
+  cursor:"pointer"
 }
 
 };
