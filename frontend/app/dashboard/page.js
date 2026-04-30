@@ -90,11 +90,11 @@ return (
 
 <div style={styles.page}>
 
-{/* 🔥 GRADIENT BRAND TITLE */}
+{/* 🔥 SIGNATURE KBETZ TITLE */}
 
 <h1 style={styles.logoGradient}>KBETZ TERMINAL</h1>
 
-{/* 🧠 ELITE AI PICKS */}
+{/* 🧠 AI PICKS */}
 
 <div style={styles.aiCardElite}>
   <h3>🧠 AI PICKS</h3>
@@ -186,17 +186,20 @@ padding:"20px",
 minHeight:"100vh"
 },
 
-/* 🔥 SIGNATURE TITLE */
+/* 🔥 YOUR SIGNATURE GRADIENT + GLOW */
 logoGradient:{
-fontSize:"28px",
-fontWeight:"bold",
-background:"linear-gradient(90deg,#a855f7,#22c55e)",
+fontSize:"30px",
+fontWeight:"900",
+letterSpacing:"1px",
+background:"linear-gradient(90deg,#a855f7 0%, #7c3aed 25%, #22c55e 75%, #00ff99 100%)",
 WebkitBackgroundClip:"text",
 WebkitTextFillColor:"transparent",
-textShadow:"0 0 20px rgba(168,85,247,0.5)"
+textShadow:`  0 0 8px rgba(168,85,247,0.6),
+  0 0 16px rgba(34,197,94,0.4),
+  0 0 30px rgba(0,255,153,0.25)`
 },
 
-/* 🔥 AI CARD */
+/* AI CARD */
 aiCardElite:{
 background:"linear-gradient(135deg,#7c3aed,#4c1d95)",
 padding:"20px",
