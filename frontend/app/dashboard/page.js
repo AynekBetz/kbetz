@@ -18,40 +18,37 @@ const fetchGames = async () => {
 try {
 if (!API) throw new Error("No API");
 
+const res = await fetch(`${API}/api/data`);
+const data = await res.json();
 
-  const res = await fetch(`${API}/api/data`);
-  const data = await res.json();
-
-  if (!data?.games || data.games.length === 0) {
-    throw new Error("No games");
-  }
-
-  setGames(data.games);
-
-} catch (err) {
-  console.log("Using fallback data");
-
-  setGames([
-    {
-      id:"1",
-      home:"Lakers",
-      away:"Warriors",
-      homeOdds:-110,
-      confidence:72,
-      edgeScore:8
-    },
-    {
-      id:"2",
-      home:"Celtics",
-      away:"Heat",
-      homeOdds:-105,
-      confidence:68,
-      edgeScore:6
-    }
-  ]);
+if (!data?.games || data.games.length === 0) {
+throw new Error("No games");
 }
 
+setGames(data.games);
 
+} catch (err) {
+console.log("Using fallback data");
+
+setGames([
+{
+id:"1",
+home:"Lakers",
+away:"Warriors",
+homeOdds:-110,
+confidence:72,
+edgeScore:8
+},
+{
+id:"2",
+home:"Celtics",
+away:"Heat",
+homeOdds:-105,
+confidence:68,
+edgeScore:6
+}
+]);
+}
 };
 
 const aiPicks = [...games]
@@ -78,87 +75,96 @@ const odds = betSlip.reduce(
 return (stake * odds).toFixed(2);
 };
 
-return ( <div style={styles.page}>
+return (
 
+<div style={styles.page}>
 
-  {/* 🔥 SIGNATURE TITLE */}
+{/* 🔥 FIXED SIGNATURE TITLE */}
+
   <h1 style={styles.logo}>
-    <span style={styles.kbetz}>KBETZ</span>{" "}
-    <span style={styles.terminal}>TERMINAL</span>
+    KBETZ TERMINAL
   </h1>
 
-  {/* AI PICKS */}
+{/* AI PICKS */}
+
   <div style={styles.aiCard}>
     <h3>🧠 AI PICKS</h3>
 
-    {aiPicks.map(p => (
-      <div key={p.id} style={styles.aiRow}>
-
-        <div>
-          <div style={styles.gameTitle}>
-            {p.away} @ {p.home}
-          </div>
-
-          <div style={styles.meta}>
-            <span style={styles.ev}>EV: +{p.edgeScore}%</span>
-            <span>Conf: {p.confidence}%</span>
-            <span style={styles.edge}>MED EDGE</span>
-          </div>
-
-          <div style={styles.note}>
-            • Line moving against public • Positive EV vs market
-          </div>
-        </div>
-
-        <div style={styles.odds}>
-          {p.homeOdds} ↓
-        </div>
-
+```
+{aiPicks.map(p => (
+  <div key={p.id} style={styles.aiRow}>
+    <div>
+      <div style={styles.gameTitle}>
+        {p.away} @ {p.home}
       </div>
-    ))}
 
-    <button style={styles.btn} onClick={buildParlay}>
-      🔗 Build AI Parlay
-    </button>
+      <div style={styles.meta}>
+        <span style={styles.ev}>EV: +{p.edgeScore}%</span>
+        <span>Conf: {p.confidence}%</span>
+        <span style={styles.edge}>MED EDGE</span>
+      </div>
+
+      <div style={styles.note}>
+        • Line moving against public • Positive EV vs market
+      </div>
+    </div>
+
+    <div style={styles.odds}>
+      {p.homeOdds} ↓
+    </div>
+  </div>
+))}
+
+<button style={styles.btn} onClick={buildParlay}>
+  🔗 Build AI Parlay
+</button>
+```
+
   </div>
 
-  {/* MARKETS */}
+{/* MARKETS */}
+
   <div style={styles.card}>
     <h3>Markets</h3>
 
-    {games.map(g => (
-      <div key={g.id} style={styles.row}>
-        {g.away} @ {g.home}
+```
+{games.map(g => (
+  <div key={g.id} style={styles.row}>
+    {g.away} @ {g.home}
 
-        <button style={styles.oddsBtn} onClick={()=>addToSlip(g)}>
-          {g.homeOdds}
-        </button>
-      </div>
-    ))}
+    <button style={styles.oddsBtn} onClick={()=>addToSlip(g)}>
+      {g.homeOdds}
+    </button>
+  </div>
+))}
+```
+
   </div>
 
-  {/* BET SLIP */}
+{/* BET SLIP */}
+
   <div style={styles.slip}>
     <h3>Bet Slip</h3>
 
-    {betSlip.map(b => (
-      <div key={b.id}>{b.home}</div>
-    ))}
+```
+{betSlip.map(b => (
+  <div key={b.id}>{b.home}</div>
+))}
 
-    <input
-      value={stake}
-      onChange={e=>setStake(Number(e.target.value))}
-      style={styles.input}
-    />
+<input
+  value={stake}
+  onChange={e=>setStake(Number(e.target.value))}
+  style={styles.input}
+/>
 
-    <div>Payout: ${payout()}</div>
+<div>Payout: ${payout()}</div>
 
-    <button style={styles.place}>Place Bet</button>
+<button style={styles.place}>Place Bet</button>
+```
+
   </div>
 
 </div>
-
-
 );
 }
 
@@ -173,21 +179,15 @@ padding:"20px",
 minHeight:"100vh"
 },
 
+/* 🔥 TRUE BLENDED KBETZ SIGNATURE */
 logo:{
 fontSize:"28px",
 fontWeight:"900",
-letterSpacing:"1px"
-},
-
-/* 🔥 YOUR SIGNATURE COLORS */
-kbetz:{
-color:"#a855f7",
-textShadow:"0 0 10px rgba(168,85,247,0.7)"
-},
-
-terminal:{
-color:"#00ff99",
-textShadow:"0 0 10px rgba(0,255,153,0.7)"
+letterSpacing:"1px",
+background:"linear-gradient(90deg,#a855f7,#00ff99)",
+WebkitBackgroundClip:"text",
+WebkitTextFillColor:"transparent",
+textShadow:"0 0 20px rgba(168,85,247,0.35)"
 },
 
 aiCard:{
