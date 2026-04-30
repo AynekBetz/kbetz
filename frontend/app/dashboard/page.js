@@ -33,7 +33,7 @@ setGames(data.games);
 
 
 } catch (err) {
-console.log("Using fallback data");
+console.log("Using fallback");
 
 
 setGames([
@@ -90,16 +90,19 @@ return (
 
 <div style={styles.page}>
 
-{/* 🔥 SIGNATURE KBETZ TITLE */}
+{/* 🔥 TRUE KBETZ BRAND */}
 
-<h1 style={styles.logoGradient}>KBETZ TERMINAL</h1>
+<h1 style={styles.logo}>
+  <span style={styles.kbetz}>KBETZ</span>{" "}
+  <span style={styles.terminal}>TERMINAL</span>
+</h1>
 
-{/* 🧠 AI PICKS */}
+{/* AI PICKS */}
 
-<div style={styles.aiCardElite}>
+<div style={styles.aiCard}>
   <h3>🧠 AI PICKS</h3>
 
-{aiPicks.map(p => ( <div key={p.id} style={styles.aiRowElite}>
+{aiPicks.map(p => ( <div key={p.id} style={styles.aiRow}>
 
 
   <div>
@@ -107,18 +110,18 @@ return (
       {p.away} @ {p.home}
     </div>
 
-    <div style={styles.metaElite}>
+    <div style={styles.meta}>
       <span style={styles.ev}>EV: +{p.edgeScore}%</span>
       <span>Conf: {p.confidence}%</span>
-      <span style={styles.edgeTag}>MED EDGE</span>
+      <span style={styles.edge}>MED EDGE</span>
     </div>
 
-    <div style={styles.sharpNote}>
+    <div style={styles.note}>
       • Line moving against public • Positive EV vs market
     </div>
   </div>
 
-  <div style={styles.oddsRed}>
+  <div style={styles.odds}>
     {p.homeOdds} ↓
   </div>
 
@@ -127,12 +130,12 @@ return (
 
 ))}
 
-  <button style={styles.aiBtn} onClick={buildParlay}>
+  <button style={styles.btn} onClick={buildParlay}>
     🔗 Build AI Parlay
   </button>
 </div>
 
-{/* 📈 MARKETS */}
+{/* MARKETS */}
 
 <div style={styles.card}>
   <h3>Markets</h3>
@@ -141,7 +144,7 @@ return (
 {g.away} @ {g.home}
 
 
-  <button style={styles.odds} onClick={()=>addToSlip(g)}>
+  <button style={styles.oddsBtn} onClick={()=>addToSlip(g)}>
     {g.homeOdds}
   </button>
 </div>
@@ -151,7 +154,7 @@ return (
 
 </div>
 
-{/* 💰 BET SLIP */}
+{/* BET SLIP */}
 
 <div style={styles.slip}>
 <h3>Bet Slip</h3>
@@ -186,21 +189,24 @@ padding:"20px",
 minHeight:"100vh"
 },
 
-/* 🔥 YOUR SIGNATURE GRADIENT + GLOW */
-logoGradient:{
-fontSize:"30px",
-fontWeight:"900",
-letterSpacing:"1px",
-background:"linear-gradient(90deg,#a855f7 0%, #7c3aed 25%, #22c55e 75%, #00ff99 100%)",
-WebkitBackgroundClip:"text",
-WebkitTextFillColor:"transparent",
-textShadow:`  0 0 8px rgba(168,85,247,0.6),
-  0 0 16px rgba(34,197,94,0.4),
-  0 0 30px rgba(0,255,153,0.25)`
+/* 🔥 BRAND TITLE */
+logo:{
+fontSize:"28px",
+fontWeight:"900"
+},
+
+kbetz:{
+color:"#a855f7",
+textShadow:"0 0 12px rgba(168,85,247,0.8)"
+},
+
+terminal:{
+color:"#00ff99",
+textShadow:"0 0 12px rgba(0,255,153,0.8)"
 },
 
 /* AI CARD */
-aiCardElite:{
+aiCard:{
 background:"linear-gradient(135deg,#7c3aed,#4c1d95)",
 padding:"20px",
 borderRadius:"16px",
@@ -208,7 +214,7 @@ marginBottom:"20px",
 boxShadow:"0 0 40px rgba(124,58,237,0.5)"
 },
 
-aiRowElite:{
+aiRow:{
 display:"flex",
 justifyContent:"space-between",
 padding:"15px",
@@ -218,46 +224,42 @@ background:"rgba(0,0,0,0.2)"
 },
 
 gameTitle:{
-fontWeight:"bold",
-fontSize:"15px"
+fontWeight:"bold"
 },
 
-metaElite:{
+meta:{
 fontSize:"12px",
-marginTop:"5px",
 display:"flex",
 gap:"10px",
-color:"#ddd"
+marginTop:"5px"
 },
 
-ev:{
-color:"#22c55e"
-},
+ev:{color:"#22c55e"},
 
-edgeTag:{
+edge:{
 color:"#facc15",
 fontWeight:"bold"
 },
 
-sharpNote:{
+note:{
 fontSize:"11px",
-marginTop:"4px",
-color:"#bbb"
+color:"#bbb",
+marginTop:"4px"
 },
 
-oddsRed:{
+odds:{
 color:"#ef4444",
 fontWeight:"bold"
 },
 
-aiBtn:{
+btn:{
 marginTop:"15px",
 background:"#22c55e",
 color:"#000",
 padding:"10px",
 border:"none",
-cursor:"pointer",
-borderRadius:"6px"
+borderRadius:"6px",
+cursor:"pointer"
 },
 
 /* MARKETS */
@@ -273,16 +275,14 @@ justifyContent:"space-between",
 padding:"14px",
 marginBottom:"8px",
 background:"#050505",
-borderRadius:"8px",
-border:"1px solid rgba(255,255,255,0.05)"
+borderRadius:"8px"
 },
 
-odds:{
+oddsBtn:{
 background:"#0f0f0f",
 border:"1px solid #22c55e",
 color:"#22c55e",
 padding:"6px 12px",
-cursor:"pointer",
 borderRadius:"6px"
 },
 
@@ -304,7 +304,6 @@ color:"#000",
 padding:"10px",
 border:"none",
 marginTop:"10px",
-cursor:"pointer",
 borderRadius:"6px"
 }
 
