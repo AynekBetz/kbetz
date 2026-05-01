@@ -10,13 +10,23 @@ const [games, setGames] = useState([]);
 const [betSlip, setBetSlip] = useState([]);
 const [stake, setStake] = useState(100);
 
-/* 🔥 NEW: toggle state for WHY panels */
+/* 🔥 WHY TOGGLE */
 const [openWhy, setOpenWhy] = useState({});
+
+/* 🔥 LIVE MOVEMENT STATE */
+const [lastOdds, setLastOdds] = useState({});
+const [flashMap, setFlashMap] = useState({});
 
 useEffect(() => {
 fetchGames();
+
+/* 🔥 refresh every 10s */
+const interval = setInterval(fetchGames, 10000);
+return () => clearInterval(interval);
+
 }, []);
 
+/* ================= FETCH ================= */
 const fetchGames = async () => {
 try {
 if (!API) throw new Error("No API");
@@ -24,14 +34,40 @@ if (!API) throw new Error("No API");
 const res = await fetch(`${API}/api/data`);
 const data = await res.json();
 
-if (!data?.games || data.games.length === 0) {
-throw new Error("No games");
+if (!data?.games) throw new Error();
+
+/* 🔥 DETECT MOVEMENT */
+const updated = data.games.map(g => {
+
+const prev = lastOdds[g.id] ?? g.homeOdds;
+const move = g.homeOdds - prev;
+
+if (move !== 0) {
+
+setFlashMap(prevMap => ({
+...prevMap,
+[g.id]: move > 0 ? "up" : "down"
+}));
+
+setTimeout(() => {
+setFlashMap(p => ({ ...p, [g.id]: null }));
+}, 800);
 }
 
-setGames(data.games);
+return g;
+});
+
+setGames(updated);
+
+/* store last odds */
+setLastOdds(prev => {
+const copy = { ...prev };
+updated.forEach(g => copy[g.id] = g.homeOdds);
+return copy;
+});
 
 } catch (err) {
-console.log("Using fallback data");
+console.log("fallback");
 
 setGames([
 {
@@ -44,7 +80,8 @@ edgeScore:8,
 move:2,
 steam:true,
 steamStrength:"medium",
-ev:6.5
+ev:6.5,
+books:[{name:"DK",home:-110},{name:"FD",home:-105}]
 },
 {
 id:"2",
@@ -56,12 +93,33 @@ edgeScore:6,
 move:-3,
 steam:true,
 steamStrength:"strong",
-ev:4.2
+ev:4.2,
+books:[{name:"DK",home:-105},{name:"FD",home:-102}]
 }
 ]);
 }
 };
 
+/* ================= HELPERS ================= */
+
+// 🔥 HEAT SCORE
+const getHeat = (g) => {
+let score = (g.edgeScore || 0) + (g.confidence || 0) / 10;
+if (g.steam) score += 5;
+return Math.min(score, 20);
+};
+
+// 🔥 BEST LINE
+const getBestLine = (g) => {
+if (!g.books || g.books.length === 0) return null;
+let best = g.books[0];
+g.books.forEach(b => {
+if (b.home > best.home) best = b;
+});
+return best;
+};
+
+/* ================= AI ================= */
 const aiPicks = [...games]
 .sort((a,b)=>(b.edgeScore||0)-(a.edgeScore||0))
 .slice(0,3);
@@ -86,135 +144,166 @@ const odds = betSlip.reduce(
 return (stake * odds).toFixed(2);
 };
 
-/* 🔥 NEW: helper to toggle WHY panel */
 const toggleWhy = (id) => {
 setOpenWhy(prev => ({ ...prev, [id]: !prev[id] }));
 };
 
+/* ================= UI ================= */
 return (
 
 <div style={styles.page}>
 
-{/* 🔥 SIGNATURE HEADER */}
+<div style={styles.topBar}>
+<h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
-  <div style={styles.topBar}>
-    <h1 style={styles.logo}>KBETZ TERMINAL</h1>
-
-```
 <div style={styles.actions}>
-  <span style={styles.pro}>PRO</span>
-  <button style={styles.smallBtn}>Logout</button>
-  <button style={styles.smallBtnOutline}>Sign Up</button>
+<span style={styles.pro}>PRO</span>
+<button style={styles.smallBtn}>Logout</button>
+<button style={styles.smallBtnOutline}>Sign Up</button>
 </div>
-```
+</div>
 
-  </div>
+<div style={styles.record}>
+🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
+</div>
 
-{/* 🔥 AI RECORD (TRUST) */}
+{/* 🔥 HEATMAP */}
 
-  <div style={styles.record}>
-    🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
-  </div>
+<div style={styles.heatmap}>
+{games.slice(0,5).map(g => (
+<div key={g.id} style={styles.heatRow}>
+<div>{g.home}</div>
+<div style={{
+...styles.heatBar,
+width: `${getHeat(g) * 5}%`
+}}/>
+</div>
+))}
+</div>
 
 {/* AI PICKS */}
 
-  <div style={styles.aiCard}>
-    <h3 style={styles.aiTitle}>🧠 AI PICKS</h3>
+<div style={styles.aiCard}>
+<h3 style={styles.aiTitle}>🧠 AI PICKS</h3>
 
-```
-{aiPicks.map(p => (
-  <div key={p.id} style={styles.aiRow}>
+{aiPicks.map(p => {
 
-    <div style={{flex:1}}>
-      <div style={styles.gameTitle}>
-        {p.away} @ {p.home}
-      </div>
+const best = getBestLine(p);
 
-      <div style={styles.meta}>
-        <span style={styles.ev}>EV: +{p.edgeScore}%</span>
-        <span>Conf: {p.confidence}%</span>
-        <span style={styles.edge}>MED EDGE</span>
+return (
 
-        {/* 🔥 STEAM BADGE */}
-        {p.steam && (
-          <span style={styles.steam}>
-            {p.steamStrength === "strong" ? "🔥 STRONG STEAM" : "⚡ STEAM"}
-          </span>
-        )}
-      </div>
+<div key={p.id} style={styles.aiRow}>
 
-      {/* 🔥 WHY BUTTON */}
-      <div style={styles.whyBtn} onClick={()=>toggleWhy(p.id)}>
-        {openWhy[p.id] ? "Hide Details ▲" : "Why this pick? ▼"}
-      </div>
+<div style={{flex:1}}>
+<div style={styles.gameTitle}>
+{p.away} @ {p.home}
+</div>
 
-      {/* 🔥 WHY PANEL */}
-      {openWhy[p.id] && (
-        <div style={styles.reasonBox}>
-          <div>📊 Public: {Math.floor(Math.random()*30+55)}%</div>
-          <div>📉 Line Move: {p.move > 0 ? "+" : ""}{p.move}</div>
-          <div>💰 Edge: +{p.edgeScore}% vs market</div>
-          <div>⚡ Steam Strength: {p.steamStrength || "none"}</div>
-        </div>
-      )}
+<div style={styles.meta}>
+<span style={styles.ev}>EV: +{p.edgeScore}%</span>
+<span>Conf: {p.confidence}%</span>
+<span style={styles.edge}>MED EDGE</span>
 
-    </div>
+{p.steam && ( <span style={styles.steam}>
+{p.steamStrength === "strong" ? "🔥 STRONG STEAM" : "⚡ STEAM"} </span>
+)}
 
-    <div style={styles.odds}>
-      {p.homeOdds} ↓
-    </div>
+{/* 🔥 BEST LINE */}
+{best && ( <span style={styles.best}>
+BEST: {best.home} ({best.name}) </span>
+)}
 
-  </div>
-))}
+</div>
+
+<div style={styles.whyBtn} onClick={()=>toggleWhy(p.id)}>
+{openWhy[p.id] ? "Hide Details ▲" : "Why this pick? ▼"}
+</div>
+
+{openWhy[p.id] && (
+
+<div style={styles.reasonBox}>
+<div>📊 Public: {Math.floor(Math.random()*30+55)}%</div>
+<div>📉 Line Move: {p.move > 0 ? "+" : ""}{p.move}</div>
+<div>💰 Edge: +{p.edgeScore}% vs market</div>
+<div>⚡ Steam Strength: {p.steamStrength || "none"}</div>
+</div>
+)}
+
+</div>
+
+<div style={{
+...styles.odds,
+...(flashMap[p.id] === "up" && styles.flashUp),
+...(flashMap[p.id] === "down" && styles.flashDown)
+}}>
+{p.homeOdds} ↓
+</div>
+
+</div>
+);
+})}
 
 <button style={styles.btn} onClick={buildParlay}>
-  🔗 Build AI Parlay
+🔗 Build AI Parlay
 </button>
-```
 
-  </div>
+</div>
 
 {/* MARKETS */}
 
-  <div style={styles.marketCard}>
-    <h3 style={styles.marketTitle}>Markets</h3>
+<div style={styles.marketCard}>
+<h3 style={styles.marketTitle}>Markets</h3>
 
-```
-{games.map(g => (
-  <div key={g.id} style={styles.marketRow}>
-    {g.away} @ {g.home}
+{games.map(g => {
 
-    <button style={styles.oddsBtn} onClick={()=>addToSlip(g)}>
-      {g.homeOdds}
-    </button>
-  </div>
-))}
-```
+const best = getBestLine(g);
 
-  </div>
+return (
+
+<div key={g.id} style={styles.marketRow}>
+
+{g.away} @ {g.home}
+
+<button
+style={{
+...styles.oddsBtn,
+...(best && best.home === g.homeOdds && styles.bestBtn),
+...(flashMap[g.id] === "up" && styles.flashUp),
+...(flashMap[g.id] === "down" && styles.flashDown)
+}}
+onClick={()=>addToSlip(g)}
+
+>
+
+{g.homeOdds} </button>
+
+</div>
+);
+})}
+
+</div>
 
 {/* BET SLIP */}
 
-  <div style={styles.slip}>
-    <h3>Bet Slip</h3>
+<div style={styles.slip}>
+<h3>Bet Slip</h3>
 
-```
 {betSlip.map(b => (
-  <div key={b.id}>{b.home}</div>
+
+<div key={b.id}>{b.home}</div>
 ))}
 
 <input
-  value={stake}
-  onChange={e=>setStake(Number(e.target.value))}
-  style={styles.input}
+value={stake}
+onChange={e=>setStake(Number(e.target.value))}
+style={styles.input}
 />
 
 <div>Payout: ${payout()}</div>
 
 <button style={styles.place}>Place Bet</button>
-```
 
-  </div>
+</div>
 
 </div>
 );
@@ -274,14 +363,25 @@ padding:"6px 12px",
 borderRadius:"6px"
 },
 
-/* 🔥 TRUST RECORD */
 record:{
 marginBottom:"15px",
 color:"#22c55e",
 fontWeight:"bold"
 },
 
-/* AI CARD */
+/* 🔥 HEATMAP */
+heatmap:{
+marginBottom:"20px"
+},
+heatRow:{
+marginBottom:"6px"
+},
+heatBar:{
+height:"6px",
+background:"#ff4444",
+borderRadius:"4px"
+},
+
 aiCard:{
 background:"linear-gradient(135deg,#7c3aed,#4c1d95)",
 padding:"20px",
@@ -323,13 +423,16 @@ color:"#facc15",
 fontWeight:"bold"
 },
 
-/* 🔥 STEAM STYLE */
 steam:{
 color:"#f97316",
 fontWeight:"bold"
 },
 
-/* 🔥 WHY BUTTON */
+best:{
+color:"#00ff99",
+fontSize:"11px"
+},
+
 whyBtn:{
 marginTop:"6px",
 fontSize:"12px",
@@ -337,7 +440,6 @@ color:"#00ff99",
 cursor:"pointer"
 },
 
-/* 🔥 WHY PANEL */
 reasonBox:{
 marginTop:"8px",
 fontSize:"11px",
@@ -350,6 +452,18 @@ color:"#ff4d4d",
 fontWeight:"bold"
 },
 
+flashUp:{
+color:"#22c55e",
+transform:"scale(1.15)",
+transition:"0.2s"
+},
+
+flashDown:{
+color:"#ef4444",
+transform:"scale(1.15)",
+transition:"0.2s"
+},
+
 btn:{
 marginTop:"15px",
 background:"#22c55e",
@@ -360,7 +474,6 @@ borderRadius:"6px",
 cursor:"pointer"
 },
 
-/* MARKETS */
 marketCard:{
 background:"linear-gradient(180deg,#0b0b0b,#050505)",
 padding:"20px",
@@ -389,7 +502,10 @@ padding:"6px 14px",
 borderRadius:"8px"
 },
 
-/* BET SLIP */
+bestBtn:{
+background:"#003322"
+},
+
 slip:{
 position:"fixed",
 right:"20px",
