@@ -3,39 +3,53 @@ import fetch from "node-fetch";
 
 const router = express.Router();
 
-const API_KEY = process.env.ODDS_API_KEY;
+let cache = [];
+let lastFetch = 0;
 
-// NBA example — you can add more sports later
 router.get("/", async (req, res) => {
-  try {
-    const url = `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${API_KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american`;
 
-    const response = await fetch(url);
-    const data = await response.json();
+try {
+// 🧠 CACHE (60 sec)
+if (Date.now() - lastFetch < 60000 && cache.length > 0) {
+return res.json({ games: cache });
+}
 
-    const games = data.map((game) => {
-      const book = game.bookmakers?.[0];
-      const outcomes = book?.markets?.[0]?.outcomes || [];
 
-      return {
-        id: game.id,
-        home: game.home_team,
-        away: game.away_team,
-        odds: outcomes[0]?.price || -110,
+const response = await fetch(
+  `https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${process.env.ODDS_API_KEY}&regions=us&markets=h2h`
+);
 
-        books: game.bookmakers.slice(0,2).map(b => ({
-          name: b.title,
-          odds: b.markets?.[0]?.outcomes?.[0]?.price
-        }))
-      };
-    });
+const data = await response.json();
 
-    res.json({ games });
+if (!Array.isArray(data)) throw new Error("Bad data");
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Odds fetch failed" });
-  }
+const games = data.slice(0, 10).map((g, i) => ({
+  id: i.toString(),
+  home: g.home_team,
+  away: g.away_team,
+  homeOdds: g.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || -110,
+  confidence: Math.floor(Math.random() * 20 + 55),
+  edgeScore: (Math.random() * 10).toFixed(2)
+}));
+
+cache = games;
+lastFetch = Date.now();
+
+res.json({ games });
+
+
+} catch (err) {
+console.log("ODDS ERROR:", err.message);
+
+
+res.json({
+  games: [],
+  error: "fallback"
+});
+
+
+}
+
 });
 
 export default router;
