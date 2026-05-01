@@ -44,7 +44,7 @@ timestamp:{type:Date,default:Date.now}
 
 /* ================= CACHE ================= */
 const cache = {};
-const CACHE_TIME = 30000; // 🔥 increased
+const CACHE_TIME = 30000;
 
 /* ================= UTILS ================= */
 const toDecimal = (o)=> o>0 ? (o/100)+1 : (100/Math.abs(o))+1;
@@ -77,48 +77,17 @@ const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${proc
 const response = await fetch(url);
 const data = await response.json();
 
-/* 🔥 FIXED QUOTA HANDLING */
 if (!Array.isArray(data)) {
   console.log("⚠️ API QUOTA HIT — USING FALLBACK");
 
   return res.json({
     source: "fallback",
-    games: [
-      {
-        id:"fallback1",
-        home:"Lakers",
-        away:"Warriors",
-        homeOdds:-110,
-        move:2,
-        steam:true,
-        steamStrength:"medium",
-        ev:6.5,
-        arb:false,
-        confidence:72,
-        recommendation:"Lakers ML",
-        books:[]
-      },
-      {
-        id:"fallback2",
-        home:"Celtics",
-        away:"Heat",
-        homeOdds:-105,
-        move:-3,
-        steam:true,
-        steamStrength:"strong",
-        ev:4.2,
-        arb:false,
-        confidence:68,
-        recommendation:"Celtics ML",
-        books:[]
-      }
-    ]
+    games: []
   });
 }
 
 const games = [];
 
-/* 🔥 MORE GAMES */
 for (const g of data.slice(0,20)) {
 
   const books = (g.bookmakers || []).slice(0,2).map(b => {
@@ -135,7 +104,6 @@ for (const g of data.slice(0,20)) {
 
   const homeOdds = books[0].home;
 
-  /* HISTORY */
   const last = await OddsHistory.findOne({gameId:g.id}).sort({timestamp:-1});
 
   let move = 0;
@@ -156,16 +124,13 @@ for (const g of data.slice(0,20)) {
     }
   }
 
-  /* BEST LINE */
   let bestHome = homeOdds;
   books.forEach(b=>{
     if(b.home > bestHome) bestHome = b.home;
   });
 
-  /* EV */
   const ev = ((toDecimal(bestHome) / toDecimal(homeOdds)) - 1) * 100;
 
-  /* ARB */
   let arb = false;
   if (books.length >= 2) {
     const d1 = toDecimal(books[0].home);
@@ -173,14 +138,12 @@ for (const g of data.slice(0,20)) {
     if ((1/d1)+(1/d2)<1) arb = true;
   }
 
-  /* AI */
   const confidence = calculateAI(ev, move, steamStrength);
 
   let recommendation = "NO BET";
   if (arb) recommendation = "ARB";
   else if (confidence > 75) recommendation = `${g.home_team} ML`;
 
-  /* STORE */
   await OddsHistory.create({
     gameId:g.id,
     odds:homeOdds
@@ -215,6 +178,41 @@ res.json(result);
 } catch(err){
 console.log(err);
 res.json({ source:"fallback", games:[] });
+}
+});
+
+/* ================= ODDS ROUTE (NEW) ================= */
+app.get('/api/odds', async (req, res) => {
+try {
+const response = await fetch(
+`https://api.the-odds-api.com/v4/sports/basketball_nba/odds/?apiKey=${process.env.ODDS_API_KEY}&regions=us&markets=h2h`
+);
+
+
+const data = await response.json();
+
+if (!Array.isArray(data)) {
+  return res.json({ source: "fallback", games: [] });
+}
+
+const games = data.slice(0, 10).map((g, i) => ({
+  id: g.id || i,
+  home: g.home_team,
+  away: g.away_team,
+  homeOdds:
+    g.bookmakers?.[0]?.markets?.[0]?.outcomes?.find(o => o.name === g.home_team)?.price || -110,
+  books: g.bookmakers?.map(b => ({
+    name: b.title,
+    home: b.markets?.[0]?.outcomes?.find(o => o.name === g.home_team)?.price
+  })) || []
+}));
+
+res.json({ source: "real", games });
+
+
+} catch (err) {
+console.error("Odds error:", err);
+res.status(500).json({ error: "Failed to fetch odds" });
 }
 });
 
