@@ -6,357 +6,236 @@ const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function Dashboard() {
 
+/* ================= EXISTING STATE ================= */
 const [games, setGames] = useState([]);
 const [betSlip, setBetSlip] = useState([]);
 const [stake, setStake] = useState(100);
 
-/* 🔥 WHY TOGGLE */
-const [openWhy, setOpenWhy] = useState({});
-
-/* 🔥 LIVE MOVEMENT STATE */
 const [lastOdds, setLastOdds] = useState({});
 const [flashMap, setFlashMap] = useState({});
-
-/* 🔒 PRO + ALERTS (NEW) */
-const [isPro, setIsPro] = useState(false);
 const [alerts, setAlerts] = useState([]);
 
+/* ================= NEW STATE ================= */
+const [isPro, setIsPro] = useState(false);
+const [activeTab, setActiveTab] = useState("dashboard");
+
+/* ================= INIT ================= */
 useEffect(() => {
 fetchGames();
+checkPro();
 
 const interval = setInterval(fetchGames, 10000);
 return () => clearInterval(interval);
-
 }, []);
 
-/* ================= FETCH ================= */
+/* ================= PRO CHECK ================= */
+const checkPro = async () => {
+try {
+const email = localStorage.getItem("email");
+if (!email) return;
+
+const res = await fetch(`${API}/api/me?email=${email}`);
+const data = await res.json();
+
+setIsPro(data.isPro);
+} catch {}
+};
+
+/* ================= FETCH GAMES ================= */
 const fetchGames = async () => {
 try {
-if (!API) throw new Error("No API");
-
 const res = await fetch(`${API}/api/data`);
 const data = await res.json();
 
-if (!data?.games) throw new Error();
-
-/* 🔥 DETECT MOVEMENT + ALERTS */
 const updated = data.games.map(g => {
 
 const prev = lastOdds[g.id] ?? g.homeOdds;
 const move = g.homeOdds - prev;
 
-/* 🔔 ALERTS */
-if (Math.abs(move) >= 3) {
+/* FLASH */
+if (move !== 0) {
+setFlashMap(p => ({
+...p,
+[g.id]: move > 0 ? "up" : "down"
+}));
+
+setTimeout(()=> {
+setFlashMap(p => ({...p,[g.id]:null}));
+},800);
+}
+
+/* ALERTS */
+if (Math.abs(move) >= 0.2) {
 setAlerts(a => [
-{
-id: Date.now() + g.id,
-text: `${g.home} moved ${move > 0 ? "+" : ""}${move}`
-},
+{ id: Date.now()+g.id, text: `${g.home} moved ${move.toFixed(2)}` },
 ...a.slice(0,4)
 ]);
 }
 
-/* 🔴🟢 FLASH */
-if (move !== 0) {
-setFlashMap(prevMap => ({
-...prevMap,
-[g.id]: move > 0 ? "up" : "down"
-}));
-
-setTimeout(() => {
-setFlashMap(p => ({ ...p, [g.id]: null }));
-}, 800);
-}
-
-return g;
+return { ...g, move };
 });
 
 setGames(updated);
 
-/* STORE LAST ODDS */
-setLastOdds(prev => {
-const copy = { ...prev };
-updated.forEach(g => copy[g.id] = g.homeOdds);
+setLastOdds(prev=>{
+const copy = {...prev};
+updated.forEach(g=>copy[g.id]=g.homeOdds);
 return copy;
 });
 
-} catch (err) {
-console.log("fallback");
-
-setGames([
-{
-id:"1",
-home:"Lakers",
-away:"Warriors",
-homeOdds:-110,
-confidence:72,
-edgeScore:8,
-move:2,
-steam:true,
-steamStrength:"medium",
-ev:6.5,
-books:[{name:"DK",home:-110},{name:"FD",home:-105}]
-},
-{
-id:"2",
-home:"Celtics",
-away:"Heat",
-homeOdds:-105,
-confidence:68,
-edgeScore:6,
-move:-3,
-steam:true,
-steamStrength:"strong",
-ev:4.2,
-books:[{name:"DK",home:-105},{name:"FD",home:-102}]
-}
-]);
-}
+} catch {}
 };
 
-/* 🔒 STRIPE */
-const upgradeToPro = async () => {
-try {
+/* ================= STRIPE ================= */
+const upgrade = async () => {
+const email = localStorage.getItem("email");
+
 const res = await fetch(`${API}/api/checkout`, {
 method:"POST",
 headers:{ "Content-Type":"application/json" },
-body: JSON.stringify({ email:"[test@kbetz.com](mailto:test@kbetz.com)" })
+body: JSON.stringify({ email })
 });
 
 const data = await res.json();
 if (data.url) window.location.href = data.url;
+};
 
-} catch {
-console.log("upgrade failed");
-}
+const openBilling = async () => {
+const email = localStorage.getItem("email");
+
+const res = await fetch(`${API}/api/billing-portal`, {
+method:"POST",
+headers:{ "Content-Type":"application/json" },
+body: JSON.stringify({ email })
+});
+
+const data = await res.json();
+if (data.url) window.location.href = data.url;
 };
 
 /* ================= HELPERS ================= */
 
-const getHeat = (g) => {
-let score = (g.edgeScore || 0) + (g.confidence || 0) / 10;
-if (g.steam) score += 5;
-return Math.min(score, 20);
+const toDecimal = (o)=> o>0?(o/100)+1:(100/Math.abs(o))+1;
+
+const payout = ()=>{
+const odds = betSlip.reduce((a,b)=>a*toDecimal(b.homeOdds||-110),1);
+return (stake*odds).toFixed(2);
 };
 
-const getBestLine = (g) => {
-if (!g.books || g.books.length === 0) return null;
-let best = g.books[0];
-g.books.forEach(b => {
-if (b.home > best.home) best = b;
-});
-return best;
-};
-
-/* ================= AI ================= */
-
-const aiPicks = [...games]
-.sort((a,b)=>(b.edgeScore||0)-(a.edgeScore||0))
-.slice(0,3);
-
-const buildParlay = () => {
-setBetSlip(aiPicks);
-};
-
-const addToSlip = (g) => {
-if (!g) return;
-if (betSlip.find(b => b.id === g.id)) return;
-setBetSlip([...betSlip, g]);
-};
-
-const toDecimal = (o)=> o>0 ? (o/100)+1 : (100/Math.abs(o))+1;
-
-const payout = () => {
-const odds = betSlip.reduce(
-(a,b)=>a*toDecimal(b?.homeOdds ?? -110),
-1
-);
-return (stake * odds).toFixed(2);
-};
-
-const toggleWhy = (id) => {
-setOpenWhy(prev => ({ ...prev, [id]: !prev[id] }));
+const addToSlip = (g)=>{
+if(!g) return;
+if(betSlip.find(b=>b.id===g.id)) return;
+setBetSlip([...betSlip,g]);
 };
 
 /* ================= UI ================= */
 
 return (
 
+<div style={{ position:"relative", zIndex:1 }}>
+
 <div style={styles.page}>
 
-{/* 🔒 PRO OVERLAY */}
-{!isPro && (
-
-<div style={styles.proOverlay}>
-<div style={styles.proCard}>
-<h2>🔒 KBETZ PRO</h2>
-<p>Unlock AI picks, sharp signals, and live edge data</p>
-<button style={styles.proBtn} onClick={upgradeToPro}>
-Upgrade to PRO
-</button>
-</div>
-</div>
-)}
-
-<div style={styles.topBar}>
 <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
-<div style={styles.actions}>
-<span style={styles.pro}>PRO</span>
-<button style={styles.smallBtn}>Logout</button>
-<button style={styles.smallBtnOutline}>Sign Up</button>
-</div>
-</div>
-
-<div style={styles.record}>
-🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
-</div>
-
-{/* 🔔 ALERTS */}
-
-<div style={styles.alertBox}>
-{alerts.map(a => (
+{/* ALERT BAR */}
+<div style={styles.alertBar}>
+{alerts.map(a=>(
 <div key={a.id} style={styles.alert}>{a.text}</div>
 ))}
 </div>
 
-{/* 🔥 HEATMAP */}
-
-<div style={styles.heatmap}>
-{games.slice(0,5).map(g => (
-<div key={g.id} style={styles.heatRow}>
-<div>{g.home}</div>
-<div style={{
-...styles.heatBar,
-width: `${getHeat(g) * 5}%`
-}}/>
-</div>
-))}
+{/* NAV */}
+<div style={styles.nav}>
+<button style={activeTab==="dashboard"?styles.activeBtn:styles.btn} onClick={()=>setActiveTab("dashboard")}>Dashboard</button>
+<button style={activeTab==="billing"?styles.activeBtn:styles.btn} onClick={()=>setActiveTab("billing")}>Billing</button>
 </div>
 
-{/* AI PICKS */}
+{/* DASHBOARD */}
+{activeTab === "dashboard" && (
 
-<div style={styles.aiCard}>
-<h3 style={styles.aiTitle}>🧠 AI PICKS</h3>
+<div>
 
-{aiPicks.map(p => {
+{/* PRO BANNER */}
+{!isPro && (
+<div style={styles.proBanner}>
+Unlock AI picks, ROI & alerts
+<button style={styles.upgradeBtn} onClick={upgrade}>Upgrade</button>
+</div>
+)}
 
-const best = getBestLine(p);
+{/* GAMES */}
+<div style={styles.grid}>
+{games.map(g => (
 
-return (
+<div key={g.id} style={{
+...styles.card,
+...(flashMap[g.id]==="up" && styles.flashUp),
+...(flashMap[g.id]==="down" && styles.flashDown)
+}}>
 
-<div key={p.id} style={styles.aiRow}>
-
-<div style={{flex:1}}>
-<div style={styles.gameTitle}>
-{p.away} @ {p.home}
+<div style={styles.match}>
+{g.away} <span style={{opacity:.5}}>vs</span> {g.home}
 </div>
 
 <div style={styles.meta}>
-<span style={styles.ev}>EV: +{p.edgeScore}%</span>
-<span>Conf: {p.confidence}%</span>
-<span style={styles.edge}>MED EDGE</span>
 
-{p.steam && ( <span style={styles.steam}>
-{p.steamStrength === "strong" ? "🔥 STRONG STEAM" : "⚡ STEAM"} </span>
-)}
+<span style={styles.odds}>{g.homeOdds}</span>
 
-{best && ( <span style={styles.best}>
-BEST: {best.home} ({best.name}) </span>
-)}
-
-</div>
-
-<div style={styles.whyBtn} onClick={()=>toggleWhy(p.id)}>
-{openWhy[p.id] ? "Hide Details ▲" : "Why this pick? ▼"}
-</div>
-
-{openWhy[p.id] && (
-
-<div style={styles.reasonBox}>
-<div>📊 Public: {Math.floor(Math.random()*30+55)}%</div>
-<div>📉 Line Move: {p.move > 0 ? "+" : ""}{p.move}</div>
-<div>💰 Edge: +{p.edgeScore}% vs market</div>
-<div>⚡ Steam Strength: {p.steamStrength || "none"}</div>
-</div>
-)}
-
-</div>
-
-<div style={{
-...styles.odds,
-...(flashMap[p.id] === "up" && styles.flashUp),
-...(flashMap[p.id] === "down" && styles.flashDown)
+<span style={{
+color: isPro ? "#00ffcc" : "#666"
 }}>
-{p.homeOdds} ↓
-</div>
+{isPro ? `+${g.ev}% EV` : "🔒"} </span>
 
 </div>
-);
-})}
 
-<button style={styles.btn} onClick={buildParlay}>
-🔗 Build AI Parlay
+<button style={styles.oddsBtn} onClick={()=>addToSlip(g)}>
+Add
 </button>
 
 </div>
 
-{/* MARKETS */}
-
-<div style={styles.marketCard}>
-<h3 style={styles.marketTitle}>Markets</h3>
-
-{games.map(g => {
-
-const best = getBestLine(g);
-
-return (
-
-<div key={g.id} style={styles.marketRow}>
-
-{g.away} @ {g.home}
-
-<button
-style={{
-...styles.oddsBtn,
-...(best && best.home === g.homeOdds && styles.bestBtn),
-...(flashMap[g.id] === "up" && styles.flashUp),
-...(flashMap[g.id] === "down" && styles.flashDown)
-}}
-onClick={()=>addToSlip(g)}
-
->
-
-{g.homeOdds} </button>
-
-</div>
-);
-})}
-
+))}
 </div>
 
 {/* BET SLIP */}
-
 <div style={styles.slip}>
 <h3>Bet Slip</h3>
-
-{betSlip.map(b => (
-
-<div key={b.id}>{b.home}</div>
-))}
-
-<input
-value={stake}
-onChange={e=>setStake(Number(e.target.value))}
-style={styles.input}
-/>
-
-<div>Payout: ${payout()}</div>
-
-<button style={styles.place}>Place Bet</button>
+{betSlip.map(b => <div key={b.id}>{b.home}</div>)}
+<input value={stake} onChange={e=>setStake(Number(e.target.value))}/>
+<div>${payout()}</div>
+</div>
 
 </div>
 
+)}
+
+{/* BILLING */}
+{activeTab === "billing" && (
+
+<div style={styles.billingBox}>
+
+<h2>Subscription</h2>
+
+<div style={{
+color: isPro ? "#22c55e" : "#ef4444",
+fontWeight:"bold",
+marginBottom:"20px"
+}}>
+{isPro ? "ACTIVE (PRO)" : "FREE PLAN"}
+</div>
+
+{!isPro ? ( <button style={styles.upgradeBtn} onClick={upgrade}>
+Upgrade to PRO </button>
+) : ( <button style={styles.manageBtn} onClick={openBilling}>
+Manage Billing </button>
+)}
+
+</div>
+
+)}
+
+</div>
 </div>
 );
 }
@@ -365,80 +244,150 @@ style={styles.input}
 
 const styles = {
 
-/* existing styles unchanged */
-...{
+page:{
+background:"#050505",
+color:"white",
+padding:"20px",
+minHeight:"100vh",
+position:"relative",
+zIndex:1
+},
 
-page:{background:"#050505",color:"white",padding:"20px",minHeight:"100vh"},
+logo:{
+fontSize:"30px",
+fontWeight:"900",
+background:"linear-gradient(90deg,#a855f7,#00ff99)",
+WebkitBackgroundClip:"text",
+WebkitTextFillColor:"transparent",
+marginBottom:"10px"
+},
 
-topBar:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"},
+alertBar:{
+display:"flex",
+gap:"10px",
+marginBottom:"10px"
+},
 
-logo:{fontSize:"28px",fontWeight:"900",background:"linear-gradient(90deg,#a855f7,#00ff99)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",textShadow:"0 0 25px rgba(168,85,247,0.35)"},
+alert:{
+background:"#111",
+padding:"6px 10px",
+borderRadius:"6px",
+fontSize:"12px"
+},
 
-actions:{display:"flex",gap:"10px",alignItems:"center"},
+nav:{
+marginBottom:"20px"
+},
 
-pro:{color:"#00ff99",fontWeight:"bold"},
+btn:{
+pointerEvents:"auto",
+zIndex:10,
+marginRight:"10px",
+padding:"10px",
+background:"#111",
+color:"#aaa",
+border:"1px solid #222",
+cursor:"pointer"
+},
 
-smallBtn:{background:"#1a1a1a",color:"#fff",border:"none",padding:"6px 12px",borderRadius:"6px"},
+activeBtn:{
+pointerEvents:"auto",
+zIndex:10,
+marginRight:"10px",
+padding:"10px",
+background:"#22c55e",
+color:"#000",
+border:"none",
+cursor:"pointer"
+},
 
-smallBtnOutline:{background:"transparent",border:"1px solid #00ff99",color:"#00ff99",padding:"6px 12px",borderRadius:"6px"},
+grid:{
+display:"grid",
+gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",
+gap:"12px"
+},
 
-record:{marginBottom:"15px",color:"#22c55e",fontWeight:"bold"},
+card:{
+background:"rgba(255,255,255,0.05)",
+backdropFilter:"blur(12px)",
+padding:"15px",
+borderRadius:"12px",
+border:"1px solid rgba(255,255,255,0.08)",
+transition:"0.2s",
+position:"relative",
+zIndex:1
+},
 
-heatmap:{marginBottom:"20px"},
-heatRow:{marginBottom:"6px"},
-heatBar:{height:"6px",background:"#ff4444",borderRadius:"4px"},
+match:{
+fontWeight:"bold",
+marginBottom:"10px"
+},
 
-aiCard:{background:"linear-gradient(135deg,#7c3aed,#4c1d95)",padding:"20px",borderRadius:"18px",boxShadow:"0 0 60px rgba(124,58,237,0.6)",marginBottom:"25px"},
+meta:{
+display:"flex",
+justifyContent:"space-between",
+marginBottom:"10px"
+},
 
-aiRow:{display:"flex",justifyContent:"space-between",padding:"18px",marginTop:"12px",borderRadius:"12px",background:"rgba(0,0,0,0.25)"},
+odds:{
+color:"#22c55e",
+fontWeight:"bold"
+},
 
-gameTitle:{fontWeight:"bold",fontSize:"16px"},
+oddsBtn:{
+pointerEvents:"auto",
+zIndex:10,
+background:"#22c55e",
+color:"#000",
+padding:"8px",
+border:"none",
+cursor:"pointer",
+width:"100%"
+},
 
-meta:{fontSize:"12px",display:"flex",gap:"10px",marginTop:"6px",flexWrap:"wrap"},
+flashUp:{ border:"1px solid #22c55e" },
+flashDown:{ border:"1px solid #ef4444" },
 
-ev:{ color:"#22c55e" },
+proBanner:{
+background:"#111",
+padding:"10px",
+marginBottom:"20px",
+display:"flex",
+justifyContent:"space-between",
+alignItems:"center"
+},
 
-edge:{color:"#facc15",fontWeight:"bold"},
+upgradeBtn:{
+pointerEvents:"auto",
+zIndex:10,
+background:"#22c55e",
+color:"#000",
+padding:"10px",
+border:"none",
+cursor:"pointer"
+},
 
-steam:{color:"#f97316",fontWeight:"bold"},
+manageBtn:{
+pointerEvents:"auto",
+zIndex:10,
+background:"#3b82f6",
+color:"#fff",
+padding:"10px",
+border:"none",
+cursor:"pointer"
+},
 
-best:{color:"#00ff99",fontSize:"11px"},
+slip:{
+marginTop:"20px",
+background:"#111",
+padding:"10px",
+borderRadius:"10px"
+},
 
-whyBtn:{marginTop:"6px",fontSize:"12px",color:"#00ff99",cursor:"pointer"},
-
-reasonBox:{marginTop:"8px",fontSize:"11px",color:"#aaa",lineHeight:"1.5"},
-
-odds:{color:"#ff4d4d",fontWeight:"bold"},
-
-flashUp:{color:"#22c55e",transform:"scale(1.15)",transition:"0.2s"},
-flashDown:{color:"#ef4444",transform:"scale(1.15)",transition:"0.2s"},
-
-btn:{marginTop:"15px",background:"#22c55e",color:"#000",padding:"10px",border:"none",borderRadius:"6px",cursor:"pointer"},
-
-marketCard:{background:"linear-gradient(180deg,#0b0b0b,#050505)",padding:"20px",borderRadius:"16px",boxShadow:"0 0 30px rgba(0,0,0,0.6)"},
-
-marketRow:{display:"flex",justifyContent:"space-between",padding:"14px",marginTop:"10px",background:"#050505",borderRadius:"10px"},
-
-oddsBtn:{background:"#0f0f0f",border:"1px solid #22c55e",color:"#22c55e",padding:"6px 14px",borderRadius:"8px"},
-
-bestBtn:{background:"#003322"},
-
-slip:{position:"fixed",right:"20px",top:"120px",width:"260px",background:"#000",padding:"15px",border:"1px solid #22c55e",borderRadius:"10px"},
-
-input:{width:"100%",marginTop:"10px",marginBottom:"10px",padding:"6px"},
-
-place:{background:"#22c55e",color:"#000",padding:"10px",border:"none",marginTop:"10px",borderRadius:"6px",cursor:"pointer"},
-
-/* NEW */
-alertBox:{marginBottom:"10px"},
-alert:{background:"#111",padding:"6px",marginBottom:"4px",borderLeft:"3px solid #22c55e"},
-
-proOverlay:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",display:"flex",justifyContent:"center",alignItems:"center",zIndex:999},
-
-proCard:{background:"#111",padding:"30px",borderRadius:"12px",textAlign:"center"},
-
-proBtn:{background:"#22c55e",padding:"10px",border:"none",cursor:"pointer"}
-
+billingBox:{
+background:"#111",
+padding:"20px",
+borderRadius:"12px"
 }
 
 };
