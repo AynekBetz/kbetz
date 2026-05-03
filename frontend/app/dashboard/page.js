@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import "../../styles/kbetz.css";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function Dashboard() {
 
-/* ================= EXISTING STATE ================= */
+/* ================= STATE ================= */
 const [games, setGames] = useState([]);
 const [betSlip, setBetSlip] = useState([]);
 const [stake, setStake] = useState(100);
@@ -15,102 +16,100 @@ const [lastOdds, setLastOdds] = useState({});
 const [flashMap, setFlashMap] = useState({});
 const [alerts, setAlerts] = useState([]);
 
-/* ================= NEW STATE ================= */
 const [isPro, setIsPro] = useState(false);
 const [activeTab, setActiveTab] = useState("dashboard");
 
 /* ================= INIT ================= */
 useEffect(() => {
-fetchGames();
-checkPro();
+  fetchGames();
+  checkPro();
 
-const interval = setInterval(fetchGames, 10000);
-return () => clearInterval(interval);
+  const interval = setInterval(fetchGames, 10000);
+  return () => clearInterval(interval);
 }, []);
 
-/* ================= PRO CHECK ================= */
+/* ================= PRO ================= */
 const checkPro = async () => {
-try {
-const email = localStorage.getItem("email");
-if (!email) return;
+  try {
+    const email = localStorage.getItem("email");
+    if (!email) return;
 
-const res = await fetch(`${API}/api/me?email=${email}`);
-const data = await res.json();
+    const res = await fetch(`${API}/api/me?email=${email}`);
+    const data = await res.json();
 
-setIsPro(data.isPro);
-} catch {}
+    setIsPro(data.isPro);
+  } catch {}
 };
 
-/* ================= FETCH GAMES ================= */
+/* ================= DATA ================= */
 const fetchGames = async () => {
-try {
-const res = await fetch(`${API}/api/data`);
-const data = await res.json();
+  try {
+    const res = await fetch(`${API}/api/data`);
+    const data = await res.json();
 
-const updated = data.games.map(g => {
+    const updated = data.games.map(g => {
 
-const prev = lastOdds[g.id] ?? g.homeOdds;
-const move = g.homeOdds - prev;
+      const prev = lastOdds[g.id] ?? g.homeOdds;
+      const move = g.homeOdds - prev;
 
-/* FLASH */
-if (move !== 0) {
-setFlashMap(p => ({
-...p,
-[g.id]: move > 0 ? "up" : "down"
-}));
+      if (move !== 0) {
+        setFlashMap(p => ({
+          ...p,
+          [g.id]: move > 0 ? "up" : "down"
+        }));
 
-setTimeout(()=> {
-setFlashMap(p => ({...p,[g.id]:null}));
-},800);
-}
+        setTimeout(()=>{
+          setFlashMap(p => ({...p,[g.id]:null}));
+        },800);
+      }
 
-/* ALERTS */
-if (Math.abs(move) >= 0.2) {
-setAlerts(a => [
-{ id: Date.now()+g.id, text: `${g.home} moved ${move.toFixed(2)}` },
-...a.slice(0,4)
-]);
-}
+      if (Math.abs(move) >= 0.2) {
+        setAlerts(a => [
+          { id: Date.now()+g.id, text: `${g.home} moved ${move.toFixed(2)}` },
+          ...a.slice(0,4)
+        ]);
+      }
 
-return { ...g, move };
-});
+      return { ...g, move };
+    });
 
-setGames(updated);
+    setGames(updated);
 
-setLastOdds(prev=>{
-const copy = {...prev};
-updated.forEach(g=>copy[g.id]=g.homeOdds);
-return copy;
-});
+    setLastOdds(prev=>{
+      const copy = {...prev};
+      updated.forEach(g=>copy[g.id]=g.homeOdds);
+      return copy;
+    });
 
-} catch {}
+  } catch {}
 };
 
 /* ================= STRIPE ================= */
+
 const upgrade = async () => {
-const email = localStorage.getItem("email");
+  const email = localStorage.getItem("email");
 
-const res = await fetch(`${API}/api/checkout`, {
-method:"POST",
-headers:{ "Content-Type":"application/json" },
-body: JSON.stringify({ email })
-});
+  const res = await fetch(`${API}/api/checkout`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ email })
+  });
 
-const data = await res.json();
-if (data.url) window.location.href = data.url;
+  const data = await res.json();
+  if (data.url) window.location.href = data.url;
 };
 
 const openBilling = async () => {
-const email = localStorage.getItem("email");
+  const email = localStorage.getItem("email");
 
-const res = await fetch(`${API}/api/billing-portal`, {
-method:"POST",
-headers:{ "Content-Type":"application/json" },
-body: JSON.stringify({ email })
-});
+  const res = await fetch(`${API}/api/billing-portal`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ email })
+  });
 
-const data = await res.json();
-if (data.url) window.location.href = data.url;
+  const data = await res.json();
+  if (data.url) window.location.href = data.url;
 };
 
 /* ================= HELPERS ================= */
@@ -118,276 +117,184 @@ if (data.url) window.location.href = data.url;
 const toDecimal = (o)=> o>0?(o/100)+1:(100/Math.abs(o))+1;
 
 const payout = ()=>{
-const odds = betSlip.reduce((a,b)=>a*toDecimal(b.homeOdds||-110),1);
-return (stake*odds).toFixed(2);
+  const odds = betSlip.reduce((a,b)=>a*toDecimal(b.homeOdds||-110),1);
+  return (stake*odds).toFixed(2);
 };
 
 const addToSlip = (g)=>{
-if(!g) return;
-if(betSlip.find(b=>b.id===g.id)) return;
-setBetSlip([...betSlip,g]);
+  if(!g) return;
+  if(betSlip.find(b=>b.id===g.id)) return;
+  setBetSlip([...betSlip,g]);
 };
 
 /* ================= UI ================= */
 
 return (
+<div style={{padding:"20px"}}>
 
-<div style={{ position:"relative", zIndex:1 }}>
+<h1 className="kbetz-logo">KBETZ TERMINAL</h1>
 
-<div style={styles.page}>
-
-<h1 style={styles.logo}>KBETZ TERMINAL</h1>
-
-{/* ALERT BAR */}
-<div style={styles.alertBar}>
+{/* ALERTS */}
+<div style={{display:"flex",gap:"10px",marginBottom:"15px"}}>
 {alerts.map(a=>(
-<div key={a.id} style={styles.alert}>{a.text}</div>
+<div key={a.id} className="glass" style={{padding:"6px 10px"}}>
+{a.text}
+</div>
 ))}
 </div>
 
 {/* NAV */}
-<div style={styles.nav}>
-<button style={activeTab==="dashboard"?styles.activeBtn:styles.btn} onClick={()=>setActiveTab("dashboard")}>Dashboard</button>
-<button style={activeTab==="billing"?styles.activeBtn:styles.btn} onClick={()=>setActiveTab("billing")}>Billing</button>
+<div style={{marginBottom:"20px"}}>
+<button
+className={`btn ${activeTab==="dashboard"?"nav-active":"nav-btn"}`}
+onClick={()=>setActiveTab("dashboard")}
+>
+Dashboard
+</button>
+
+<button
+className={`btn ${activeTab==="billing"?"nav-active":"nav-btn"}`}
+onClick={()=>setActiveTab("billing")}
+>
+Billing
+</button>
 </div>
 
 {/* DASHBOARD */}
-{activeTab === "dashboard" && (
+{activeTab==="dashboard" && (
 
 <div>
 
 {/* PRO BANNER */}
 {!isPro && (
-<div style={styles.proBanner}>
+<div className="glass" style={{
+padding:"12px",
+marginBottom:"20px",
+display:"flex",
+justifyContent:"space-between"
+}}>
 Unlock AI picks, ROI & alerts
-<button style={styles.upgradeBtn} onClick={upgrade}>Upgrade</button>
+<button className="btn btn-gradient" onClick={upgrade}>
+Upgrade
+</button>
 </div>
 )}
 
 {/* GAMES */}
-<div style={styles.grid}>
+<div style={{
+display:"grid",
+gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",
+gap:"16px"
+}}>
+
 {games.map(g => (
 
-<div key={g.id} style={{
-...styles.card,
-...(flashMap[g.id]==="up" && styles.flashUp),
-...(flashMap[g.id]==="down" && styles.flashDown)
-}}>
+<div key={g.id}
+className={`glass ${
+flashMap[g.id]==="up" ? "flash-up" :
+flashMap[g.id]==="down" ? "flash-down" : ""
+}`}
+style={{padding:"16px"}}
+>
 
-<div style={styles.match}>
-{g.away} <span style={{opacity:.5}}>vs</span> {g.home}
+<div style={{marginBottom:"10px"}}>
+{g.away} vs {g.home}
 </div>
 
-<div style={styles.meta}>
+<div style={{
+display:"flex",
+justifyContent:"space-between",
+marginBottom:"10px"
+}}>
 
-<span style={styles.odds}>{g.homeOdds}</span>
+<span className="odds">
+{g.homeOdds}
+
+{g.move !== 0 && (
+<span style={{
+marginLeft:"6px",
+color: g.move > 0 ? "#00ffcc" : "#ff4d4d",
+fontSize:"12px"
+}}>
+{g.move > 0 ? "▲" : "▼"}
+</span>
+)}
+
+</span>
 
 <span style={{
-color: isPro ? "#00ffcc" : "#666"
+filter: isPro ? "none" : "blur(4px)"
 }}>
-{isPro ? `+${g.ev}% EV` : "🔒"} </span>
++{g.ev}% EV
+</span>
 
 </div>
 
-<button style={styles.oddsBtn} onClick={()=>addToSlip(g)}>
+<button
+className="btn btn-primary"
+onClick={()=>addToSlip(g)}
+>
 Add
 </button>
 
 </div>
 
 ))}
+
 </div>
 
 {/* BET SLIP */}
-<div style={styles.slip}>
+<div className="glass bet-slip">
+
 <h3>Bet Slip</h3>
-{betSlip.map(b => <div key={b.id}>{b.home}</div>)}
-<input value={stake} onChange={e=>setStake(Number(e.target.value))}/>
-<div>${payout()}</div>
+
+{betSlip.map(b => (
+<div key={b.id}>{b.home}</div>
+))}
+
+<input
+value={stake}
+onChange={e=>setStake(Number(e.target.value))}
+style={{width:"100%",marginTop:"10px"}}
+/>
+
+<div style={{marginTop:"10px"}}>
+${payout()}
 </div>
 
 </div>
 
+</div>
 )}
 
 {/* BILLING */}
-{activeTab === "billing" && (
+{activeTab==="billing" && (
 
-<div style={styles.billingBox}>
+<div className="glass" style={{padding:"20px"}}>
 
 <h2>Subscription</h2>
 
 <div style={{
-color: isPro ? "#22c55e" : "#ef4444",
-fontWeight:"bold",
+color: isPro ? "#00ffcc" : "#ff4d4d",
 marginBottom:"20px"
 }}>
-{isPro ? "ACTIVE (PRO)" : "FREE PLAN"}
+{isPro ? "PRO ACTIVE" : "FREE PLAN"}
 </div>
 
-{!isPro ? ( <button style={styles.upgradeBtn} onClick={upgrade}>
-Upgrade to PRO </button>
-) : ( <button style={styles.manageBtn} onClick={openBilling}>
-Manage Billing </button>
+{!isPro ? (
+<button className="btn btn-gradient" onClick={upgrade}>
+Upgrade
+</button>
+) : (
+<button className="btn btn-primary" onClick={openBilling}>
+Manage Billing
+</button>
 )}
 
 </div>
 
 )}
 
-</div>
 </div>
 );
 }
-
-/* ================= STYLES ================= */
-
-const styles = {
-
-page:{
-background:"#050505",
-color:"white",
-padding:"20px",
-minHeight:"100vh",
-position:"relative",
-zIndex:1
-},
-
-logo:{
-fontSize:"30px",
-fontWeight:"900",
-background:"linear-gradient(90deg,#a855f7,#00ff99)",
-WebkitBackgroundClip:"text",
-WebkitTextFillColor:"transparent",
-marginBottom:"10px"
-},
-
-alertBar:{
-display:"flex",
-gap:"10px",
-marginBottom:"10px"
-},
-
-alert:{
-background:"#111",
-padding:"6px 10px",
-borderRadius:"6px",
-fontSize:"12px"
-},
-
-nav:{
-marginBottom:"20px"
-},
-
-btn:{
-pointerEvents:"auto",
-zIndex:10,
-marginRight:"10px",
-padding:"10px",
-background:"#111",
-color:"#aaa",
-border:"1px solid #222",
-cursor:"pointer"
-},
-
-activeBtn:{
-pointerEvents:"auto",
-zIndex:10,
-marginRight:"10px",
-padding:"10px",
-background:"#22c55e",
-color:"#000",
-border:"none",
-cursor:"pointer"
-},
-
-grid:{
-display:"grid",
-gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",
-gap:"12px"
-},
-
-card:{
-background:"rgba(255,255,255,0.05)",
-backdropFilter:"blur(12px)",
-padding:"15px",
-borderRadius:"12px",
-border:"1px solid rgba(255,255,255,0.08)",
-transition:"0.2s",
-position:"relative",
-zIndex:1
-},
-
-match:{
-fontWeight:"bold",
-marginBottom:"10px"
-},
-
-meta:{
-display:"flex",
-justifyContent:"space-between",
-marginBottom:"10px"
-},
-
-odds:{
-color:"#22c55e",
-fontWeight:"bold"
-},
-
-oddsBtn:{
-pointerEvents:"auto",
-zIndex:10,
-background:"#22c55e",
-color:"#000",
-padding:"8px",
-border:"none",
-cursor:"pointer",
-width:"100%"
-},
-
-flashUp:{ border:"1px solid #22c55e" },
-flashDown:{ border:"1px solid #ef4444" },
-
-proBanner:{
-background:"#111",
-padding:"10px",
-marginBottom:"20px",
-display:"flex",
-justifyContent:"space-between",
-alignItems:"center"
-},
-
-upgradeBtn:{
-pointerEvents:"auto",
-zIndex:10,
-background:"#22c55e",
-color:"#000",
-padding:"10px",
-border:"none",
-cursor:"pointer"
-},
-
-manageBtn:{
-pointerEvents:"auto",
-zIndex:10,
-background:"#3b82f6",
-color:"#fff",
-padding:"10px",
-border:"none",
-cursor:"pointer"
-},
-
-slip:{
-marginTop:"20px",
-background:"#111",
-padding:"10px",
-borderRadius:"10px"
-},
-
-billingBox:{
-background:"#111",
-padding:"20px",
-borderRadius:"12px"
-}
-
-};
