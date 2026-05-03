@@ -98,11 +98,10 @@ const handleUpgrade = async () => {
       window.location.href = data.url;
     } else {
       alert("Checkout failed");
-      console.log("Checkout response:", data);
     }
 
   } catch (err) {
-    console.log("Upgrade error:", err);
+    console.log(err);
     alert("Server error");
   }
 };
@@ -198,7 +197,7 @@ ${payout()}
 );
 }
 
-/* ================= KBETZ STYLE ================= */
+/* ================= STYLES ================= */
 
 const styles = {
 
@@ -209,12 +208,21 @@ padding:"20px",
 minHeight:"100vh"
 },
 
+/* 🔥 UPDATED LOGO ONLY */
 logo:{
 fontSize:"32px",
 fontWeight:"900",
-background:"linear-gradient(90deg,#7c3aed,#9333ea,#00ffcc)",
+background:`linear-gradient(
+  90deg,
+  #6d28d9 0%,
+  #9333ea 35%,
+  #a855f7 55%,
+  #22d3ee 80%,
+  #00ffcc 100%
+)`,
 WebkitBackgroundClip:"text",
-WebkitTextFillColor:"transparent"
+WebkitTextFillColor:"transparent",
+letterSpacing:"1px"
 },
 
 status:{
