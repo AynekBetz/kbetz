@@ -94,11 +94,7 @@ const handleUpgrade = async () => {
 
     const data = await res.json();
 
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert("Checkout failed");
-    }
+    if (data.url) window.location.href = data.url;
 
   } catch (err) {
     console.log(err);
@@ -124,7 +120,6 @@ const addToSlip = (g)=>{
 return (
 <div style={styles.page}>
 
-{/* HEADER */}
 <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
 <div style={styles.status}>
@@ -138,7 +133,7 @@ return (
 ))}
 </div>
 
-{/* PRO BANNER */}
+{/* PRO */}
 {!isPro && (
 <div style={styles.proBanner}>
 Unlock AI picks, ROI & alerts
@@ -174,7 +169,6 @@ Add
 
 {/* BET SLIP */}
 <div style={styles.betPanel}>
-
 <h3>Bet Slip</h3>
 
 {betSlip.map(b=>(
@@ -190,25 +184,34 @@ style={styles.input}
 <div style={styles.payout}>
 ${payout()}
 </div>
-
 </div>
 
 </div>
 );
 }
 
-/* ================= STYLES ================= */
+/* ================= KBETZ FULL BLEND SYSTEM ================= */
 
 const styles = {
 
 page:{
-background:"radial-gradient(circle at top,#140a2a,#000)",
+background: `
+linear-gradient(
+  to bottom,
+  #000 0%,
+  #0a0014 25%,
+  #2b0a4a 45%,
+  #6d28d9 55%,
+  #2b0a4a 65%,
+  #0a0014 80%,
+  #000 100%
+)
+`,
 color:"white",
 padding:"20px",
 minHeight:"100vh"
 },
 
-/* 🔥 UPDATED LOGO ONLY */
 logo:{
 fontSize:"32px",
 fontWeight:"900",
@@ -221,8 +224,7 @@ background:`linear-gradient(
   #00ffcc 100%
 )`,
 WebkitBackgroundClip:"text",
-WebkitTextFillColor:"transparent",
-letterSpacing:"1px"
+WebkitTextFillColor:"transparent"
 },
 
 status:{
@@ -249,16 +251,15 @@ gap:"12px"
 },
 
 card:{
-background:"rgba(20,10,40,0.8)",
+background:"rgba(30,0,60,0.45)",
+backdropFilter:"blur(10px)",
 padding:"15px",
 borderRadius:"12px",
-border:"1px solid rgba(124,58,237,0.2)"
+border:"1px solid rgba(124,58,237,0.2)",
+boxShadow:"0 0 20px rgba(124,58,237,0.15)"
 },
 
-teams:{
-color:"#ddd",
-marginBottom:"6px"
-},
+teams:{ color:"#ddd" },
 
 odds:{
 color:"#00ffcc",
@@ -266,7 +267,7 @@ fontWeight:"bold"
 },
 
 addBtn:{
-background:"#22c55e",
+background:"linear-gradient(90deg,#9333ea,#00ffcc)",
 color:"#000",
 padding:"8px",
 border:"none",
@@ -275,9 +276,10 @@ cursor:"pointer"
 
 betPanel:{
 marginTop:"20px",
-background:"#111",
+background:"rgba(10,0,20,0.7)",
+border:"1px solid rgba(0,255,200,0.2)",
 padding:"15px",
-borderRadius:"10px"
+borderRadius:"12px"
 },
 
 input:{
@@ -291,12 +293,13 @@ color:"#00ffcc"
 },
 
 proBanner:{
-background:"linear-gradient(90deg,#6d28d9,#4c1d95)",
+background:"linear-gradient(90deg,#6d28d9,#9333ea)",
 padding:"10px",
 marginBottom:"15px",
 display:"flex",
 justifyContent:"space-between",
-borderRadius:"10px"
+borderRadius:"12px",
+boxShadow:"0 0 40px rgba(124,58,237,0.4)"
 },
 
 upgradeBtn:{
@@ -307,7 +310,7 @@ border:"none",
 cursor:"pointer"
 },
 
-flashUp:{ boxShadow:"0 0 15px rgba(0,255,200,0.3)" },
-flashDown:{ boxShadow:"0 0 15px rgba(255,0,0,0.3)" }
+flashUp:{ boxShadow:"0 0 15px rgba(0,255,200,0.4)" },
+flashDown:{ boxShadow:"0 0 15px rgba(255,0,0,0.4)" }
 
 };
