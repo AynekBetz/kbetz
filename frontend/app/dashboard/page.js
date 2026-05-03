@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import "../../styles/kbetz.css";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -17,7 +16,6 @@ const [flashMap, setFlashMap] = useState({});
 const [alerts, setAlerts] = useState([]);
 
 const [isPro, setIsPro] = useState(false);
-const [activeTab, setActiveTab] = useState("dashboard");
 
 /* ================= INIT ================= */
 useEffect(() => {
@@ -48,7 +46,6 @@ const fetchGames = async () => {
     const data = await res.json();
 
     const updated = data.games.map(g => {
-
       const prev = lastOdds[g.id] ?? g.homeOdds;
       const move = g.homeOdds - prev;
 
@@ -85,35 +82,32 @@ const fetchGames = async () => {
 };
 
 /* ================= STRIPE ================= */
+const handleUpgrade = async () => {
+  try {
+    const email = localStorage.getItem("email");
 
-const upgrade = async () => {
-  const email = localStorage.getItem("email");
+    const res = await fetch(`${API}/api/checkout`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ email })
+    });
 
-  const res = await fetch(`${API}/api/checkout`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ email })
-  });
+    const data = await res.json();
 
-  const data = await res.json();
-  if (data.url) window.location.href = data.url;
-};
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      alert("Checkout failed");
+      console.log("Checkout response:", data);
+    }
 
-const openBilling = async () => {
-  const email = localStorage.getItem("email");
-
-  const res = await fetch(`${API}/api/billing-portal`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ email })
-  });
-
-  const data = await res.json();
-  if (data.url) window.location.href = data.url;
+  } catch (err) {
+    console.log("Upgrade error:", err);
+    alert("Server error");
+  }
 };
 
 /* ================= HELPERS ================= */
-
 const toDecimal = (o)=> o>0?(o/100)+1:(100/Math.abs(o))+1;
 
 const payout = ()=>{
@@ -128,173 +122,184 @@ const addToSlip = (g)=>{
 };
 
 /* ================= UI ================= */
-
 return (
-<div style={{padding:"20px"}}>
+<div style={styles.page}>
 
-<h1 className="kbetz-logo">KBETZ TERMINAL</h1>
+{/* HEADER */}
+<h1 style={styles.logo}>KBETZ TERMINAL</h1>
+
+<div style={styles.status}>
+🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
+</div>
 
 {/* ALERTS */}
-<div style={{display:"flex",gap:"10px",marginBottom:"15px"}}>
+<div style={styles.alertBar}>
 {alerts.map(a=>(
-<div key={a.id} className="glass" style={{padding:"6px 10px"}}>
-{a.text}
-</div>
+<div key={a.id} style={styles.alert}>{a.text}</div>
 ))}
 </div>
 
-{/* NAV */}
-<div style={{marginBottom:"20px"}}>
-<button
-className={`btn ${activeTab==="dashboard"?"nav-active":"nav-btn"}`}
-onClick={()=>setActiveTab("dashboard")}
->
-Dashboard
-</button>
-
-<button
-className={`btn ${activeTab==="billing"?"nav-active":"nav-btn"}`}
-onClick={()=>setActiveTab("billing")}
->
-Billing
-</button>
-</div>
-
-{/* DASHBOARD */}
-{activeTab==="dashboard" && (
-
-<div>
-
 {/* PRO BANNER */}
 {!isPro && (
-<div className="glass" style={{
-padding:"12px",
-marginBottom:"20px",
-display:"flex",
-justifyContent:"space-between"
-}}>
+<div style={styles.proBanner}>
 Unlock AI picks, ROI & alerts
-<button className="btn btn-gradient" onClick={upgrade}>
+
+<button style={styles.upgradeBtn} onClick={handleUpgrade}>
 Upgrade
 </button>
 </div>
 )}
 
 {/* GAMES */}
-<div style={{
-display:"grid",
-gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",
-gap:"16px"
+<div style={styles.grid}>
+{games.map(g => (
+<div key={g.id} style={{
+...styles.card,
+...(flashMap[g.id]==="up" && styles.flashUp),
+...(flashMap[g.id]==="down" && styles.flashDown)
 }}>
 
-{games.map(g => (
-
-<div key={g.id}
-className={`glass ${
-flashMap[g.id]==="up" ? "flash-up" :
-flashMap[g.id]==="down" ? "flash-down" : ""
-}`}
-style={{padding:"16px"}}
->
-
-<div style={{marginBottom:"10px"}}>
+<div style={styles.teams}>
 {g.away} vs {g.home}
 </div>
 
-<div style={{
-display:"flex",
-justifyContent:"space-between",
-marginBottom:"10px"
-}}>
+<div style={styles.odds}>{g.homeOdds}</div>
 
-<span className="odds">
-{g.homeOdds}
-
-{g.move !== 0 && (
-<span style={{
-marginLeft:"6px",
-color: g.move > 0 ? "#00ffcc" : "#ff4d4d",
-fontSize:"12px"
-}}>
-{g.move > 0 ? "▲" : "▼"}
-</span>
-)}
-
-</span>
-
-<span style={{
-filter: isPro ? "none" : "blur(4px)"
-}}>
-+{g.ev}% EV
-</span>
-
-</div>
-
-<button
-className="btn btn-primary"
-onClick={()=>addToSlip(g)}
->
+<button style={styles.addBtn} onClick={()=>addToSlip(g)}>
 Add
 </button>
 
 </div>
-
 ))}
-
 </div>
 
 {/* BET SLIP */}
-<div className="glass bet-slip">
+<div style={styles.betPanel}>
 
 <h3>Bet Slip</h3>
 
-{betSlip.map(b => (
+{betSlip.map(b=>(
 <div key={b.id}>{b.home}</div>
 ))}
 
 <input
 value={stake}
 onChange={e=>setStake(Number(e.target.value))}
-style={{width:"100%",marginTop:"10px"}}
+style={styles.input}
 />
 
-<div style={{marginTop:"10px"}}>
+<div style={styles.payout}>
 ${payout()}
 </div>
 
 </div>
 
 </div>
-)}
-
-{/* BILLING */}
-{activeTab==="billing" && (
-
-<div className="glass" style={{padding:"20px"}}>
-
-<h2>Subscription</h2>
-
-<div style={{
-color: isPro ? "#00ffcc" : "#ff4d4d",
-marginBottom:"20px"
-}}>
-{isPro ? "PRO ACTIVE" : "FREE PLAN"}
-</div>
-
-{!isPro ? (
-<button className="btn btn-gradient" onClick={upgrade}>
-Upgrade
-</button>
-) : (
-<button className="btn btn-primary" onClick={openBilling}>
-Manage Billing
-</button>
-)}
-
-</div>
-
-)}
-
-</div>
 );
 }
+
+/* ================= KBETZ STYLE ================= */
+
+const styles = {
+
+page:{
+background:"radial-gradient(circle at top,#140a2a,#000)",
+color:"white",
+padding:"20px",
+minHeight:"100vh"
+},
+
+logo:{
+fontSize:"32px",
+fontWeight:"900",
+background:"linear-gradient(90deg,#7c3aed,#9333ea,#00ffcc)",
+WebkitBackgroundClip:"text",
+WebkitTextFillColor:"transparent"
+},
+
+status:{
+color:"#00ffcc",
+marginBottom:"15px"
+},
+
+alertBar:{
+display:"flex",
+gap:"10px",
+marginBottom:"15px"
+},
+
+alert:{
+background:"rgba(255,255,255,0.05)",
+padding:"6px 10px",
+borderRadius:"6px"
+},
+
+grid:{
+display:"grid",
+gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",
+gap:"12px"
+},
+
+card:{
+background:"rgba(20,10,40,0.8)",
+padding:"15px",
+borderRadius:"12px",
+border:"1px solid rgba(124,58,237,0.2)"
+},
+
+teams:{
+color:"#ddd",
+marginBottom:"6px"
+},
+
+odds:{
+color:"#00ffcc",
+fontWeight:"bold"
+},
+
+addBtn:{
+background:"#22c55e",
+color:"#000",
+padding:"8px",
+border:"none",
+cursor:"pointer"
+},
+
+betPanel:{
+marginTop:"20px",
+background:"#111",
+padding:"15px",
+borderRadius:"10px"
+},
+
+input:{
+width:"100%",
+marginTop:"10px"
+},
+
+payout:{
+marginTop:"10px",
+color:"#00ffcc"
+},
+
+proBanner:{
+background:"linear-gradient(90deg,#6d28d9,#4c1d95)",
+padding:"10px",
+marginBottom:"15px",
+display:"flex",
+justifyContent:"space-between",
+borderRadius:"10px"
+},
+
+upgradeBtn:{
+background:"#22c55e",
+color:"#000",
+padding:"8px",
+border:"none",
+cursor:"pointer"
+},
+
+flashUp:{ boxShadow:"0 0 15px rgba(0,255,200,0.3)" },
+flashDown:{ boxShadow:"0 0 15px rgba(255,0,0,0.3)" }
+
+};
