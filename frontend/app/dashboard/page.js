@@ -35,50 +35,47 @@ const checkPro = async () => {
     const res = await fetch(`${API}/api/me?email=${email}`);
     const data = await res.json();
 
-    setIsPro(data.isPro);
-  } catch {}
+    setIsPro(data?.isPro || false);
+  } catch {
+    setIsPro(false);
+  }
 };
 
-/* ================= DATA ================= */
+/* ================= SAFE DATA FETCH ================= */
 const fetchGames = async () => {
   try {
     const res = await fetch(`${API}/api/data`);
+
+    if (!res.ok) throw new Error("API failed");
+
     const data = await res.json();
+
+    // 🔥 CRASH FIX
+    if (!data || !Array.isArray(data.games)) {
+      console.log("Invalid data:", data);
+      setGames([]);
+      return;
+    }
 
     const updated = data.games.map(g => {
       const prev = lastOdds[g.id] ?? g.homeOdds;
       const move = g.homeOdds - prev;
-
-      if (move !== 0) {
-        setFlashMap(p => ({
-          ...p,
-          [g.id]: move > 0 ? "up" : "down"
-        }));
-
-        setTimeout(()=>{
-          setFlashMap(p => ({...p,[g.id]:null}));
-        },800);
-      }
-
-      if (Math.abs(move) >= 0.2) {
-        setAlerts(a => [
-          { id: Date.now()+g.id, text: `${g.home} moved ${move.toFixed(2)}` },
-          ...a.slice(0,4)
-        ]);
-      }
 
       return { ...g, move };
     });
 
     setGames(updated);
 
-    setLastOdds(prev=>{
-      const copy = {...prev};
-      updated.forEach(g=>copy[g.id]=g.homeOdds);
+    setLastOdds(prev => {
+      const copy = { ...prev };
+      updated.forEach(g => (copy[g.id] = g.homeOdds));
       return copy;
     });
 
-  } catch {}
+  } catch (err) {
+    console.log("FETCH ERROR:", err);
+    setGames([]); // 🔥 prevent crash
+  }
 };
 
 /* ================= STRIPE ================= */
@@ -94,11 +91,11 @@ const handleUpgrade = async () => {
 
     const data = await res.json();
 
-    if (data.url) window.location.href = data.url;
+    if (data?.url) window.location.href = data.url;
 
   } catch (err) {
     console.log(err);
-    alert("Server error");
+    alert("Upgrade failed");
   }
 };
 
@@ -146,12 +143,8 @@ Upgrade
 
 {/* GAMES */}
 <div style={styles.grid}>
-{games.map(g => (
-<div key={g.id} style={{
-...styles.card,
-...(flashMap[g.id]==="up" && styles.flashUp),
-...(flashMap[g.id]==="down" && styles.flashDown)
-}}>
+{Array.isArray(games) && games.map(g => (
+<div key={g.id} style={styles.card}>
 
 <div style={styles.teams}>
 {g.away} vs {g.home}
@@ -190,7 +183,7 @@ ${payout()}
 );
 }
 
-/* ================= KBETZ FULL BLEND SYSTEM ================= */
+/* ================= STYLES ================= */
 
 const styles = {
 
@@ -213,30 +206,24 @@ minHeight:"100vh"
 },
 
 logo:{
-fontSize:"32px",
+fontSize:"34px",
 fontWeight:"900",
 background:`linear-gradient(
   90deg,
-  #6d28d9 0%,
-  #9333ea 35%,
-  #a855f7 55%,
-  #22d3ee 80%,
+  #7c3aed 0%,
+  #9333ea 25%,
+  #a855f7 45%,
+  #22d3ee 70%,
   #00ffcc 100%
 )`,
 WebkitBackgroundClip:"text",
-WebkitTextFillColor:"transparent"
+WebkitTextFillColor:"transparent",
+color:"transparent"
 },
 
-status:{
-color:"#00ffcc",
-marginBottom:"15px"
-},
+status:{ color:"#00ffcc", marginBottom:"15px" },
 
-alertBar:{
-display:"flex",
-gap:"10px",
-marginBottom:"15px"
-},
+alertBar:{ display:"flex", gap:"10px", marginBottom:"15px" },
 
 alert:{
 background:"rgba(255,255,255,0.05)",
@@ -252,22 +239,17 @@ gap:"12px"
 
 card:{
 background:"rgba(30,0,60,0.45)",
-backdropFilter:"blur(10px)",
 padding:"15px",
 borderRadius:"12px",
-border:"1px solid rgba(124,58,237,0.2)",
-boxShadow:"0 0 20px rgba(124,58,237,0.15)"
+border:"1px solid rgba(124,58,237,0.2)"
 },
 
 teams:{ color:"#ddd" },
 
-odds:{
-color:"#00ffcc",
-fontWeight:"bold"
-},
+odds:{ color:"#00ffcc", fontWeight:"bold" },
 
 addBtn:{
-background:"linear-gradient(90deg,#9333ea,#00ffcc)",
+background:"#22c55e",
 color:"#000",
 padding:"8px",
 border:"none",
@@ -277,20 +259,13 @@ cursor:"pointer"
 betPanel:{
 marginTop:"20px",
 background:"rgba(10,0,20,0.7)",
-border:"1px solid rgba(0,255,200,0.2)",
 padding:"15px",
 borderRadius:"12px"
 },
 
-input:{
-width:"100%",
-marginTop:"10px"
-},
+input:{ width:"100%", marginTop:"10px" },
 
-payout:{
-marginTop:"10px",
-color:"#00ffcc"
-},
+payout:{ marginTop:"10px", color:"#00ffcc" },
 
 proBanner:{
 background:"linear-gradient(90deg,#6d28d9,#9333ea)",
@@ -298,8 +273,7 @@ padding:"10px",
 marginBottom:"15px",
 display:"flex",
 justifyContent:"space-between",
-borderRadius:"12px",
-boxShadow:"0 0 40px rgba(124,58,237,0.4)"
+borderRadius:"12px"
 },
 
 upgradeBtn:{
@@ -308,9 +282,6 @@ color:"#000",
 padding:"8px",
 border:"none",
 cursor:"pointer"
-},
-
-flashUp:{ boxShadow:"0 0 15px rgba(0,255,200,0.4)" },
-flashDown:{ boxShadow:"0 0 15px rgba(255,0,0,0.4)" }
+}
 
 };
