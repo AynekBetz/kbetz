@@ -6,25 +6,34 @@ const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function Dashboard() {
 
-/* ================= STATE ================= */
 const [games, setGames] = useState([]);
 const [betSlip, setBetSlip] = useState([]);
 const [stake, setStake] = useState(100);
-
-const [lastOdds, setLastOdds] = useState({});
-const [flashMap, setFlashMap] = useState({});
-const [alerts, setAlerts] = useState([]);
-
 const [isPro, setIsPro] = useState(false);
 
 /* ================= INIT ================= */
 useEffect(() => {
   fetchGames();
   checkPro();
-
-  const interval = setInterval(fetchGames, 10000);
-  return () => clearInterval(interval);
 }, []);
+
+/* ================= DATA ================= */
+const fetchGames = async () => {
+  try {
+    const res = await fetch(`${API}/api/data`);
+    const data = await res.json();
+
+    if (!data || !Array.isArray(data.games)) {
+      setGames([]);
+      return;
+    }
+
+    setGames(data.games);
+
+  } catch {
+    setGames([]);
+  }
+};
 
 /* ================= PRO ================= */
 const checkPro = async () => {
@@ -36,46 +45,7 @@ const checkPro = async () => {
     const data = await res.json();
 
     setIsPro(data?.isPro || false);
-  } catch {
-    setIsPro(false);
-  }
-};
-
-/* ================= SAFE DATA FETCH ================= */
-const fetchGames = async () => {
-  try {
-    const res = await fetch(`${API}/api/data`);
-
-    if (!res.ok) throw new Error("API failed");
-
-    const data = await res.json();
-
-    // 🔥 CRASH FIX
-    if (!data || !Array.isArray(data.games)) {
-      console.log("Invalid data:", data);
-      setGames([]);
-      return;
-    }
-
-    const updated = data.games.map(g => {
-      const prev = lastOdds[g.id] ?? g.homeOdds;
-      const move = g.homeOdds - prev;
-
-      return { ...g, move };
-    });
-
-    setGames(updated);
-
-    setLastOdds(prev => {
-      const copy = { ...prev };
-      updated.forEach(g => (copy[g.id] = g.homeOdds));
-      return copy;
-    });
-
-  } catch (err) {
-    console.log("FETCH ERROR:", err);
-    setGames([]); // 🔥 prevent crash
-  }
+  } catch {}
 };
 
 /* ================= STRIPE ================= */
@@ -93,24 +63,20 @@ const handleUpgrade = async () => {
 
     if (data?.url) window.location.href = data.url;
 
-  } catch (err) {
-    console.log(err);
+  } catch {
     alert("Upgrade failed");
   }
 };
 
-/* ================= HELPERS ================= */
-const toDecimal = (o)=> o>0?(o/100)+1:(100/Math.abs(o))+1;
-
-const payout = ()=>{
-  const odds = betSlip.reduce((a,b)=>a*toDecimal(b.homeOdds||-110),1);
-  return (stake*odds).toFixed(2);
-};
-
+/* ================= BET SLIP ================= */
 const addToSlip = (g)=>{
   if(!g) return;
   if(betSlip.find(b=>b.id===g.id)) return;
   setBetSlip([...betSlip,g]);
+};
+
+const payout = ()=>{
+  return stake.toFixed(2);
 };
 
 /* ================= UI ================= */
@@ -123,18 +89,10 @@ return (
 🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
 </div>
 
-{/* ALERTS */}
-<div style={styles.alertBar}>
-{alerts.map(a=>(
-<div key={a.id} style={styles.alert}>{a.text}</div>
-))}
-</div>
-
 {/* PRO */}
 {!isPro && (
 <div style={styles.proBanner}>
 Unlock AI picks, ROI & alerts
-
 <button style={styles.upgradeBtn} onClick={handleUpgrade}>
 Upgrade
 </button>
@@ -177,19 +135,19 @@ style={styles.input}
 <div style={styles.payout}>
 ${payout()}
 </div>
+
 </div>
 
 </div>
 );
 }
 
-/* ================= STYLES ================= */
+/* ================= CLEAN STYLES ================= */
 
 const styles = {
 
 page:{
-background: `
-linear-gradient(
+background: `linear-gradient(
   to bottom,
   #000 0%,
   #0a0014 25%,
@@ -198,8 +156,7 @@ linear-gradient(
   #2b0a4a 65%,
   #0a0014 80%,
   #000 100%
-)
-`,
+)`,
 color:"white",
 padding:"20px",
 minHeight:"100vh"
@@ -223,14 +180,6 @@ color:"transparent"
 
 status:{ color:"#00ffcc", marginBottom:"15px" },
 
-alertBar:{ display:"flex", gap:"10px", marginBottom:"15px" },
-
-alert:{
-background:"rgba(255,255,255,0.05)",
-padding:"6px 10px",
-borderRadius:"6px"
-},
-
 grid:{
 display:"grid",
 gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",
@@ -249,7 +198,7 @@ teams:{ color:"#ddd" },
 odds:{ color:"#00ffcc", fontWeight:"bold" },
 
 addBtn:{
-background:"#22c55e",
+background:"linear-gradient(90deg,#9333ea,#00ffcc)",
 color:"#000",
 padding:"8px",
 border:"none",
