@@ -1,30 +1,25 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-useEffect(() => {
-const token = localStorage.getItem("token");
+  const router = useRouter();
 
-```
-if (token) {
-  window.location.href = "/dashboard";
-} else {
-  window.location.href = "/login";
-}
-```
+  useEffect(() => {
+    router.replace("/dashboard");
+  }, []);
 
-}, []);
-
-return (
-<div style={{
-height: "100vh",
-background: "#050505",
-color: "white",
-display: "flex",
-justifyContent: "center",
-alignItems: "center"
-}}>
-Loading... </div>
-);
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "black",
+      color: "white",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }}>
+      Loading KBETZ...
+    </div>
+  );
 }
