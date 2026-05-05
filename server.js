@@ -70,7 +70,7 @@ app.get("/api/me", async (req, res) => {
   }
 });
 
-/* ================= LOGIN (NEW) ================= */
+/* ================= LOGIN ================= */
 app.post("/api/login", async (req, res) => {
   try {
     const { email } = req.body;
@@ -82,19 +82,50 @@ app.post("/api/login", async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      user = await User.create({ email, isPro: false });
+      user = await User.create({ email, isPro:false });
       console.log("🆕 New user created:", email);
     }
 
     res.json({
-      success: true,
-      email: user.email,
-      isPro: user.isPro
+      success:true,
+      email:user.email,
+      isPro:user.isPro
     });
 
   } catch (err) {
     console.log("LOGIN ERROR:", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error:"Server error" });
+  }
+});
+
+/* ================= CHECKOUT (FIXED) ================= */
+app.post("/api/checkout", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Missing email" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "subscription",
+      customer_email: email,
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      success_url: `${process.env.CLIENT_URL}/dashboard`,
+      cancel_url: `${process.env.CLIENT_URL}/dashboard`,
+    });
+
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.log("CHECKOUT ERROR:", err.message);
+    res.status(500).json({ error: "Checkout failed" });
   }
 });
 
@@ -110,17 +141,20 @@ app.post("/api/stripe/webhook", async (req, res) => {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
-  } catch {
+  } catch (err) {
+    console.log("❌ Webhook signature failed");
     return res.sendStatus(400);
   }
 
   if (event.type === "checkout.session.completed") {
-    const email = event.data.object.customer_email;
+    const session = event.data.object;
+    const email = session.customer_email;
 
     const user = await User.findOne({ email });
     if (user) {
       user.isPro = true;
       await user.save();
+      console.log("✅ PRO unlocked:", email);
     }
   }
 
@@ -130,6 +164,7 @@ app.post("/api/stripe/webhook", async (req, res) => {
     if (user) {
       user.isPro = false;
       await user.save();
+      console.log("❌ PRO removed:", customer.email);
     }
   }
 
@@ -139,20 +174,21 @@ app.post("/api/stripe/webhook", async (req, res) => {
     if (user) {
       user.isPro = false;
       await user.save();
+      console.log("❌ PRO removed (fail):", customer.email);
     }
   }
 
   res.sendStatus(200);
 });
 
-/* ================= BILLING PORTAL ================= */
+/* ================= BILLING ================= */
 app.post("/api/billing-portal", async (req, res) => {
   try {
     const { email } = req.body;
 
     const customers = await stripe.customers.list({ email });
     if (!customers.data.length) {
-      return res.status(400).json({ error: "No customer found" });
+      return res.status(400).json({ error:"No customer found" });
     }
 
     const session = await stripe.billingPortal.sessions.create({
@@ -160,10 +196,11 @@ app.post("/api/billing-portal", async (req, res) => {
       return_url: `${process.env.CLIENT_URL}/billing`
     });
 
-    res.json({ url: session.url });
+    res.json({ url:session.url });
 
-  } catch {
-    res.status(500).json({ error: "Billing portal failed" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error:"Billing failed" });
   }
 });
 
@@ -194,24 +231,54 @@ app.get("/api/data", async (req, res) => {
     const games = [];
 
     for (const g of data.slice(0,20)) {
+
       const books = (g.bookmakers || []).slice(0,2).map(b => {
         const h2h = b.markets?.find(m => m.key === "h2h");
+
         return {
           name: b.title,
           home: h2h?.outcomes?.find(o => o.name === g.home_team)?.price,
           away: h2h?.outcomes?.find(o => o.name === g.away_team)?.price
         };
+
       }).filter(b => b.home && b.away);
 
       if (!books.length) continue;
 
       const homeOdds = books[0].home;
 
+      const last = await OddsHistory.findOne({gameId:g.id}).sort({timestamp:-1});
+
+      let move = 0;
+      let steam=false;
+      let steamStrength="none";
+
+      if(last){
+        move = homeOdds - last.odds;
+        if(Math.abs(move)>=3) steamStrength="medium";
+        if(Math.abs(move)>=5) steamStrength="strong";
+        steam = steamStrength !== "none";
+      }
+
+      let bestHome = Math.max(...books.map(b=>b.home));
+      const avgHome = books.reduce((s,b)=>s+b.home,0)/books.length;
+
+      const ev = ((1/toDecimal(avgHome) - 1/toDecimal(bestHome))*100);
+
+      let confidence = Math.min(95, 50 + ev*5);
+
+      await OddsHistory.create({gameId:g.id, odds:homeOdds});
+
       games.push({
         id:g.id,
         home:g.home_team,
         away:g.away_team,
         homeOdds,
+        move,
+        steam,
+        steamStrength,
+        ev:Number(ev.toFixed(2)),
+        confidence,
         books
       });
     }
