@@ -7,17 +7,18 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
+    // ALWAYS go to dashboard (no login block)
     router.replace("/dashboard");
   }, []);
 
   return (
     <div style={{
-      minHeight: "100vh",
-      background: "black",
+      height: "100vh",
+      background: "#050505",
       color: "white",
       display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
+      alignItems: "center"
     }}>
       Loading KBETZ...
     </div>
