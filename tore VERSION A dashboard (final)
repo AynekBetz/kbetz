@@ -1,0 +1,91 @@
+[33mfef22f3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m final checkout fix
+[33me88798b[m remove login block for public viewing
+[33md31683e[m fix mobile routing
+[33m6716258[m fix: root route to dashboard
+[33mb006960[m hard reset test
+[33m97a2646[m restore working dashboard
+[33m2211e1f[m fix: clean duplicate styles + crash fix
+[33mabc8bcd[m fix: prevent client crash (safe render)
+[33m4b8f5d8[m KBETZ: full UI blend + terminal styling applied
+[33md33b560[m fix: kbetz logo blend
+[33m05bcd6d[m fix: build + working dashboard + kbetz theme
+[33mf40255d[m locked UI + stable dashboard
+[33mbdea063[m fix button click issue
+[33mdbaafc9[m add /api/odds (no break)
+[33mb1859fc[m step 4 heatmap + best line FULL
+[33m6c5526d[m add trust layer (why picks + steam + record)
+[33m49b8457[m restore exact KBETZ signature UI
+[33me1aa34f[m restore KBETZ blended gradient signature
+[33md0b4a35[m FINAL: restore KBETZ signature + stable dashboard
+[33m63f2aa5[m restore KBETZ signature title + elite UI
+[33m0912eda[m KBETZ signature gradient restored safely
+[33me92c809[m restore elite KBETZ UI safely
+[33m84aeb13[m force data + full integration
+[33m24c6eb3[m fix react 418 crash
+[33me92dbad[m stable dashboard fix
+[33m8effee5[m fix crash
+[33me369f40[m final working dashboard
+[33m0ac3f71[m test build full script
+[33m2ecee2a[m fix dashboard caching
+[33md221202[m force dynamic dashboard
+[33mbbe869c[m final premium UI dashboard
+[33m4684591[m final premium UI
+[33m1eca492[m fix backend JSX crash + full upgrade
+[33m4b09545[m force deploy
+[33mf04fb19[m full AI + charts + steam + hedge upgrade
+[33m8f71fde[m FINAL: full dashboard complete
+[33md14479e[m FINAL: full animated dashboard
+[33m7264e73[m LOCK: Full Elite Dashboard (stable)
+[33me15d8f4[m FINAL BUILD: full system (EV + arb + optimizer + ROI + UI)
+[33mba8932c[m restore: elite UI + multi-book + sharp detection
+[33m8dd8744[m feat: multi-book + sharp detection
+[33m5a8b382[m fix: stable dashboard + real EV + restored UI
+[33md67e6f2[m fix: crash + safe EV + stable render
+[33mdabbb1d[m feat: real EV model + improved sharp logic (no randomness)
+[33m7715c3a[m ui: elite dashboard + EV + signals + alerts
+[33m66ccb2a[m[33m ([m[1;33mtag: [m[1;33mv1.1-ev-alerts[m[33m)[m feat: EV model + sharp signals + alerts system
+[33mecc8dfb[m feat: heatmap + charts + sharp tracker
+[33m7e9d3e4[m feat: smart odds flash + ai parlay + sound
+[33mfb9c7c2[m[33m ([m[1;33mtag: [m[1;33mv1.0-stable[m[33m)[m feat: bet slip + parlay builder + PRO blur
+[33m7d709be[m fix: typescript style typing
+[33m2e42665[m feat: add PRO blur lock + upgrade overlay
+[33ma00d99e[m fix: checkout route added
+[33m0813800[m debug checkout error
+[33m2854666[m fix: checkout route corrected
+[33m862f1d0[m fix: real upgrade button click + stripe
+[33mf3a7017[m fix: upgrade button + stripe + pro flow
+[33m813f0fd[m fix signup redirect + UX
+[33m662e14c[m fix login TS + convert to tsx
+[33mc3ffcb0[m fix signup TS error
+[33m3f7739d[m fix TS style error
+[33m931d41b[m[33m ([m[1;32mstable-locked[m[33m)[m fix upgrade + signup access
+[33m4ea895f[m fix upgrade button click
+[33me266c01[m final signup fix
+[33m23374a9[m[33m ([m[1;33mtag: [m[1;33mstable-v1[m[33m, [m[1;31morigin/stable-locked[m[33m)[m fix layout crash (final)
+[33m903a20f[m fix useUser hook crash
+[33m9302d3a[m final dashboard fix
+[33mafbfd9b[m fix empty string function crash
+[33m73dd14a[m fix api connection
+[33m9c6adee[m FINAL FIX: backend crash + stable API
+[33mb0dae9d[m fix cors + login connection
+[33m0bb0100[m final login fix
+[33ma7c09ed[m fix login crash
+[33m2546abf[m add homepage route fix
+[33mf9bf829[m force fresh deploy
+[33m839ddd7[m restore dashboard page
+[33m478861a[m remove all js.tsx conflicts
+[33mec1841a[m force rebuild
+[33m59a6188[m[33m ([m[1;31morigin/stable-lock[m[33m, [m[1;32mstable-lock[m[33m)[m restore login page
+[33mecc8992[m pro lock upgrade
+[33ma2f2ddc[m[33m ([m[1;33mtag: [m[1;33mv1-stable-login[m[33m)[m FINAL STABLE SECURE VERSION
+[33m7936f79[m stable final backend
+[33mf9c978c[m final login debug fix
+[33me47661a[m final stable backend fix
+[33me646497[m final cors fix
+[33me76a101[m final fix remove node-fetch
+[33mc290d21[m force real error deploy final
+[33m03f8b9b[m show real signup error final
+[33me9c1882[m final signup crash fix
+[33m00591b0[m fix signup crash + cors issue clean
+[33m729970c[m final signup + cors + stability fix
+[33m1d2efc9[m force debug signup error visible
