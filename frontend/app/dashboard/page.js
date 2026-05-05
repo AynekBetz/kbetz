@@ -6,6 +6,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function Dashboard() {
 
+/* ================= STATE ================= */
 const [games, setGames] = useState([]);
 const [betSlip, setBetSlip] = useState([]);
 const [stake, setStake] = useState(100);
@@ -17,7 +18,7 @@ useEffect(() => {
   checkPro();
 }, []);
 
-/* ================= DATA ================= */
+/* ================= FETCH GAMES ================= */
 const fetchGames = async () => {
   try {
     const res = await fetch(`${API}/api/data`);
@@ -29,13 +30,13 @@ const fetchGames = async () => {
     }
 
     setGames(data.games);
-
-  } catch {
+  } catch (err) {
+    console.log("Fetch error:", err);
     setGames([]);
   }
 };
 
-/* ================= PRO ================= */
+/* ================= CHECK PRO ================= */
 const checkPro = async () => {
   try {
     const email = localStorage.getItem("email");
@@ -45,37 +46,45 @@ const checkPro = async () => {
     const data = await res.json();
 
     setIsPro(data?.isPro || false);
-  } catch {}
+  } catch {
+    setIsPro(false);
+  }
 };
 
-/* ================= STRIPE ================= */
+/* ================= UPGRADE ================= */
 const handleUpgrade = async () => {
   try {
     const email = localStorage.getItem("email");
 
     const res = await fetch(`${API}/api/checkout`, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email })
     });
 
     const data = await res.json();
 
-    if (data?.url) window.location.href = data.url;
+    if (data?.url) {
+      window.location.href = data.url;
+    } else {
+      alert("Checkout failed");
+      console.log(data);
+    }
 
-  } catch {
+  } catch (err) {
+    console.log(err);
     alert("Upgrade failed");
   }
 };
 
-/* ================= BET SLIP ================= */
-const addToSlip = (g)=>{
-  if(!g) return;
-  if(betSlip.find(b=>b.id===g.id)) return;
-  setBetSlip([...betSlip,g]);
+/* ================= BET LOGIC ================= */
+const addToSlip = (g) => {
+  if (!g) return;
+  if (betSlip.find(b => b.id === g.id)) return;
+  setBetSlip([...betSlip, g]);
 };
 
-const payout = ()=>{
+const payout = () => {
   return stake.toFixed(2);
 };
 
@@ -89,7 +98,7 @@ return (
 🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
 </div>
 
-{/* PRO */}
+{/* PRO BANNER */}
 {!isPro && (
 <div style={styles.proBanner}>
 Unlock AI picks, ROI & alerts
@@ -101,16 +110,18 @@ Upgrade
 
 {/* GAMES */}
 <div style={styles.grid}>
-{Array.isArray(games) && games.map(g => (
+{games.map((g) => (
 <div key={g.id} style={styles.card}>
 
 <div style={styles.teams}>
 {g.away} vs {g.home}
 </div>
 
-<div style={styles.odds}>{g.homeOdds}</div>
+<div style={styles.odds}>
+{g.homeOdds}
+</div>
 
-<button style={styles.addBtn} onClick={()=>addToSlip(g)}>
+<button style={styles.addBtn} onClick={() => addToSlip(g)}>
 Add
 </button>
 
@@ -122,13 +133,13 @@ Add
 <div style={styles.betPanel}>
 <h3>Bet Slip</h3>
 
-{betSlip.map(b=>(
+{betSlip.map((b) => (
 <div key={b.id}>{b.home}</div>
 ))}
 
 <input
 value={stake}
-onChange={e=>setStake(Number(e.target.value))}
+onChange={(e) => setStake(Number(e.target.value))}
 style={styles.input}
 />
 
@@ -142,12 +153,13 @@ ${payout()}
 );
 }
 
-/* ================= CLEAN STYLES ================= */
+/* ================= STYLES ================= */
 
 const styles = {
 
-page:{
-background: `linear-gradient(
+page: {
+background: `
+linear-gradient(
   to bottom,
   #000 0%,
   #0a0014 25%,
@@ -157,80 +169,94 @@ background: `linear-gradient(
   #0a0014 80%,
   #000 100%
 )`,
-color:"white",
-padding:"20px",
-minHeight:"100vh"
+color: "white",
+padding: "20px",
+minHeight: "100vh"
 },
 
-logo:{
-fontSize:"34px",
-fontWeight:"900",
-background:`linear-gradient(
+logo: {
+fontSize: "34px",
+fontWeight: "900",
+background: `linear-gradient(
   90deg,
-  #7c3aed 0%,
-  #9333ea 25%,
-  #a855f7 45%,
-  #22d3ee 70%,
-  #00ffcc 100%
+  #7c3aed,
+  #9333ea,
+  #a855f7,
+  #22d3ee,
+  #00ffcc
 )`,
-WebkitBackgroundClip:"text",
-WebkitTextFillColor:"transparent",
-color:"transparent"
+WebkitBackgroundClip: "text",
+WebkitTextFillColor: "transparent",
+color: "transparent"
 },
 
-status:{ color:"#00ffcc", marginBottom:"15px" },
-
-grid:{
-display:"grid",
-gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",
-gap:"12px"
+status: {
+color: "#00ffcc",
+marginBottom: "15px"
 },
 
-card:{
-background:"rgba(30,0,60,0.45)",
-padding:"15px",
-borderRadius:"12px",
-border:"1px solid rgba(124,58,237,0.2)"
+grid: {
+display: "grid",
+gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
+gap: "12px"
 },
 
-teams:{ color:"#ddd" },
-
-odds:{ color:"#00ffcc", fontWeight:"bold" },
-
-addBtn:{
-background:"linear-gradient(90deg,#9333ea,#00ffcc)",
-color:"#000",
-padding:"8px",
-border:"none",
-cursor:"pointer"
+card: {
+background: "rgba(30,0,60,0.45)",
+padding: "15px",
+borderRadius: "12px",
+border: "1px solid rgba(124,58,237,0.2)"
 },
 
-betPanel:{
-marginTop:"20px",
-background:"rgba(10,0,20,0.7)",
-padding:"15px",
-borderRadius:"12px"
+teams: {
+color: "#ddd"
 },
 
-input:{ width:"100%", marginTop:"10px" },
-
-payout:{ marginTop:"10px", color:"#00ffcc" },
-
-proBanner:{
-background:"linear-gradient(90deg,#6d28d9,#9333ea)",
-padding:"10px",
-marginBottom:"15px",
-display:"flex",
-justifyContent:"space-between",
-borderRadius:"12px"
+odds: {
+color: "#00ffcc",
+fontWeight: "bold"
 },
 
-upgradeBtn:{
-background:"#22c55e",
-color:"#000",
-padding:"8px",
-border:"none",
-cursor:"pointer"
+addBtn: {
+background: "#22c55e",
+color: "#000",
+padding: "8px",
+border: "none",
+cursor: "pointer"
+},
+
+betPanel: {
+marginTop: "20px",
+background: "rgba(10,0,20,0.7)",
+padding: "15px",
+borderRadius: "12px"
+},
+
+input: {
+width: "100%",
+marginTop: "10px"
+},
+
+payout: {
+marginTop: "10px",
+color: "#00ffcc"
+},
+
+proBanner: {
+background: "linear-gradient(90deg,#6d28d9,#9333ea)",
+padding: "10px",
+marginBottom: "15px",
+display: "flex",
+justifyContent: "space-between",
+borderRadius: "12px"
+},
+
+upgradeBtn: {
+background: "#22c55e",
+color: "#000",
+padding: "8px",
+border: "none",
+cursor: "pointer"
 }
 
 };
