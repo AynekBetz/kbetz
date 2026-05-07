@@ -103,6 +103,9 @@ app.post("/api/checkout", async (req, res) => {
   try {
     const { email } = req.body;
 
+    console.log("💳 CHECKOUT HIT:", email);
+    console.log("💰 PRICE:", process.env.STRIPE_PRICE_ID);
+
     if (!email) {
       return res.status(400).json({ error: "Missing email" });
     }
@@ -117,14 +120,14 @@ app.post("/api/checkout", async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.CLIENT_URL}/dashboard`,
-      cancel_url: `${process.env.CLIENT_URL}/dashboard`,
+      success_url: `${process.env.FRONTEND_URL}/dashboard?success=true`,
+      cancel_url: `${process.env.FRONTEND_URL}/dashboard?canceled=true`,
     });
 
     res.json({ url: session.url });
 
   } catch (err) {
-    console.log("CHECKOUT ERROR:", err.message);
+    console.log("❌ CHECKOUT ERROR:", err);
     res.status(500).json({ error: "Checkout failed" });
   }
 });
@@ -193,7 +196,7 @@ app.post("/api/billing-portal", async (req, res) => {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customers.data[0].id,
-      return_url: `${process.env.CLIENT_URL}/billing`
+      return_url: `${process.env.FRONTEND_URL}/billing`
     });
 
     res.json({ url:session.url });
