@@ -11,52 +11,64 @@ const [loading, setLoading] = useState(true);
 
 /* ================= INIT ================= */
 useEffect(() => {
-  fetchGames();
+  try {
+    fetchGames();
+  } catch (e) {
+    console.log("INIT ERROR:", e);
+    safeFallback();
+  }
 }, []);
+
+/* ================= SAFE FALLBACK ================= */
+const safeFallback = () => {
+  setGames([
+    { id: 1, away: "Warriors", home: "Lakers", homeOdds: -110 },
+    { id: 2, away: "Heat", home: "Celtics", homeOdds: -105 }
+  ]);
+  setLoading(false);
+};
 
 /* ================= FETCH ================= */
 const fetchGames = async () => {
   try {
     const API = process.env.NEXT_PUBLIC_API_URL;
 
-    if (!API) throw new Error("Missing API URL");
+    // 🔥 DO NOT crash if env missing
+    if (!API || typeof API !== "string") {
+      console.log("NO API → fallback");
+      safeFallback();
+      return;
+    }
 
-    const res = await fetch(`${API}/api/data`);
+    const res = await fetch(`${API}/api/data`).catch(() => null);
 
-    if (!res.ok) throw new Error("Bad response");
+    if (!res || !res.ok) {
+      console.log("BAD RESPONSE → fallback");
+      safeFallback();
+      return;
+    }
 
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
 
     if (!data || !Array.isArray(data.games)) {
-      throw new Error("Invalid data");
+      console.log("BAD DATA → fallback");
+      safeFallback();
+      return;
     }
 
     setGames(data.games);
+    setLoading(false);
 
   } catch (err) {
-    console.log("API FAILED → using fallback", err);
-
-    // 🔥 fallback so UI NEVER crashes
-    setGames([
-      { id: 1, away: "Warriors", home: "Lakers", homeOdds: -110 },
-      { id: 2, away: "Heat", home: "Celtics", homeOdds: -105 }
-    ]);
-  } finally {
-    setLoading(false);
+    console.log("FETCH CRASH → fallback", err);
+    safeFallback();
   }
 };
 
-/* ================= LOADING ================= */
+/* ================= SAFE RENDER ================= */
 if (loading) {
   return (
-    <div style={{
-      height: "100vh",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      background: "#000",
-      color: "#fff"
-    }}>
+    <div style={styles.loading}>
       Loading KBETZ...
     </div>
   );
@@ -68,13 +80,13 @@ return (
 
 {/* HEADER */}
 <div style={styles.header}>
-<h1 style={styles.logo}>KBETZ TERMINAL</h1>
+  <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
-<div style={styles.actions}>
-<span style={styles.free}>FREE</span>
-<button style={styles.logout}>Logout</button>
-<button style={styles.upgrade}>Upgrade PRO</button>
-</div>
+  <div style={styles.actions}>
+    <span style={styles.free}>FREE</span>
+    <button style={styles.logout}>Logout</button>
+    <button style={styles.upgrade}>Upgrade PRO</button>
+  </div>
 </div>
 
 {/* STATUS */}
@@ -84,30 +96,28 @@ return (
 
 {/* AI PICKS */}
 <div style={styles.aiCard}>
-<h2 style={styles.aiTitle}>🧠 AI PICKS</h2>
+  <h2>🧠 AI PICKS</h2>
 
-{games.slice(0,2).map((g, i) => (
-<div key={g.id || i} style={styles.pick}>
-{g.away} @ {g.home}
-<div style={styles.ev}>
-EV: {(Math.random()*2+4).toFixed(2)}
-</div>
-</div>
-))}
-
+  {games.slice(0,2).map((g, i) => (
+    <div key={g?.id || i} style={styles.pick}>
+      {(g?.away || "Team")} @ {(g?.home || "Team")}
+      <div style={styles.ev}>
+        EV: {(Math.random()*2+4).toFixed(2)}
+      </div>
+    </div>
+  ))}
 </div>
 
 {/* MARKETS */}
 <div style={styles.marketCard}>
-<h2>Markets</h2>
+  <h2>Markets</h2>
 
-{games.map((g, i) => (
-<div key={g.id || i} style={styles.row}>
-<span>{g.away} @ {g.home}</span>
-<span style={styles.odds}>{g.homeOdds}</span>
-</div>
-))}
-
+  {games.map((g, i) => (
+    <div key={g?.id || i} style={styles.row}>
+      <span>{(g?.away || "Team")} @ {(g?.home || "Team")}</span>
+      <span style={styles.odds}>{g?.homeOdds ?? "-"}</span>
+    </div>
+  ))}
 </div>
 
 </div>
@@ -123,6 +133,15 @@ background:"linear-gradient(to bottom,#000,#0a0014,#2b0a4a,#6d28d9,#000)",
 color:"white",
 padding:"20px",
 minHeight:"100vh"
+},
+
+loading:{
+height:"100vh",
+display:"flex",
+justifyContent:"center",
+alignItems:"center",
+background:"#000",
+color:"#fff"
 },
 
 header:{
@@ -178,10 +197,6 @@ background:"linear-gradient(90deg,#6d28d9,#9333ea)",
 padding:"20px",
 borderRadius:"14px",
 marginBottom:"20px"
-},
-
-aiTitle:{
-marginBottom:"10px"
 },
 
 pick:{
