@@ -11,21 +11,25 @@ const [loading, setLoading] = useState(true);
 
 /* ================= INIT ================= */
 useEffect(() => {
-  try {
-    fetchGames();
-  } catch (e) {
-    console.log("INIT ERROR:", e);
-    safeFallback();
-  }
+  checkAuth();
 }, []);
 
-/* ================= SAFE FALLBACK ================= */
-const safeFallback = () => {
-  setGames([
-    { id: 1, away: "Warriors", home: "Lakers", homeOdds: -110 },
-    { id: 2, away: "Heat", home: "Celtics", homeOdds: -105 }
-  ]);
-  setLoading(false);
+/* ================= AUTH ================= */
+const checkAuth = () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      window.location.href = "/";
+      return;
+    }
+
+    fetchGames();
+
+  } catch (err) {
+    console.log("Auth error:", err);
+    window.location.href = "/";
+  }
 };
 
 /* ================= FETCH ================= */
@@ -33,43 +37,42 @@ const fetchGames = async () => {
   try {
     const API = process.env.NEXT_PUBLIC_API_URL;
 
-    // 🔥 DO NOT crash if env missing
-    if (!API || typeof API !== "string") {
-      console.log("NO API → fallback");
-      safeFallback();
-      return;
-    }
+    const res = await fetch(`${API}/api/data`);
 
-    const res = await fetch(`${API}/api/data`).catch(() => null);
+    if (!res.ok) throw new Error("Bad response");
 
-    if (!res || !res.ok) {
-      console.log("BAD RESPONSE → fallback");
-      safeFallback();
-      return;
-    }
-
-    const data = await res.json().catch(() => null);
+    const data = await res.json();
 
     if (!data || !Array.isArray(data.games)) {
-      console.log("BAD DATA → fallback");
-      safeFallback();
-      return;
+      throw new Error("Bad data");
     }
 
     setGames(data.games);
-    setLoading(false);
 
   } catch (err) {
-    console.log("FETCH CRASH → fallback", err);
-    safeFallback();
+    console.log("Fallback data used");
+
+    setGames([
+      { id: 1, away: "Warriors", home: "Lakers", homeOdds: -110 },
+      { id: 2, away: "Heat", home: "Celtics", homeOdds: -105 }
+    ]);
+  } finally {
+    setLoading(false);
   }
 };
 
-/* ================= SAFE RENDER ================= */
+/* ================= LOGOUT ================= */
+const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("email");
+  window.location.href = "/";
+};
+
+/* ================= LOADING ================= */
 if (loading) {
   return (
     <div style={styles.loading}>
-      Loading KBETZ...
+      Loading Dashboard...
     </div>
   );
 }
@@ -83,9 +86,10 @@ return (
   <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
   <div style={styles.actions}>
-    <span style={styles.free}>FREE</span>
-    <button style={styles.logout}>Logout</button>
-    <button style={styles.upgrade}>Upgrade PRO</button>
+    <span style={styles.free}>LIVE</span>
+    <button style={styles.logout} onClick={handleLogout}>
+      Logout
+    </button>
   </div>
 </div>
 
@@ -99,8 +103,8 @@ return (
   <h2>🧠 AI PICKS</h2>
 
   {games.slice(0,2).map((g, i) => (
-    <div key={g?.id || i} style={styles.pick}>
-      {(g?.away || "Team")} @ {(g?.home || "Team")}
+    <div key={g.id || i}>
+      {g.away} @ {g.home}
       <div style={styles.ev}>
         EV: {(Math.random()*2+4).toFixed(2)}
       </div>
@@ -113,9 +117,9 @@ return (
   <h2>Markets</h2>
 
   {games.map((g, i) => (
-    <div key={g?.id || i} style={styles.row}>
-      <span>{(g?.away || "Team")} @ {(g?.home || "Team")}</span>
-      <span style={styles.odds}>{g?.homeOdds ?? "-"}</span>
+    <div key={g.id || i} style={styles.row}>
+      <span>{g.away} @ {g.home}</span>
+      <span style={styles.odds}>{g.homeOdds}</span>
     </div>
   ))}
 </div>
@@ -178,15 +182,6 @@ borderRadius:"6px",
 cursor:"pointer"
 },
 
-upgrade:{
-background:"#facc15",
-color:"#000",
-border:"none",
-padding:"6px 10px",
-borderRadius:"6px",
-cursor:"pointer"
-},
-
 status:{
 color:"#00ffcc",
 marginBottom:"20px"
@@ -197,10 +192,6 @@ background:"linear-gradient(90deg,#6d28d9,#9333ea)",
 padding:"20px",
 borderRadius:"14px",
 marginBottom:"20px"
-},
-
-pick:{
-marginBottom:"10px"
 },
 
 ev:{
