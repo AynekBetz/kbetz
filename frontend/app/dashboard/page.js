@@ -191,7 +191,6 @@ Add
 
 {/* BET SLIP */}
 <div style={styles.betPanel}>
-
 <h3>Bet Slip</h3>
 
 {betSlip.map(b => (
@@ -214,26 +213,23 @@ ${payout()}
 );
 }
 
-/* ================= KBETZ STYLE ================= */
+/* ================= STYLE ================= */
 
 const styles = {
-
 page:{
 background:`linear-gradient(
 to bottom,
-#000 0%,
-#0a0014 25%,
-#2b0a4a 45%,
-#6d28d9 55%,
-#2b0a4a 65%,
-#0a0014 80%,
-#000 100%
+#000,
+#0a0014,
+#2b0a4a,
+#6d28d9,
+#2b0a4a,
+#000
 )`,
 color:"white",
 padding:"20px",
 minHeight:"100vh"
 },
-
 logo:{
 fontSize:"34px",
 fontWeight:"900",
@@ -241,73 +237,19 @@ background:"linear-gradient(90deg,#7c3aed,#9333ea,#22d3ee,#00ffcc)",
 WebkitBackgroundClip:"text",
 WebkitTextFillColor:"transparent"
 },
-
 status:{ color:"#00ffcc", marginBottom:"15px" },
-
 alertBar:{ display:"flex", gap:"10px", marginBottom:"15px" },
-
-alert:{
-background:"rgba(255,255,255,0.05)",
-padding:"6px 10px",
-borderRadius:"6px"
-},
-
-grid:{
-display:"grid",
-gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",
-gap:"12px"
-},
-
-card:{
-background:"rgba(30,0,60,0.45)",
-padding:"15px",
-borderRadius:"12px",
-border:"1px solid rgba(124,58,237,0.2)",
-boxShadow:"0 0 20px rgba(124,58,237,0.15)"
-},
-
-teams:{ color:"#ddd", marginBottom:"6px" },
-
+alert:{ background:"rgba(255,255,255,0.05)", padding:"6px 10px", borderRadius:"6px" },
+grid:{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:"12px" },
+card:{ background:"rgba(30,0,60,0.45)", padding:"15px", borderRadius:"12px", border:"1px solid rgba(124,58,237,0.2)", boxShadow:"0 0 20px rgba(124,58,237,0.15)" },
+teams:{ color:"#ddd" },
 odds:{ color:"#00ffcc", fontWeight:"bold" },
-
-addBtn:{
-background:"linear-gradient(90deg,#9333ea,#00ffcc)",
-color:"#000",
-padding:"8px",
-border:"none",
-cursor:"pointer"
-},
-
-betPanel:{
-marginTop:"20px",
-background:"rgba(10,0,20,0.7)",
-padding:"15px",
-borderRadius:"12px"
-},
-
+addBtn:{ background:"linear-gradient(90deg,#9333ea,#00ffcc)", color:"#000", padding:"8px", border:"none", cursor:"pointer" },
+betPanel:{ marginTop:"20px", background:"rgba(10,0,20,0.7)", padding:"15px", borderRadius:"12px" },
 input:{ width:"100%", marginTop:"10px" },
-
 payout:{ marginTop:"10px", color:"#00ffcc" },
-
-proBanner:{
-background:"linear-gradient(90deg,#6d28d9,#9333ea)",
-padding:"10px",
-marginBottom:"15px",
-display:"flex",
-justifyContent:"space-between",
-borderRadius:"12px",
-boxShadow:"0 0 40px rgba(124,58,237,0.4)"
-},
-
-upgradeBtn:{
-background:"#22c55e",
-color:"#000",
-padding:"8px",
-border:"none",
-cursor:"pointer"
-},
-
+proBanner:{ background:"linear-gradient(90deg,#6d28d9,#9333ea)", padding:"10px", marginBottom:"15px", display:"flex", justifyContent:"space-between", borderRadius:"12px", boxShadow:"0 0 40px rgba(124,58,237,0.4)" },
+upgradeBtn:{ background:"#22c55e", color:"#000", padding:"8px", border:"none", cursor:"pointer" },
 flashUp:{ boxShadow:"0 0 15px rgba(0,255,200,0.4)" },
 flashDown:{ boxShadow:"0 0 15px rgba(255,0,0,0.4)" }
-
 };
