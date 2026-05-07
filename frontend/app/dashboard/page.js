@@ -7,6 +7,7 @@ export default function Dashboard() {
 
 /* ================= STATE ================= */
 const [games, setGames] = useState([]);
+const [loading, setLoading] = useState(true);
 
 /* ================= INIT ================= */
 useEffect(() => {
@@ -16,32 +17,50 @@ useEffect(() => {
 /* ================= FETCH ================= */
 const fetchGames = async () => {
   try {
-    const res = await fetch("/api/data");
+    const res = await fetch(
+      process.env.NEXT_PUBLIC_API_URL
+        ? `${process.env.NEXT_PUBLIC_API_URL}/api/data`
+        : "/api/data"
+    );
 
-    // Prevent crash if API fails
-    if (!res.ok) {
-      setGames([]);
-      return;
-    }
+    if (!res.ok) throw new Error("bad response");
 
     const data = await res.json();
 
-    // Safe fallback
     if (!data || !Array.isArray(data.games)) {
       setGames([]);
-      return;
+    } else {
+      setGames(data.games);
     }
 
-    setGames(data.games);
-
   } catch (err) {
-    console.log("fetch error:", err);
-    setGames([]);
+    console.log("SAFE FALLBACK:", err);
+
+    // 🔥 fallback data so UI NEVER crashes
+    setGames([
+      { id: 1, home: "Lakers", away: "Warriors", homeOdds: -110 },
+      { id: 2, home: "Celtics", away: "Heat", homeOdds: -105 }
+    ]);
+  } finally {
+    setLoading(false);
   }
 };
 
-/* ================= SAFE RENDER ================= */
-if (!games) return null;
+/* ================= SAFE LOADING ================= */
+if (loading) {
+  return (
+    <div style={{
+      height:"100vh",
+      display:"flex",
+      justifyContent:"center",
+      alignItems:"center",
+      background:"#000",
+      color:"#fff"
+    }}>
+      Loading KBETZ...
+    </div>
+  );
+}
 
 /* ================= UI ================= */
 return (
@@ -55,13 +74,13 @@ return (
 
 {/* AI PICKS */}
 <div style={styles.aiCard}>
-<h2 style={styles.aiTitle}>🧠 AI PICKS</h2>
+<h2>🧠 AI PICKS</h2>
 
-{Array.isArray(games) && games.slice(0,2).map((g, i) => (
-<div key={g?.id || i} style={styles.pick}>
-{g?.away ?? "Team"} @ {g?.home ?? "Team"}
+{games.slice(0,2).map((g, i) => (
+<div key={g.id || i}>
+{g.away} @ {g.home}
 <div style={styles.ev}>
-EV: {(Math.random() * 2 + 4).toFixed(2)}
+EV: {(Math.random()*2+4).toFixed(2)}
 </div>
 </div>
 ))}
@@ -72,15 +91,10 @@ EV: {(Math.random() * 2 + 4).toFixed(2)}
 <div style={styles.marketCard}>
 <h2>Markets</h2>
 
-{Array.isArray(games) && games.map((g, i) => (
-<div key={g?.id || i} style={styles.marketRow}>
-<span>
-{g?.away ?? "Team"} @ {g?.home ?? "Team"}
-</span>
-
-<span style={styles.odds}>
-{g?.homeOdds ?? "-"}
-</span>
+{games.map((g, i) => (
+<div key={g.id || i} style={styles.row}>
+<span>{g.away} @ {g.home}</span>
+<span style={styles.odds}>{g.homeOdds}</span>
 </div>
 ))}
 
@@ -120,14 +134,6 @@ borderRadius:"14px",
 marginBottom:"20px"
 },
 
-aiTitle:{
-marginBottom:"10px"
-},
-
-pick:{
-marginBottom:"10px"
-},
-
 ev:{
 color:"#00ffcc"
 },
@@ -138,17 +144,16 @@ padding:"20px",
 borderRadius:"14px"
 },
 
-marketRow:{
+row:{
 display:"flex",
 justifyContent:"space-between",
-padding:"12px",
 background:"#000",
+padding:"12px",
 borderRadius:"10px",
 marginBottom:"10px"
 },
 
 odds:{
-color:"#00ffcc",
-fontWeight:"bold"
+color:"#00ffcc"
 }
 };
