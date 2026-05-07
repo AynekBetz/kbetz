@@ -89,3 +89,184 @@
 [33m00591b0[m fix signup crash + cors issue clean
 [33m729970c[m final signup + cors + stability fix
 [33m1d2efc9[m force debug signup error visible
+[33m006084f[m full debug signup version
+[33m5c0a0aa[m final mongoose fix production backend
+[33m1c06b8a[m remove old middleware + clean architecture
+[33m7c48d41[m production architecture stable backend
+[33mb236a0c[m clean server final
+[33m150f640[m final fix no backticks + mongo order
+[33m1db2c96[m final stable backend (mongo + auth + stripe)
+[33m066dcbe[m final mongo timeout fix + stable backend
+[33m444cbaa[m final signup fix
+[33m6f24c4a[m mongo debug fix
+[33mc538ad1[m stabilize backend (remove crash + fix mobile checkout)
+[33madb85df[m mobile upgrade fix + api env support
+[33m2af3b86[m redirect homepage to dashboard
+[33mdd4abbf[m resolve merge conflict
+[33m5ed3128[m final dashboard fix
+[33md1d9001[m add pro unlock flow
+[33m19b86ed[m add stripe checkout full
+[33m306656b[m final fix working odds api
+[33ma2c49a0[m fix import typo
+[33m3237e0f[m final clean server
+[33m0102538[m auth fix without breaking UI
+[33m7e5661b[m remove demo mode, real login only
+[33m5ef0b94[m remove backticks breaking build
+[33m3a2622b[m fix login (token + debug)
+[33mdf5863a[m clean login + signup working
+[33mb54432d[m restore working dashboard (clean reset)
+[33m3517841[m clean dashboard (no backticks, stable build)
+[33m2ced2e3[m safe homepage redirect (no server issues)
+[33m6f018af[m force dynamic homepage redirect
+[33m8769f64[m fix login signup + force dashboard landing
+[33mb79e88d[m force homepage to dashboard
+[33m1481de5[m fix signup locally (working flow)
+[33mf72c92f[m restore dashboard + proper unlock logic
+[33m5f3eabe[m unlock dashboard demo version
+[33m1c99bb3[m fix dashboard dynamic build error
+[33m73aafa7[m force dynamic dashboard
+[33mb0064d3[m[33m ([m[1;31morigin/elite-dashboard[m[33m, [m[1;32melite-dashboard[m[33m)[m force rebuild
+[33m7c04a56[m fix homepage redirect
+[33m55c63e4[m force deploy elite-dashboard
+[33m9c3428b[m[33m ([m[1;31morigin/elite-ui-lock[m[33m, [m[1;32melite-ui-lock[m[33m)[m restore FULL dashboard (elite UI version)
+[33med5f1de[m restore full dashboard
+[33m0559188[m install stripe
+[33m508f364[m[33m ([m[1;31morigin/final-stable[m[33m, [m[1;32mfinal-stable[m[33m)[m FULL system: odds + auth + stripe + webhook
+[33m36d955f[m secure dashboard access (auth protection)
+[33m571a926[m add auto login + persistent session
+[33m507198d[m full backend fix: auth + multi-sport + real odds
+[33mec56be1[m[33m ([m[1;31morigin/elite-stable[m[33m, [m[1;32melite-stable[m[33m)[m elite UI without breaking features
+[33md66845b[m safe full build with AI + parlay
+[33m4e7c540[m LOCK STABLE VERSION
+[33ma8ba4b9[m upgrade to premium UI experience
+[33m00e2371[m add multi AI picks + parlay AI
+[33m0d6c498[m add real AI logic + explanations
+[33m4faa059[m add AI bet card + premium lock
+[33md731400[m add odds flash + movement animation
+[33mbdb50c6[m elite UI upgrade
+[33m1ecfada[m fix full auth + blur + sound + upgrade
+[33m6120323[m force fix upgrade button
+[33mf87aa7c[m fix upgrade button
+[33m1afcc55[m FULL SaaS system ready
+[33mf1456f6[m add pro mode lock
+[33mf7cceed[m real odds only (no simulation)
+[33mfa256c9[m connect real odds api
+[33ma3ee93f[m add sharp money + trap detection
+[33m1ece129[m AI smarter: EV + steam + momentum
+[33md37906d[m fix ai + api stability
+[33mc324cd3[m AI bet card added
+[33mbad3310[m force live api connection
+[33ma0a7909[m live odds api connected
+[33m95fc4ae[m fix vercel crash + safe api fallback
+[33m9b01fdc[m market behavior obvious + simulation
+[33m4899eef[m make market behavior obvious
+[33m3697386[m add sharp money detection
+[33m9ec9f04[m fix real alert sound
+[33md19ec7c[m fix sound + steam detection
+[33m71bc4ed[m add steam detection
+[33m3c4dfd1[m add charts + history
+[33m8d98095[m add live odds + sound
+[33m59c74ff[m pro UI upgrade
+[33mbcc54cf[m add bet slip builder
+[33m5da293a[m restore real dashboard UI
+[33m1dcc6a0[m NUCLEAR CLEAN RESET
+[33md6c894e[m connect to live backend
+[33mca0bc36[m FULL RESET UI
+[33m445e701[m connect frontend to backend
+[33m8581e4c[m fix frontend refresh rate to 60s + stabilize odds loading
+[33mdb1a729[m force guaranteed odds route
+[33mf9b1d4e[m smart odds system (auto sport detection)
+[33m2c6d4c9[m final full backend with live odds system
+[33m9989ef9[m full backend update with live odds
+[33mbd293de[m fix odds route with logging + fallback
+[33md61b3f3[m connect live odds full system
+[33m6ca2b49[m install node-fetch for odds api
+[33m9c5a1b6[m force backend entry fix
+[33m95cb378[m fix missing /api/auth/me route
+[33mde84f90[m add MongoDB persistence
+[33m2dcd3c9[m switch to real auth system (dashboard)
+[33m4b4cf79[m add win probability + confidence model
+[33mb668009[m lock AI behind PRO + teaser preview
+[33m377232b[m add AI parlay builder full
+[33m655478a[m add payout calculator + parlay odds
+[33m5ff9c46[m add bet slip + clickable odds
+[33m3d68de4[m add best line highlight + arb UI
+[33ma04c248[m final audio + movement fix
+[33m5b43587[m add real EV + arbitrage engine
+[33m3afa450[m add value teaser logic
+[33m0133e80[m premium UI upgrade
+[33mbabccc6[m add locked feature component
+[33mbca7563[m force fresh build
+[33m2f073a0[m final clean checkout fix
+[33m3f9a799[m final checkout fix
+[33m386af14[m fix checkout GET + POST
+[33m67b3679[m fix checkout to use local api
+[33m3305c6a[m restore working stripe
+[33m685004b[m fix stripe route mount
+[33m3d781a5[m fix route path
+[33m3898ec2[m switch stripe to GET
+[33ma3b61fd[m final stripe debug
+[33m647e83e[m fix render cold start + cors
+[33m989dc86[m final backend fix
+[33m527e6ef[m fix stripe route
+[33m907a7ab[m backend ready for render
+[33m1feca89[m upgrade user model to production version
+[33mc9507dd[m full SaaS backend complete
+[33ma3d7bc3[m live odds movement + arrows + sound
+[33mbd12299[m connected real odds api
+[33m72f0bf4[m final secure auth system
+[33mf5d1988[m final auth + stripe + mongo system
+[33m284180d[m force redeploy auth routes
+[33m042f6ab[m add auth routes
+[33m8147850[m update user model with auth
+[33md4a04c1[m real SaaS backend with Mongo + Stripe
+[33m40b8539[m add user model
+[33me540c81[m FINAL webhook fix (timeout + slash)
+[33mc1b92f8[m fix webhook timeout FINAL
+[33m64d2c97[m restore real dashboard
+[33mb376a13[m force dynamic dashboard fix FINAL
+[33m29566a6[m force rebuild dashboard
+[33mc1a4a81[m button test direct redirect
+[33mf3ea818[m fix stripe env crash
+[33me75c3f3[m fix stripe install location
+[33m8576137[m final dashboard fix
+[33md1ae454[m fix esm server fully
+[33mb94a279[m fix backend crash safe stripe
+[33m23f3c33[m fix health route
+[33m8df91e1[m direct stripe fix
+[33mad25e5b[m fix checkout route location
+[33m9a2b15a[m final stripe route fix
+[33m3f60a1a[m restore stripe route
+[33m0c3e5c9[m added checkout api route
+[33m42496f0[m final click test
+[33m3b4f6a7[m final working link button
+[33ma13a8c9[m fix health route
+[33m0d3c5fd[m fix overlay blocking main content
+[33mdc62779[m fix css click blocking
+[33m6da776d[m force native click test
+[33m6393b4a[m add health api route
+[33mb74eb74[m final clean dashboard fix
+[33mde6b837[m force dynamic dashboard fix
+[33md0fcbbd[m remove layout blockers
+[33ma38c46b[m fix layout blocking clicks FINAL
+[33md6031f7[m force clickable div fix
+[33m601ffb6[m final button debug
+[33mc698865[m force dashboard connected final
+[33m2f93f57[m final proxy fix
+[33m058060b[m final connected fix
+[33mfe945fa[m force connection success
+[33m8d4e51c[m final fetch cors fix
+[33ma45029c[m final connection fix
+[33mf9bd2fd[m FINAL cors fix allow all
+[33m22391fb[m final dashboard fix
+[33m8d6a81d[m final cors + stripe fix
+[33mab6d2b2[m force deploy
+[33m9a70278[m delete backup folder permanently
+[33mdaeb6d4[m debug stripe button
+[33m8298925[m final stripe dashboard
+[33m456b38a[m full stripe checkout setup
+[33m174aa10[m remove backup folder fix build
+[33mfe53bdf[m connect real dashboard
+[33m9771d87[m connect dashboard
+[33m68673d2[m added api connection
+[33meaba01a[m final backend stable

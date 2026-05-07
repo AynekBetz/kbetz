@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 
@@ -10,33 +11,30 @@ export default function Dashboard() {
 const [games, setGames] = useState([]);
 const [betSlip, setBetSlip] = useState([]);
 const [stake, setStake] = useState(100);
+
+const [lastOdds, setLastOdds] = useState({});
+const [flashMap, setFlashMap] = useState({});
+const [alerts, setAlerts] = useState([]);
+
 const [isPro, setIsPro] = useState(false);
+
+/* ================= SOUND ================= */
+const playAlert = () => {
+  const audio = new Audio("/alert.mp3");
+  audio.volume = 0.5;
+  audio.play();
+};
 
 /* ================= INIT ================= */
 useEffect(() => {
   fetchGames();
   checkPro();
+
+  const interval = setInterval(fetchGames, 10000);
+  return () => clearInterval(interval);
 }, []);
 
-/* ================= FETCH GAMES ================= */
-const fetchGames = async () => {
-  try {
-    const res = await fetch(`${API}/api/data`);
-    const data = await res.json();
-
-    if (!data || !Array.isArray(data.games)) {
-      setGames([]);
-      return;
-    }
-
-    setGames(data.games);
-  } catch (err) {
-    console.log("Fetch error:", err);
-    setGames([]);
-  }
-};
-
-/* ================= CHECK PRO ================= */
+/* ================= PRO ================= */
 const checkPro = async () => {
   try {
     const email = localStorage.getItem("email");
@@ -51,7 +49,55 @@ const checkPro = async () => {
   }
 };
 
-/* ================= UPGRADE ================= */
+/* ================= DATA ================= */
+const fetchGames = async () => {
+  try {
+    const res = await fetch(`${API}/api/data`);
+    const data = await res.json();
+
+    if (!data || !Array.isArray(data.games)) return;
+
+    const updated = data.games.map(g => {
+      const prev = lastOdds[g.id] ?? g.homeOdds;
+      const move = g.homeOdds - prev;
+
+      if (move !== 0) {
+        setFlashMap(p => ({
+          ...p,
+          [g.id]: move > 0 ? "up" : "down"
+        }));
+
+        setTimeout(() => {
+          setFlashMap(p => ({ ...p, [g.id]: null }));
+        }, 800);
+      }
+
+      if (Math.abs(move) >= 0.2) {
+        playAlert();
+
+        setAlerts(a => [
+          { id: Date.now() + g.id, text: `${g.home} moved ${move.toFixed(2)}` },
+          ...a.slice(0, 4)
+        ]);
+      }
+
+      return { ...g, move };
+    });
+
+    setGames(updated);
+
+    setLastOdds(prev => {
+      const copy = { ...prev };
+      updated.forEach(g => (copy[g.id] = g.homeOdds));
+      return copy;
+    });
+
+  } catch (err) {
+    console.log("fetch error", err);
+  }
+};
+
+/* ================= STRIPE ================= */
 const handleUpgrade = async () => {
   try {
     const email = localStorage.getItem("email");
@@ -64,28 +110,33 @@ const handleUpgrade = async () => {
 
     const data = await res.json();
 
-    if (data?.url) {
+    if (data.url) {
       window.location.href = data.url;
     } else {
       alert("Checkout failed");
-      console.log(data);
     }
 
-  } catch (err) {
-    console.log(err);
-    alert("Upgrade failed");
+  } catch {
+    alert("Upgrade error");
   }
 };
 
-/* ================= BET LOGIC ================= */
-const addToSlip = (g) => {
+/* ================= HELPERS ================= */
+const toDecimal = o => (o > 0 ? o / 100 + 1 : 100 / Math.abs(o) + 1);
+
+const payout = () => {
+  if (!betSlip.length) return stake.toFixed(2);
+  const odds = betSlip.reduce(
+    (a, b) => a * toDecimal(b.homeOdds || -110),
+    1
+  );
+  return (stake * odds).toFixed(2);
+};
+
+const addToSlip = g => {
   if (!g) return;
   if (betSlip.find(b => b.id === g.id)) return;
   setBetSlip([...betSlip, g]);
-};
-
-const payout = () => {
-  return stake.toFixed(2);
 };
 
 /* ================= UI ================= */
@@ -98,7 +149,14 @@ return (
 🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
 </div>
 
-{/* PRO BANNER */}
+{/* ALERTS */}
+<div style={styles.alertBar}>
+{alerts.map(a => (
+<div key={a.id} style={styles.alert}>{a.text}</div>
+))}
+</div>
+
+{/* PRO */}
 {!isPro && (
 <div style={styles.proBanner}>
 Unlock AI picks, ROI & alerts
@@ -110,16 +168,18 @@ Upgrade
 
 {/* GAMES */}
 <div style={styles.grid}>
-{games.map((g) => (
-<div key={g.id} style={styles.card}>
+{games.map(g => (
+<div key={g.id} style={{
+...styles.card,
+...(flashMap[g.id] === "up" && styles.flashUp),
+...(flashMap[g.id] === "down" && styles.flashDown)
+}}>
 
 <div style={styles.teams}>
 {g.away} vs {g.home}
 </div>
 
-<div style={styles.odds}>
-{g.homeOdds}
-</div>
+<div style={styles.odds}>{g.homeOdds}</div>
 
 <button style={styles.addBtn} onClick={() => addToSlip(g)}>
 Add
@@ -131,15 +191,16 @@ Add
 
 {/* BET SLIP */}
 <div style={styles.betPanel}>
+
 <h3>Bet Slip</h3>
 
-{betSlip.map((b) => (
+{betSlip.map(b => (
 <div key={b.id}>{b.home}</div>
 ))}
 
 <input
 value={stake}
-onChange={(e) => setStake(Number(e.target.value))}
+onChange={e => setStake(Number(e.target.value))}
 style={styles.input}
 />
 
@@ -153,110 +214,100 @@ ${payout()}
 );
 }
 
-/* ================= STYLES ================= */
+/* ================= KBETZ STYLE ================= */
 
 const styles = {
 
-page: {
-background: `
-linear-gradient(
-  to bottom,
-  #000 0%,
-  #0a0014 25%,
-  #2b0a4a 45%,
-  #6d28d9 55%,
-  #2b0a4a 65%,
-  #0a0014 80%,
-  #000 100%
+page:{
+background:`linear-gradient(
+to bottom,
+#000 0%,
+#0a0014 25%,
+#2b0a4a 45%,
+#6d28d9 55%,
+#2b0a4a 65%,
+#0a0014 80%,
+#000 100%
 )`,
-color: "white",
-padding: "20px",
-minHeight: "100vh"
+color:"white",
+padding:"20px",
+minHeight:"100vh"
 },
 
-logo: {
-fontSize: "34px",
-fontWeight: "900",
-background: `linear-gradient(
-  90deg,
-  #7c3aed,
-  #9333ea,
-  #a855f7,
-  #22d3ee,
-  #00ffcc
-)`,
-WebkitBackgroundClip: "text",
-WebkitTextFillColor: "transparent",
-color: "transparent"
+logo:{
+fontSize:"34px",
+fontWeight:"900",
+background:"linear-gradient(90deg,#7c3aed,#9333ea,#22d3ee,#00ffcc)",
+WebkitBackgroundClip:"text",
+WebkitTextFillColor:"transparent"
 },
 
-status: {
-color: "#00ffcc",
-marginBottom: "15px"
+status:{ color:"#00ffcc", marginBottom:"15px" },
+
+alertBar:{ display:"flex", gap:"10px", marginBottom:"15px" },
+
+alert:{
+background:"rgba(255,255,255,0.05)",
+padding:"6px 10px",
+borderRadius:"6px"
 },
 
-grid: {
-display: "grid",
-gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))",
-gap: "12px"
+grid:{
+display:"grid",
+gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",
+gap:"12px"
 },
 
-card: {
-background: "rgba(30,0,60,0.45)",
-padding: "15px",
-borderRadius: "12px",
-border: "1px solid rgba(124,58,237,0.2)"
+card:{
+background:"rgba(30,0,60,0.45)",
+padding:"15px",
+borderRadius:"12px",
+border:"1px solid rgba(124,58,237,0.2)",
+boxShadow:"0 0 20px rgba(124,58,237,0.15)"
 },
 
-teams: {
-color: "#ddd"
+teams:{ color:"#ddd", marginBottom:"6px" },
+
+odds:{ color:"#00ffcc", fontWeight:"bold" },
+
+addBtn:{
+background:"linear-gradient(90deg,#9333ea,#00ffcc)",
+color:"#000",
+padding:"8px",
+border:"none",
+cursor:"pointer"
 },
 
-odds: {
-color: "#00ffcc",
-fontWeight: "bold"
+betPanel:{
+marginTop:"20px",
+background:"rgba(10,0,20,0.7)",
+padding:"15px",
+borderRadius:"12px"
 },
 
-addBtn: {
-background: "#22c55e",
-color: "#000",
-padding: "8px",
-border: "none",
-cursor: "pointer"
+input:{ width:"100%", marginTop:"10px" },
+
+payout:{ marginTop:"10px", color:"#00ffcc" },
+
+proBanner:{
+background:"linear-gradient(90deg,#6d28d9,#9333ea)",
+padding:"10px",
+marginBottom:"15px",
+display:"flex",
+justifyContent:"space-between",
+borderRadius:"12px",
+boxShadow:"0 0 40px rgba(124,58,237,0.4)"
 },
 
-betPanel: {
-marginTop: "20px",
-background: "rgba(10,0,20,0.7)",
-padding: "15px",
-borderRadius: "12px"
+upgradeBtn:{
+background:"#22c55e",
+color:"#000",
+padding:"8px",
+border:"none",
+cursor:"pointer"
 },
 
-input: {
-width: "100%",
-marginTop: "10px"
-},
-
-payout: {
-marginTop: "10px",
-color: "#00ffcc"
-},
-
-proBanner: {
-background: "linear-gradient(90deg,#6d28d9,#9333ea)",
-padding: "10px",
-marginBottom: "15px",
-display: "flex",
-justifyContent: "space-between",
-borderRadius: "12px"
-},
-
-upgradeBtn: {
-background: "#22c55e",
-color: "#000",
-padding: "8px",
-border: "none",
-cursor: "pointer"
-}
+flashUp:{ boxShadow:"0 0 15px rgba(0,255,200,0.4)" },
+flashDown:{ boxShadow:"0 0 15px rgba(255,0,0,0.4)" }
 
 };
