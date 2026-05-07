@@ -16,9 +16,7 @@ const fetchGames = async () => {
     const res = await fetch("/api/data");
     const data = await res.json();
     if (Array.isArray(data.games)) setGames(data.games);
-  } catch (err) {
-    console.log(err);
-  }
+  } catch {}
 };
 
 return (
@@ -31,31 +29,26 @@ return (
 </div>
 
 {/* AI PICKS */}
-<div style={styles.aiBox}>
-<h2>🧠 AI PICKS</h2>
+<div style={styles.aiCard}>
+<h2 style={styles.aiTitle}>🧠 AI PICKS</h2>
 
 {games.slice(0,2).map(g => (
-<div key={g.id}>
+<div key={g.id} style={styles.pick}>
 {g.away} @ {g.home}
-<br />
-<span style={{color:"#00ffcc"}}>
-EV: {(Math.random()*2+4).toFixed(2)}
-</span>
+<div style={styles.ev}>EV: 6.30</div>
 </div>
 ))}
 
 </div>
 
 {/* MARKETS */}
-<div style={styles.marketBox}>
+<div style={styles.marketCard}>
 <h2>Markets</h2>
 
 {games.map(g => (
 <div key={g.id} style={styles.marketRow}>
-{g.away} @ {g.home}
-<span style={{color:"#00ffcc"}}>
-{g.homeOdds}
-</span>
+<span>{g.away} @ {g.home}</span>
+<span style={styles.odds}>{g.homeOdds}</span>
 </div>
 ))}
 
@@ -65,7 +58,7 @@ EV: {(Math.random()*2+4).toFixed(2)}
 );
 }
 
-/* ================= STYLE ================= */
+/* ================= STYLES ================= */
 
 const styles = {
 page:{
@@ -74,6 +67,7 @@ color:"white",
 padding:"20px",
 minHeight:"100vh"
 },
+
 logo:{
 fontSize:"34px",
 fontWeight:"900",
@@ -81,27 +75,44 @@ background:"linear-gradient(90deg,#7c3aed,#22d3ee,#00ffcc)",
 WebkitBackgroundClip:"text",
 WebkitTextFillColor:"transparent"
 },
-status:{ color:"#00ffcc", marginBottom:"15px" },
 
-aiBox:{
+status:{ color:"#00ffcc", marginBottom:"20px" },
+
+aiCard:{
 background:"linear-gradient(90deg,#6d28d9,#9333ea)",
 padding:"20px",
-borderRadius:"12px",
+borderRadius:"14px",
 marginBottom:"20px"
 },
 
-marketBox:{
+aiTitle:{
+marginBottom:"10px"
+},
+
+pick:{
+marginBottom:"10px"
+},
+
+ev:{
+color:"#00ffcc"
+},
+
+marketCard:{
 background:"rgba(20,10,40,0.8)",
 padding:"20px",
-borderRadius:"12px"
+borderRadius:"14px"
 },
 
 marketRow:{
 display:"flex",
 justifyContent:"space-between",
-padding:"10px",
-background:"black",
-borderRadius:"8px",
-marginBottom:"8px"
+padding:"12px",
+background:"#000",
+borderRadius:"10px",
+marginBottom:"10px"
+},
+
+odds:{
+color:"#00ffcc"
 }
 };
