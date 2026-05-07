@@ -3,28 +3,31 @@
 import { useEffect } from "react";
 
 export default function Home() {
-useEffect(() => {
-const token = localStorage.getItem("token");
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem("token");
 
-```
-if (token) {
-  window.location.href = "/dashboard";
-} else {
-  window.location.href = "/login";
-}
-```
+      if (token) {
+        window.location.href = "/dashboard";
+      } else {
+        window.location.href = "/login";
+      }
+    } catch (err) {
+      console.log("Routing fallback:", err);
+      window.location.href = "/login";
+    }
+  }, []);
 
-}, []);
-
-return (
-<div style={{
-height: "100vh",
-background: "#050505",
-color: "white",
-display: "flex",
-justifyContent: "center",
-alignItems: "center"
-}}>
-Loading... </div>
-);
+  return (
+    <div style={{
+      height: "100vh",
+      background: "#000",
+      color: "#fff",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center"
+    }}>
+      Loading KBETZ...
+    </div>
+  );
 }
