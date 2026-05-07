@@ -17,45 +17,45 @@ useEffect(() => {
 /* ================= FETCH ================= */
 const fetchGames = async () => {
   try {
-    const res = await fetch(
-      process.env.NEXT_PUBLIC_API_URL
-        ? `${process.env.NEXT_PUBLIC_API_URL}/api/data`
-        : "/api/data"
-    );
+    const API = process.env.NEXT_PUBLIC_API_URL;
 
-    if (!res.ok) throw new Error("bad response");
+    if (!API) throw new Error("Missing API URL");
+
+    const res = await fetch(`${API}/api/data`);
+
+    if (!res.ok) throw new Error("Bad response");
 
     const data = await res.json();
 
     if (!data || !Array.isArray(data.games)) {
-      setGames([]);
-    } else {
-      setGames(data.games);
+      throw new Error("Invalid data");
     }
 
-  } catch (err) {
-    console.log("SAFE FALLBACK:", err);
+    setGames(data.games);
 
-    // 🔥 fallback data so UI NEVER crashes
+  } catch (err) {
+    console.log("API FAILED → using fallback", err);
+
+    // 🔥 fallback so UI NEVER crashes
     setGames([
-      { id: 1, home: "Lakers", away: "Warriors", homeOdds: -110 },
-      { id: 2, home: "Celtics", away: "Heat", homeOdds: -105 }
+      { id: 1, away: "Warriors", home: "Lakers", homeOdds: -110 },
+      { id: 2, away: "Heat", home: "Celtics", homeOdds: -105 }
     ]);
   } finally {
     setLoading(false);
   }
 };
 
-/* ================= SAFE LOADING ================= */
+/* ================= LOADING ================= */
 if (loading) {
   return (
     <div style={{
-      height:"100vh",
-      display:"flex",
-      justifyContent:"center",
-      alignItems:"center",
-      background:"#000",
-      color:"#fff"
+      height: "100vh",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      background: "#000",
+      color: "#fff"
     }}>
       Loading KBETZ...
     </div>
@@ -66,18 +66,28 @@ if (loading) {
 return (
 <div style={styles.page}>
 
+{/* HEADER */}
+<div style={styles.header}>
 <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
+<div style={styles.actions}>
+<span style={styles.free}>FREE</span>
+<button style={styles.logout}>Logout</button>
+<button style={styles.upgrade}>Upgrade PRO</button>
+</div>
+</div>
+
+{/* STATUS */}
 <div style={styles.status}>
 🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
 </div>
 
 {/* AI PICKS */}
 <div style={styles.aiCard}>
-<h2>🧠 AI PICKS</h2>
+<h2 style={styles.aiTitle}>🧠 AI PICKS</h2>
 
 {games.slice(0,2).map((g, i) => (
-<div key={g.id || i}>
+<div key={g.id || i} style={styles.pick}>
 {g.away} @ {g.home}
 <div style={styles.ev}>
 EV: {(Math.random()*2+4).toFixed(2)}
@@ -107,11 +117,19 @@ EV: {(Math.random()*2+4).toFixed(2)}
 /* ================= STYLES ================= */
 
 const styles = {
+
 page:{
 background:"linear-gradient(to bottom,#000,#0a0014,#2b0a4a,#6d28d9,#000)",
 color:"white",
 padding:"20px",
 minHeight:"100vh"
+},
+
+header:{
+display:"flex",
+justifyContent:"space-between",
+alignItems:"center",
+marginBottom:"10px"
 },
 
 logo:{
@@ -120,6 +138,34 @@ fontWeight:"900",
 background:"linear-gradient(90deg,#7c3aed,#22d3ee,#00ffcc)",
 WebkitBackgroundClip:"text",
 WebkitTextFillColor:"transparent"
+},
+
+actions:{
+display:"flex",
+gap:"10px",
+alignItems:"center"
+},
+
+free:{
+color:"#00ffcc"
+},
+
+logout:{
+background:"#222",
+color:"#fff",
+border:"none",
+padding:"6px 10px",
+borderRadius:"6px",
+cursor:"pointer"
+},
+
+upgrade:{
+background:"#facc15",
+color:"#000",
+border:"none",
+padding:"6px 10px",
+borderRadius:"6px",
+cursor:"pointer"
 },
 
 status:{
@@ -132,6 +178,14 @@ background:"linear-gradient(90deg,#6d28d9,#9333ea)",
 padding:"20px",
 borderRadius:"14px",
 marginBottom:"20px"
+},
+
+aiTitle:{
+marginBottom:"10px"
+},
+
+pick:{
+marginBottom:"10px"
 },
 
 ev:{
@@ -154,6 +208,8 @@ marginBottom:"10px"
 },
 
 odds:{
-color:"#00ffcc"
+color:"#00ffcc",
+fontWeight:"bold"
 }
+
 };
