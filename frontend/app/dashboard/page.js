@@ -27,14 +27,6 @@ useEffect(() => {
   checkPro(email);
   fetchGames();
 
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("success") === "true") {
-    setTimeout(() => {
-      checkPro(email);
-      window.history.replaceState({}, document.title, "/dashboard");
-    }, 1500);
-  }
-
   const t = setInterval(fetchGames, 8000);
   return () => clearInterval(t);
 }, []);
@@ -51,28 +43,19 @@ const checkPro = async (email) => {
   }
 };
 
-/* ================= 🔥 ADDED (ONLY THIS) ================= */
+/* ================= UPGRADE ================= */
 const handleUpgrade = async () => {
   const email = localStorage.getItem("email");
   const API = process.env.NEXT_PUBLIC_API_URL;
 
-  try {
-    const res = await fetch(`${API}/api/checkout`, {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ email })
-    });
+  const res = await fetch(`${API}/api/checkout`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ email })
+  });
 
-    const data = await res.json();
-
-    if (data.url) {
-      window.location.href = data.url;
-    } else {
-      alert("Checkout failed");
-    }
-  } catch (err) {
-    console.log("Upgrade error:", err);
-  }
+  const data = await res.json();
+  if (data.url) window.location.href = data.url;
 };
 
 /* ================= ALERT ================= */
@@ -97,7 +80,6 @@ const fetchGames = async () => {
 
     const updated = (data.games || []).map(g => {
       const prev = prevOdds.current[g.id];
-
       let movement = "";
       let steam = false;
 
@@ -109,7 +91,7 @@ const fetchGames = async () => {
 
         if (Math.abs(diff) >= 5) {
           steam = true;
-          pushAlert(`🔥 STEAM: ${g.away} @ ${g.home} → ${g.homeOdds}`, g);
+          pushAlert(`🔥 STEAM: ${g.away} @ ${g.home}`, g);
         }
 
         if ((movement || steam) && audioRef.current) {
@@ -133,8 +115,8 @@ const fetchGames = async () => {
 
   } catch {
     setGames([
-      { id:1, away:"Warriors", home:"Lakers", homeOdds:-110, ev:5.2, confidence:80 },
-      { id:2, away:"Heat", home:"Celtics", homeOdds:-105, ev:4.7, confidence:75 }
+      { id:1, away:"Warriors", home:"Lakers", homeOdds:-110 },
+      { id:2, away:"Heat", home:"Celtics", homeOdds:-105 }
     ]);
   } finally {
     setLoading(false);
@@ -144,7 +126,7 @@ const fetchGames = async () => {
 /* ================= HELPERS ================= */
 const isSelected = (id) => betSlip.some(b => b.id === id);
 
-/* ================= WIN PROB ================= */
+/* ================= PROBABILITY (RESTORED) ================= */
 const getWinProbability = (odds, confidence) => {
   let base = odds > 0
     ? 100 / (odds + 100)
@@ -159,14 +141,13 @@ const parlayProbability = () => {
 
   let prob = 1;
   betSlip.forEach(b => {
-    const p = getWinProbability(b.homeOdds, b.confidence) / 100;
-    prob *= p;
+    prob *= getWinProbability(b.homeOdds, b.confidence) / 100;
   });
 
   return (prob * 100).toFixed(2);
 };
 
-/* ================= AI ================= */
+/* ================= AI (RESTORED) ================= */
 const buildAIParlayAdvanced = (type = "balanced") => {
   if (!isPro) return;
 
@@ -199,8 +180,7 @@ const removeBet = (id) => {
 const payout = () => {
   let total = 1;
   betSlip.forEach(b => {
-    const o = b.homeOdds;
-    const d = o > 0 ? (o/100)+1 : (100/Math.abs(o))+1;
+    const d = b.homeOdds > 0 ? (b.homeOdds/100)+1 : (100/Math.abs(b.homeOdds))+1;
     total *= d;
   });
   return (stake * total).toFixed(2);
@@ -217,11 +197,7 @@ return (
 {/* ALERTS */}
 <div style={styles.alertContainer}>
   {alerts.map(a => (
-    <div
-      key={a.id}
-      style={{ ...styles.alert, cursor: a.game ? "pointer" : "default" }}
-      onClick={() => a.game && addToSlip(a.game)}
-    >
+    <div key={a.id} style={styles.alert} onClick={()=>a.game && addToSlip(a.game)}>
       {a.text}
     </div>
   ))}
@@ -232,10 +208,24 @@ return (
   <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
   <div style={styles.headerRight}>
-    <span style={styles.live}>● LIVE FEED</span>
+    <span style={styles.live}>● LIVE</span>
+
     <span style={isPro ? styles.proBadge : styles.freeBadge}>
       {isPro ? "PRO" : "FREE"}
     </span>
+
+    {!isPro && (
+      <button style={styles.upgradeBtn} onClick={handleUpgrade}>
+        Upgrade
+      </button>
+    )}
+
+    <button style={styles.logoutBtn} onClick={()=>{
+      localStorage.clear();
+      window.location.href="/";
+    }}>
+      Logout
+    </button>
   </div>
 </div>
 
@@ -244,80 +234,52 @@ return (
   <div style={styles.tickerMove}>
     {games.map(g => (
       <span key={g.id} style={styles.tickerItem}>
-        {g.steam && "🔥 STEAM "}
-        {g.ev > 4 && "🧠 EV "}
+        {g.steam && "🔥 "}
         {g.away}@{g.home} {g.homeOdds}
       </span>
     ))}
   </div>
 </div>
 
-{/* ALERT HISTORY */}
+{/* 🔥 ALERT HISTORY (RESTORED) */}
 <div style={styles.historyPanel}>
   <h3>Alert History</h3>
   {alertHistory.map(a => (
-    <div
-      key={a.id}
-      style={{ cursor: a.game ? "pointer" : "default" }}
-      onClick={() => a.game && addToSlip(a.game)}
-    >
+    <div key={a.id} onClick={()=>a.game && addToSlip(a.game)}>
       {a.text}
     </div>
   ))}
 </div>
 
-{/* AI BUILDER */}
-<div style={{
-  ...styles.aiBuilder,
-  ...(!isPro && styles.blur)
-}}>
-  <h3>AI Bet Builder</h3>
-
-  {!isPro && (
-    <div style={styles.lockOverlay}>
-      <p>🔒 PRO ONLY</p>
-      <button onClick={handleUpgrade}>Upgrade</button>
-    </div>
-  )}
-
-  <div style={styles.aiButtons}>
-    <button onClick={()=>buildAIParlayAdvanced("safe")}>Safe</button>
-    <button onClick={()=>buildAIParlayAdvanced("balanced")}>Balanced</button>
-    <button onClick={()=>buildAIParlayAdvanced("aggressive")}>Aggressive</button>
-  </div>
+{/* 🔥 AI BUILDER (RESTORED) */}
+<div style={styles.aiPanel}>
+  <h3>AI Builder</h3>
+  <button onClick={()=>buildAIParlayAdvanced("safe")}>Safe</button>
+  <button onClick={()=>buildAIParlayAdvanced("balanced")}>Balanced</button>
+  <button onClick={()=>buildAIParlayAdvanced("aggressive")}>Aggressive</button>
 </div>
 
 {/* MARKETS */}
 {games.map(g => (
-  <div
-    key={g.id}
-    style={{
-      ...styles.row,
-      ...(isSelected(g.id) && styles.selected),
-      ...(g.movement === "up" && styles.upGlow),
-      ...(g.movement === "down" && styles.downGlow)
-    }}
-  >
+  <div key={g.id} style={{
+    ...styles.row,
+    ...(isSelected(g.id) && styles.selected),
+    ...(g.movement==="up" && styles.upGlow),
+    ...(g.movement==="down" && styles.downGlow)
+  }}>
     {g.away} @ {g.home}
-    <span onClick={()=>addToSlip(g)} style={styles.oddsBtn}>
-      {g.homeOdds}
-    </span>
+    <span onClick={()=>addToSlip(g)}>{g.homeOdds}</span>
   </div>
 ))}
 
 /* BET SLIP */
 <div style={styles.slip}>
-  <h3>Bet Slip</h3>
-
   {betSlip.map(b => (
-    <div key={b.id} style={styles.betCard}>
-      {b.away}@{b.home}
-      <div>Win: {getWinProbability(b.homeOdds, b.confidence)}%</div>
+    <div key={b.id}>
+      {b.away}@{b.home} ({getWinProbability(b.homeOdds,b.confidence)}%)
       <button onClick={()=>removeBet(b.id)}>x</button>
     </div>
   ))}
-
-  <input value={stake} onChange={(e)=>setStake(e.target.value)} />
   <div>${payout()}</div>
   <div>Parlay: {parlayProbability()}%</div>
 </div>
@@ -330,44 +292,23 @@ return (
 const styles = {
 page:{ background:"#000", color:"#fff", padding:"20px" },
 loading:{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center" },
-
-alertContainer:{ position:"fixed", top:"20px", right:"20px", zIndex:999 },
-alert:{ background:"#111", padding:"10px", marginBottom:"10px", borderRadius:"8px", border:"1px solid #00ffcc" },
-
+alertContainer:{ position:"fixed", top:"20px", right:"20px" },
+alert:{ background:"#111", padding:"10px", marginBottom:"10px" },
 header:{ display:"flex", justifyContent:"space-between" },
 headerRight:{ display:"flex", gap:"10px" },
-
 logo:{ color:"#00ffcc" },
 live:{ color:"#00ffcc" },
 proBadge:{ background:"#00ffcc", color:"#000", padding:"4px 10px" },
 freeBadge:{ background:"#333", color:"#aaa", padding:"4px 10px" },
-
+upgradeBtn:{ background:"#00ffcc", color:"#000" },
+logoutBtn:{ background:"#222", color:"#fff" },
 ticker:{ margin:"10px 0" },
 tickerItem:{ marginRight:"20px" },
-
-historyPanel:{ background:"#111", padding:"10px", marginBottom:"15px" },
-
-row:{ display:"flex", justifyContent:"space-between", padding:"10px", marginBottom:"8px", background:"#111" },
-
+historyPanel:{ background:"#111", padding:"10px", marginBottom:"10px" },
+aiPanel:{ background:"#111", padding:"10px", marginBottom:"10px" },
+row:{ padding:"10px", background:"#111", marginBottom:"6px" },
 selected:{ boxShadow:"0 0 10px #00ffcc" },
 upGlow:{ boxShadow:"0 0 10px #00ff00" },
 downGlow:{ boxShadow:"0 0 10px #ff0000" },
-
-oddsBtn:{ cursor:"pointer", color:"#00ffcc" },
-
-slip:{ marginTop:"20px" },
-
-aiBuilder:{ background:"#111", padding:"20px", marginBottom:"20px", position:"relative" },
-aiButtons:{ display:"flex", gap:"10px" },
-blur:{ filter:"blur(4px)", pointerEvents:"none" },
-
-lockOverlay:{
-position:"absolute",
-top:0,left:0,right:0,bottom:0,
-display:"flex",
-flexDirection:"column",
-justifyContent:"center",
-alignItems:"center",
-background:"rgba(0,0,0,0.7)"
-}
+slip:{ marginTop:"20px" }
 };
