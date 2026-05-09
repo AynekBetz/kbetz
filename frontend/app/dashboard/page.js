@@ -106,8 +106,15 @@ const fetchGames = async () => {
         ...g,
         movement,
         steam,
-        ev: g.ev || (Math.random()*5+3).toFixed(2),
-        confidence: g.confidence || Math.floor(Math.random()*20+70)
+
+        // ✅ FIXED (NUMBER SAFE)
+        ev: typeof g.ev === "number"
+          ? g.ev
+          : Number((Math.random()*5+3).toFixed(2)),
+
+        confidence: typeof g.confidence === "number"
+          ? g.confidence
+          : Math.floor(Math.random()*20+70)
       };
     });
 
@@ -126,7 +133,7 @@ const fetchGames = async () => {
 /* ================= HELPERS ================= */
 const isSelected = (id) => betSlip.some(b => b.id === id);
 
-/* ================= PROBABILITY (RESTORED) ================= */
+/* ================= PROBABILITY ================= */
 const getWinProbability = (odds, confidence) => {
   let base = odds > 0
     ? 100 / (odds + 100)
@@ -147,7 +154,7 @@ const parlayProbability = () => {
   return (prob * 100).toFixed(2);
 };
 
-/* ================= AI (RESTORED) ================= */
+/* ================= AI ================= */
 const buildAIParlayAdvanced = (type = "balanced") => {
   if (!isPro) return;
 
@@ -241,7 +248,7 @@ return (
   </div>
 </div>
 
-{/* 🔥 ALERT HISTORY (RESTORED) */}
+{/* ALERT HISTORY */}
 <div style={styles.historyPanel}>
   <h3>Alert History</h3>
   {alertHistory.map(a => (
@@ -251,7 +258,7 @@ return (
   ))}
 </div>
 
-{/* 🔥 AI BUILDER (RESTORED) */}
+{/* AI BUILDER */}
 <div style={styles.aiPanel}>
   <h3>AI Builder</h3>
   <button onClick={()=>buildAIParlayAdvanced("safe")}>Safe</button>
@@ -272,7 +279,7 @@ return (
   </div>
 ))}
 
-/* BET SLIP */
+{/* BET SLIP */}
 <div style={styles.slip}>
   {betSlip.map(b => (
     <div key={b.id}>
