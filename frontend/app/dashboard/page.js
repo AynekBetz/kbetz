@@ -107,7 +107,7 @@ const fetchGames = async () => {
         movement,
         steam,
 
-        // ✅ FIXED (NUMBER SAFE)
+        // ✅ FIX (NUMBER SAFE)
         ev: typeof g.ev === "number"
           ? g.ev
           : Number((Math.random()*5+3).toFixed(2)),
@@ -275,7 +275,7 @@ return (
     ...(g.movement==="down" && styles.downGlow)
   }}>
     {g.away} @ {g.home}
-    <span onClick={()=>addToSlip(g)}>{g.homeOdds}</span>
+    <span onClick={()=>addToSlip(g)} style={styles.odds}>{g.homeOdds}</span>
   </div>
 ))}
 
@@ -297,25 +297,32 @@ return (
 
 /* ================= STYLE ================= */
 const styles = {
-page:{ background:"#000", color:"#fff", padding:"20px" },
+page:{
+  background:`radial-gradient(circle at 20% 20%, rgba(124,58,237,0.25), transparent 40%), radial-gradient(circle at 80% 0%, rgba(34,211,238,0.15), transparent 40%), #000`,
+  color:"#fff",
+  padding:"20px",
+  minHeight:"100vh"
+},
 loading:{ height:"100vh", display:"flex", justifyContent:"center", alignItems:"center" },
-alertContainer:{ position:"fixed", top:"20px", right:"20px" },
-alert:{ background:"#111", padding:"10px", marginBottom:"10px" },
-header:{ display:"flex", justifyContent:"space-between" },
-headerRight:{ display:"flex", gap:"10px" },
-logo:{ color:"#00ffcc" },
+alertContainer:{ position:"fixed", top:"20px", right:"20px", zIndex:999 },
+alert:{ background:"#111", padding:"12px", marginBottom:"10px", borderRadius:"8px", border:"1px solid #00ffcc" },
+header:{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" },
+headerRight:{ display:"flex", gap:"10px", alignItems:"center" },
+logo:{ fontSize:"32px", fontWeight:"900", background:"linear-gradient(90deg,#8b5cf6,#22d3ee,#00ffcc)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" },
 live:{ color:"#00ffcc" },
-proBadge:{ background:"#00ffcc", color:"#000", padding:"4px 10px" },
-freeBadge:{ background:"#333", color:"#aaa", padding:"4px 10px" },
-upgradeBtn:{ background:"#00ffcc", color:"#000" },
-logoutBtn:{ background:"#222", color:"#fff" },
-ticker:{ margin:"10px 0" },
-tickerItem:{ marginRight:"20px" },
-historyPanel:{ background:"#111", padding:"10px", marginBottom:"10px" },
-aiPanel:{ background:"#111", padding:"10px", marginBottom:"10px" },
-row:{ padding:"10px", background:"#111", marginBottom:"6px" },
+proBadge:{ background:"#00ffcc", color:"#000", padding:"4px 10px", borderRadius:"6px" },
+freeBadge:{ background:"#333", color:"#aaa", padding:"4px 10px", borderRadius:"6px" },
+upgradeBtn:{ background:"#00ffcc", color:"#000", padding:"6px 12px", borderRadius:"6px" },
+logoutBtn:{ background:"#222", color:"#fff", padding:"6px 12px", borderRadius:"6px" },
+ticker:{ margin:"12px 0", overflow:"hidden" },
+tickerMove:{ display:"inline-block", animation:"scroll 20s linear infinite" },
+tickerItem:{ marginRight:"30px", color:"#00ffcc" },
+historyPanel:{ background:"rgba(20,10,40,0.6)", padding:"15px", borderRadius:"12px", marginBottom:"15px" },
+aiPanel:{ background:"linear-gradient(135deg,#7c3aed,#22d3ee33)", padding:"15px", borderRadius:"12px", marginBottom:"15px" },
+row:{ display:"flex", justifyContent:"space-between", padding:"12px", background:"rgba(0,0,0,0.7)", marginBottom:"8px", borderRadius:"10px" },
+odds:{ color:"#00ffcc", fontWeight:"bold" },
 selected:{ boxShadow:"0 0 10px #00ffcc" },
 upGlow:{ boxShadow:"0 0 10px #00ff00" },
-downGlow:{ boxShadow:"0 0 10px #ff0000" },
-slip:{ marginTop:"20px" }
+downGlow:{ boxShadow:"0 0 10px #ff4d4d" },
+slip:{ marginTop:"20px", background:"rgba(20,10,40,0.6)", padding:"15px", borderRadius:"12px" }
 };
