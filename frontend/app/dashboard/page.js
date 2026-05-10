@@ -1,154 +1,218 @@
 "use client";
-export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
+  const [games, setGames] = useState([]);
+  const [slip, setSlip] = useState([]);
+  const [user, setUser] = useState({ pro: false });
+  const [stake, setStake] = useState(100);
 
-/* ================= STATE ================= */
-const [games, setGames] = useState([]);
+  /* ================= FETCH ================= */
+  useEffect(() => {
+    setGames([
+      { id: 1, away: "Warriors", home: "Lakers", odds: -110, ev: 4.28 },
+      { id: 2, away: "Heat", home: "Celtics", odds: -105, ev: 5.88 },
+      { id: 3, away: "Bucks", home: "Knicks", odds: -120, ev: 6.1 },
+      { id: 4, away: "Suns", home: "Clippers", odds: -115, ev: 3.9 },
+    ]);
+  }, []);
 
-/* ================= INIT ================= */
-useEffect(() => {
-  fetchGames();
-}, []);
+  /* ================= ACTIONS ================= */
 
-/* ================= FETCH ================= */
-const fetchGames = async () => {
-  try {
-    const res = await fetch("/api/data");
+  const addToSlip = (game) => {
+    if (!game) return;
 
-    // Prevent crash if API fails
-    if (!res.ok) {
-      setGames([]);
-      return;
+    setSlip((prev) => {
+      if (prev.find((g) => g.id === game.id)) return prev;
+      return [...prev, game];
+    });
+  };
+
+  const clearSlip = () => setSlip([]);
+
+  const handleUpgrade = async () => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/stripe/checkout`
+      );
+
+      const data = await res.json();
+
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Upgrade failed");
+      }
+    } catch (err) {
+      console.error("Upgrade error:", err);
+      alert("Connection failed");
     }
+  };
 
-    const data = await res.json();
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  };
 
-    // Safe fallback
-    if (!data || !Array.isArray(data.games)) {
-      setGames([]);
-      return;
-    }
+  /* ================= PARLAY BUILDER ================= */
 
-    setGames(data.games);
+  const buildParlay = (type) => {
+    let sorted = [...games].sort((a, b) => b.ev - a.ev);
 
-  } catch (err) {
-    console.log("fetch error:", err);
-    setGames([]);
-  }
-};
+    if (type === "safe") sorted = sorted.slice(0, 2);
+    if (type === "balanced") sorted = sorted.slice(0, 3);
+    if (type === "aggressive") sorted = sorted.slice(0, 4);
 
-/* ================= SAFE RENDER ================= */
-if (!games) return null;
+    setSlip(sorted);
+  };
 
-/* ================= UI ================= */
-return (
-<div style={styles.page}>
+  /* ================= ODDS CALC ================= */
 
-<h1 style={styles.logo}>KBETZ TERMINAL</h1>
+  const convertOdds = (odds) => {
+    return odds > 0 ? odds / 100 + 1 : 100 / Math.abs(odds) + 1;
+  };
 
-<div style={styles.status}>
-🔥 AI RECORD: 58-41 (+12.4u) | ROI: +8.7%
-</div>
+  const totalOdds =
+    slip.length === 0
+      ? 0
+      : slip.reduce((acc, g) => acc * convertOdds(g.odds), 1);
 
-{/* AI PICKS */}
-<div style={styles.aiCard}>
-<h2 style={styles.aiTitle}>🧠 AI PICKS</h2>
+  const payout =
+    slip.length === 0 ? "0.00" : (stake * totalOdds).toFixed(2);
 
-{Array.isArray(games) && games.slice(0,2).map((g, i) => (
-<div key={g?.id || i} style={styles.pick}>
-{g?.away ?? "Team"} @ {g?.home ?? "Team"}
-<div style={styles.ev}>
-EV: {(Math.random() * 2 + 4).toFixed(2)}
-</div>
-</div>
-))}
+  /* ================= UI ================= */
 
-</div>
+  return (
+    <div style={styles.page}>
+      {/* HEADER */}
+      <div style={styles.header}>
+        <div style={styles.logo}>KBETZ TERMINAL</div>
 
-{/* MARKETS */}
-<div style={styles.marketCard}>
-<h2>Markets</h2>
+        <div style={styles.headerRight}>
+          <span style={styles.live}>● LIVE</span>
 
-{Array.isArray(games) && games.map((g, i) => (
-<div key={g?.id || i} style={styles.marketRow}>
-<span>
-{g?.away ?? "Team"} @ {g?.home ?? "Team"}
-</span>
+          {user.pro ? (
+            <span style={styles.proBadge}>PRO</span>
+          ) : (
+            <span style={styles.freeBadge}>FREE</span>
+          )}
 
-<span style={styles.odds}>
-{g?.homeOdds ?? "-"}
-</span>
-</div>
-))}
+          {!user.pro && (
+            <button style={styles.upgradeBtn} onClick={handleUpgrade}>
+              Upgrade
+            </button>
+          )}
 
-</div>
+          <button style={styles.logoutBtn} onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
+      </div>
 
-</div>
-);
+      {/* AI PICKS */}
+      <div style={styles.aiPanel}>
+        <h2>🧠 AI PICKS</h2>
+
+        {!user.pro && (
+          <div style={styles.blurOverlay}>
+            🔒 Upgrade to unlock AI Picks
+          </div>
+        )}
+
+        {games.map((g) => (
+          <div key={g.id}>
+            {g.away} @ {g.home}
+            <div style={{ color: "#00ffcc" }}>EV: {g.ev}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* PARLAY BUILDER */}
+      <div style={styles.builder}>
+        <h3>AI Parlay Builder</h3>
+
+        {!user.pro && (
+          <div style={styles.blurOverlay}>
+            🔒 PRO Required
+          </div>
+        )}
+
+        <button onClick={() => buildParlay("safe")} style={styles.btn}>
+          Safe
+        </button>
+        <button onClick={() => buildParlay("balanced")} style={styles.btn}>
+          Balanced
+        </button>
+        <button onClick={() => buildParlay("aggressive")} style={styles.btn}>
+          Aggressive
+        </button>
+
+        <button onClick={clearSlip} style={styles.clearBtn}>
+          Clear
+        </button>
+      </div>
+
+      {/* MARKETS */}
+      <div style={styles.marketPanel}>
+        <h2>Markets</h2>
+
+        {games.map((g) => (
+          <div key={g.id} style={styles.row}>
+            <span>
+              {g.away} @ {g.home}
+            </span>
+
+            <span style={styles.odds} onClick={() => addToSlip(g)}>
+              {g.odds}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* SLIP */}
+      <div style={styles.slip}>
+        <h3>Bet Slip</h3>
+
+        {slip.length === 0 && <div>No bets yet</div>}
+
+        {slip.map((s) => (
+          <div key={s.id}>
+            {s.away} @ {s.home} ({s.odds})
+          </div>
+        ))}
+
+        {slip.length > 0 && (
+          <div style={{ marginTop: 15 }}>
+            <input
+              type="number"
+              value={stake}
+              onChange={(e) => setStake(Number(e.target.value))}
+              style={styles.input}
+            />
+
+            <div>Total Odds: {totalOdds.toFixed(2)}</div>
+            <div style={{ color: "#00ffcc" }}>
+              Payout: ${payout}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ================= STYLES ================= */
 
 const styles = {
-page:{
-background:"linear-gradient(to bottom,#000,#0a0014,#2b0a4a,#6d28d9,#000)",
-color:"white",
-padding:"20px",
-minHeight:"100vh"
-},
-
-logo:{
-fontSize:"34px",
-fontWeight:"900",
-background:"linear-gradient(90deg,#7c3aed,#22d3ee,#00ffcc)",
-WebkitBackgroundClip:"text",
-WebkitTextFillColor:"transparent"
-},
-
-status:{
-color:"#00ffcc",
-marginBottom:"20px"
-},
-
-aiCard:{
-background:"linear-gradient(90deg,#6d28d9,#9333ea)",
-padding:"20px",
-borderRadius:"14px",
-marginBottom:"20px"
-},
-
-aiTitle:{
-marginBottom:"10px"
-},
-
-pick:{
-marginBottom:"10px"
-},
-
-ev:{
-color:"#00ffcc"
-},
-
-marketCard:{
-background:"rgba(20,10,40,0.8)",
-padding:"20px",
-borderRadius:"14px"
-},
-
-marketRow:{
-display:"flex",
-justifyContent:"space-between",
-padding:"12px",
-background:"#000",
-borderRadius:"10px",
-marginBottom:"10px"
-},
-
-odds:{
-color:"#00ffcc",
-fontWeight:"bold"
-}
+  ...{
+    clearBtn: {
+      marginLeft: 10,
+      padding: "6px 12px",
+      background: "#ff4444",
+      color: "#fff",
+      borderRadius: 6,
+      cursor: "pointer",
+    },
+  },
 };
