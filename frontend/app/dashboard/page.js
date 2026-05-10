@@ -3,108 +3,96 @@
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  const [games, setGames] = useState([]);
-  const [slip, setSlip] = useState([]);
-  const [user, setUser] = useState({ pro: false });
-  const [stake, setStake] = useState(100);
+  const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-  /* ================= FETCH ================= */
+  const [games, setGames] = useState([]);
+  const [parlay, setParlay] = useState([]);
+  const [stake, setStake] = useState(10);
+  const [isPro, setIsPro] = useState(false);
+
+  // FETCH DATA
   useEffect(() => {
-    setGames([
-      { id: 1, away: "Warriors", home: "Lakers", odds: -110, ev: 4.28 },
-      { id: 2, away: "Heat", home: "Celtics", odds: -105, ev: 5.88 },
-      { id: 3, away: "Bucks", home: "Knicks", odds: -120, ev: 6.1 },
-      { id: 4, away: "Suns", home: "Clippers", odds: -115, ev: 3.9 },
-    ]);
+    fetch(`${API}/api/data`)
+      .then((r) => r.json())
+      .then((d) => setGames(d.games || []))
+      .catch(() => {});
   }, []);
 
-  /* ================= ACTIONS ================= */
+  // AUTH CHECK
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
-  const addToSlip = (game) => {
-    if (!game) return;
+    fetch(`${API}/api/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setIsPro(d.plan === "PRO"))
+      .catch(() => {});
+  }, []);
 
-    setSlip((prev) => {
-      if (prev.find((g) => g.id === game.id)) return prev;
-      return [...prev, game];
-    });
-  };
-
-  const clearSlip = () => setSlip([]);
-
-  const handleUpgrade = async () => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/stripe/checkout`
-      );
-
-      const data = await res.json();
-
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        alert("Upgrade failed");
-      }
-    } catch (err) {
-      console.error("Upgrade error:", err);
-      alert("Connection failed");
-    }
-  };
-
-  const handleLogout = () => {
+  // LOGOUT
+  const logout = () => {
     localStorage.removeItem("token");
-    window.location.href = "/login";
+    location.href = "/login";
   };
 
-  /* ================= PARLAY BUILDER ================= */
-
-  const buildParlay = (type) => {
-    let sorted = [...games].sort((a, b) => b.ev - a.ev);
-
-    if (type === "safe") sorted = sorted.slice(0, 2);
-    if (type === "balanced") sorted = sorted.slice(0, 3);
-    if (type === "aggressive") sorted = sorted.slice(0, 4);
-
-    setSlip(sorted);
+  // STRIPE
+  const upgrade = async () => {
+    const res = await fetch(`${API}/api/checkout`, {
+      method: "POST",
+    });
+    const data = await res.json();
+    window.location.href = data.url;
   };
 
-  /* ================= ODDS CALC ================= */
+  // PARLAY LOGIC
+  const addToParlay = (game) => {
+    setParlay((p) => [...p, game]);
+  };
 
-  const convertOdds = (odds) => {
-    return odds > 0 ? odds / 100 + 1 : 100 / Math.abs(odds) + 1;
+  const clearParlay = () => setParlay([]);
+
+  const americanToDecimal = (odds) => {
+    if (odds > 0) return 1 + odds / 100;
+    return 1 + 100 / Math.abs(odds);
   };
 
   const totalOdds =
-    slip.length === 0
-      ? 0
-      : slip.reduce((acc, g) => acc * convertOdds(g.odds), 1);
+    parlay.reduce((acc, g) => acc * americanToDecimal(g.homeOdds), 1) || 1;
 
-  const payout =
-    slip.length === 0 ? "0.00" : (stake * totalOdds).toFixed(2);
+  const payout = (stake * totalOdds).toFixed(2);
 
-  /* ================= UI ================= */
+  // SMART AI PARLAY (simple but real)
+  const buildAIParlay = () => {
+    const best = [...games]
+      .sort((a, b) => b.edgeScore - a.edgeScore)
+      .slice(0, 3);
+    setParlay(best);
+  };
 
   return (
     <div style={styles.page}>
       {/* HEADER */}
       <div style={styles.header}>
-        <div style={styles.logo}>KBETZ TERMINAL</div>
+        <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
         <div style={styles.headerRight}>
-          <span style={styles.live}>● LIVE</span>
+          <span style={styles.live}>LIVE</span>
 
-          {user.pro ? (
+          {isPro ? (
             <span style={styles.proBadge}>PRO</span>
           ) : (
             <span style={styles.freeBadge}>FREE</span>
           )}
 
-          {!user.pro && (
-            <button style={styles.upgradeBtn} onClick={handleUpgrade}>
+          {!isPro && (
+            <button style={styles.upgradeBtn} onClick={upgrade}>
               Upgrade
             </button>
           )}
 
-          <button style={styles.logoutBtn} onClick={handleLogout}>
+          <button style={styles.logoutBtn} onClick={logout}>
             Logout
           </button>
         </div>
@@ -114,105 +102,212 @@ export default function Dashboard() {
       <div style={styles.aiPanel}>
         <h2>🧠 AI PICKS</h2>
 
-        {!user.pro && (
-          <div style={styles.blurOverlay}>
-            🔒 Upgrade to unlock AI Picks
-          </div>
-        )}
-
-        {games.map((g) => (
-          <div key={g.id}>
-            {g.away} @ {g.home}
-            <div style={{ color: "#00ffcc" }}>EV: {g.ev}</div>
+        {games.slice(0, 2).map((g, i) => (
+          <div key={i}>
+            {g.away} @ {g.home} — EV {g.edgeScore}
           </div>
         ))}
       </div>
 
-      {/* PARLAY BUILDER */}
+      {/* AI PARLAY BUILDER */}
       <div style={styles.builder}>
-        <h3>AI Parlay Builder</h3>
+        <h3>⚡ AI PARLAY BUILDER</h3>
 
-        {!user.pro && (
+        <button style={styles.btn} onClick={buildAIParlay}>
+          Build Smart Parlay
+        </button>
+
+        {!isPro && (
           <div style={styles.blurOverlay}>
-            🔒 PRO Required
+            🔒 Upgrade for AI Builder
           </div>
         )}
-
-        <button onClick={() => buildParlay("safe")} style={styles.btn}>
-          Safe
-        </button>
-        <button onClick={() => buildParlay("balanced")} style={styles.btn}>
-          Balanced
-        </button>
-        <button onClick={() => buildParlay("aggressive")} style={styles.btn}>
-          Aggressive
-        </button>
-
-        <button onClick={clearSlip} style={styles.clearBtn}>
-          Clear
-        </button>
       </div>
 
       {/* MARKETS */}
       <div style={styles.marketPanel}>
         <h2>Markets</h2>
 
-        {games.map((g) => (
-          <div key={g.id} style={styles.row}>
+        {games.map((g, i) => (
+          <div key={i} style={styles.row}>
             <span>
               {g.away} @ {g.home}
             </span>
 
-            <span style={styles.odds} onClick={() => addToSlip(g)}>
-              {g.odds}
+            <span
+              style={styles.odds}
+              onClick={() => addToParlay(g)}
+            >
+              {g.homeOdds}
             </span>
           </div>
         ))}
       </div>
 
-      {/* SLIP */}
+      {/* BET SLIP */}
       <div style={styles.slip}>
         <h3>Bet Slip</h3>
 
-        {slip.length === 0 && <div>No bets yet</div>}
-
-        {slip.map((s) => (
-          <div key={s.id}>
-            {s.away} @ {s.home} ({s.odds})
+        {parlay.map((p, i) => (
+          <div key={i}>
+            {p.away} @ {p.home}
           </div>
         ))}
 
-        {slip.length > 0 && (
-          <div style={{ marginTop: 15 }}>
-            <input
-              type="number"
-              value={stake}
-              onChange={(e) => setStake(Number(e.target.value))}
-              style={styles.input}
-            />
+        <input
+          type="number"
+          value={stake}
+          onChange={(e) => setStake(Number(e.target.value))}
+          style={styles.input}
+        />
 
-            <div>Total Odds: {totalOdds.toFixed(2)}</div>
-            <div style={{ color: "#00ffcc" }}>
-              Payout: ${payout}
-            </div>
-          </div>
-        )}
+        <div>Total Odds: {totalOdds.toFixed(2)}</div>
+        <div>Payout: ${payout}</div>
+
+        <button style={styles.clearBtn} onClick={clearParlay}>
+          Clear
+        </button>
       </div>
     </div>
   );
 }
 
-/* ================= STYLES ================= */
-
+// ✅ FIXED STYLES (NO CRASH)
 const styles = {
-  ...{
-    clearBtn: {
-      marginLeft: 10,
-      padding: "6px 12px",
-      background: "#ff4444",
-      color: "#fff",
-      borderRadius: 6,
-      cursor: "pointer",
-    },
+  page: {
+    background:
+      "radial-gradient(circle at 20% 20%, rgba(124,58,237,0.25), transparent 40%), radial-gradient(circle at 80% 0%, rgba(34,211,238,0.15), transparent 40%), #000",
+    color: "#fff",
+    padding: "20px",
+    minHeight: "100vh",
+  },
+
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: "20px",
+  },
+
+  headerRight: {
+    display: "flex",
+    gap: "10px",
+    alignItems: "center",
+  },
+
+  logo: {
+    fontSize: "32px",
+    fontWeight: "900",
+    background:
+      "linear-gradient(90deg,#8b5cf6,#22d3ee,#00ffcc)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+  },
+
+  live: { color: "#00ffcc" },
+
+  proBadge: {
+    background: "#00ffcc",
+    color: "#000",
+    padding: "4px 10px",
+    borderRadius: "6px",
+  },
+
+  freeBadge: {
+    background: "#333",
+    color: "#aaa",
+    padding: "4px 10px",
+    borderRadius: "6px",
+  },
+
+  upgradeBtn: {
+    background: "#00ffcc",
+    color: "#000",
+    padding: "6px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+
+  logoutBtn: {
+    background: "#222",
+    color: "#fff",
+    padding: "6px 12px",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+
+  aiPanel: {
+    background:
+      "linear-gradient(135deg,#7c3aed,#22d3ee33)",
+    padding: "15px",
+    borderRadius: "12px",
+    marginBottom: "15px",
+  },
+
+  builder: {
+    position: "relative",
+    marginBottom: "15px",
+  },
+
+  blurOverlay: {
+    position: "absolute",
+    inset: 0,
+    backdropFilter: "blur(6px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "bold",
+  },
+
+  btn: {
+    marginRight: 10,
+    padding: "6px 12px",
+    background: "#00ffcc",
+    color: "#000",
+    borderRadius: 6,
+    cursor: "pointer",
+  },
+
+  clearBtn: {
+    marginTop: 10,
+    padding: "6px 12px",
+    background: "#ff4444",
+    color: "#fff",
+    borderRadius: 6,
+    cursor: "pointer",
+  },
+
+  marketPanel: {
+    background: "rgba(20,10,40,0.6)",
+    padding: "15px",
+    borderRadius: "12px",
+  },
+
+  row: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "12px",
+    background: "#000",
+    marginBottom: "8px",
+    borderRadius: "10px",
+  },
+
+  odds: {
+    color: "#00ffcc",
+    fontWeight: "bold",
+    cursor: "pointer",
+  },
+
+  slip: {
+    marginTop: "20px",
+    background: "rgba(20,10,40,0.6)",
+    padding: "15px",
+    borderRadius: "12px",
+  },
+
+  input: {
+    padding: "6px",
+    marginBottom: "10px",
+    borderRadius: "6px",
+    border: "none",
   },
 };
