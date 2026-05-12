@@ -11,50 +11,63 @@ export default function Dashboard() {
   const [stake, setStake] = useState(100);
   const [mode, setMode] = useState("balanced");
   const [isPro, setIsPro] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   /* ================= FETCH ================= */
   useEffect(() => {
-    fetch(`${API}/api/data`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (Array.isArray(d.games)) {
-          setGames(d.games);
+    const load = async () => {
+      try {
+        const res = await fetch(`${API}/api/data`);
+        const data = await res.json();
+
+        if (Array.isArray(data?.games)) {
+          setGames(data.games);
         } else {
-          setGames([
-            {
-              away: "Warriors",
-              home: "Lakers",
-              homeOdds: -110,
-              edgeScore: 4.2,
-            },
-            {
-              away: "Heat",
-              home: "Celtics",
-              homeOdds: -105,
-              edgeScore: 5.8,
-            },
-          ]);
+          throw new Error("Invalid data");
         }
-      })
-      .catch(() => {});
+      } catch (err) {
+        console.log("Fallback data used");
+        setGames([
+          {
+            away: "Warriors",
+            home: "Lakers",
+            homeOdds: -110,
+            edgeScore: 4.2,
+          },
+          {
+            away: "Heat",
+            home: "Celtics",
+            homeOdds: -105,
+            edgeScore: 5.8,
+          },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, []);
 
   /* ================= AUTH ================= */
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
 
-    fetch(`${API}/api/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
-      .then((d) => setIsPro(d?.plan === "PRO"))
-      .catch(() => {});
+      fetch(`${API}/api/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then((d) => setIsPro(d?.plan === "PRO"))
+        .catch(() => {});
+    } catch {}
   }, []);
 
   /* ================= ACTIONS ================= */
 
   const addToParlay = (game) => {
+    if (!game) return;
     setParlay((p) => [...p, game]);
   };
 
@@ -80,7 +93,7 @@ export default function Dashboard() {
   /* ================= ODDS ================= */
 
   const americanToDecimal = (odds) => {
-    if (!odds) return 1;
+    if (!odds || isNaN(odds)) return 1;
     return odds > 0 ? 1 + odds / 100 : 1 + 100 / Math.abs(odds);
   };
 
@@ -88,7 +101,7 @@ export default function Dashboard() {
     parlay.length === 0
       ? 1
       : parlay.reduce(
-          (acc, g) => acc * americanToDecimal(g.homeOdds),
+          (acc, g) => acc * americanToDecimal(g?.homeOdds),
           1
         );
 
@@ -100,7 +113,7 @@ export default function Dashboard() {
     setMode(type);
 
     let sorted = [...games].sort(
-      (a, b) => b.edgeScore - a.edgeScore
+      (a, b) => (b?.edgeScore || 0) - (a?.edgeScore || 0)
     );
 
     if (type === "safe") sorted = sorted.slice(0, 2);
@@ -109,6 +122,16 @@ export default function Dashboard() {
 
     setParlay(sorted);
   };
+
+  /* ================= LOADING GUARD ================= */
+
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <h2>Loading KBETZ...</h2>
+      </div>
+    );
+  }
 
   /* ================= UI ================= */
 
@@ -137,16 +160,16 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* LIVE TICKER */}
+      {/* TICKER */}
       <div style={styles.ticker}>
         {games.map((g, i) => (
           <span key={i}>
-            {g.away}@{g.home} {g.homeOdds}
+            {g?.away}@{g?.home} {g?.homeOdds}
           </span>
         ))}
       </div>
 
-      {/* ALERT HISTORY */}
+      {/* ALERT */}
       <div style={styles.panel}>Alert History</div>
 
       {/* AI BUILDER */}
@@ -171,14 +194,14 @@ export default function Dashboard() {
         {games.map((g, i) => (
           <div key={i} style={styles.row}>
             <span>
-              {g.away} @ {g.home}
+              {g?.away} @ {g?.home}
             </span>
 
             <span
               style={styles.odds}
               onClick={() => addToParlay(g)}
             >
-              {g.homeOdds}
+              {g?.homeOdds}
             </span>
           </div>
         ))}
@@ -206,18 +229,15 @@ const styles = {
     background:
       "radial-gradient(circle at 50% 100%, #5b21b6, #000)",
   },
-
   header: {
     display: "flex",
     justifyContent: "space-between",
   },
-
   headerRight: {
     display: "flex",
     gap: "10px",
     alignItems: "center",
   },
-
   logo: {
     fontSize: "32px",
     fontWeight: "900",
@@ -226,39 +246,29 @@ const styles = {
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
   },
-
   live: { color: "#00ffcc" },
-
-  freeBadge: {
-    background: "#333",
-    padding: "4px 10px",
-  },
-
+  freeBadge: { background: "#333", padding: "4px 10px" },
   upgradeBtn: {
     background: "#00ffcc",
     color: "#000",
     padding: "6px 12px",
   },
-
   logoutBtn: {
     background: "#222",
     color: "#fff",
     padding: "6px 12px",
   },
-
   ticker: {
     marginTop: "10px",
     display: "flex",
     gap: "20px",
   },
-
   panel: {
     marginTop: "20px",
     background: "#111",
     padding: "15px",
     borderRadius: "10px",
   },
-
   builder: {
     marginTop: "20px",
     background:
@@ -266,11 +276,7 @@ const styles = {
     padding: "15px",
     borderRadius: "10px",
   },
-
-  market: {
-    marginTop: "20px",
-  },
-
+  market: { marginTop: "20px" },
   row: {
     display: "flex",
     justifyContent: "space-between",
@@ -279,12 +285,7 @@ const styles = {
     marginBottom: "8px",
     borderRadius: "10px",
   },
-
-  odds: {
-    color: "#00ffcc",
-    cursor: "pointer",
-  },
-
+  odds: { color: "#00ffcc", cursor: "pointer" },
   slip: {
     marginTop: "20px",
     background: "#111",
