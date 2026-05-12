@@ -15,7 +15,7 @@ export default function Dashboard() {
 
   /* ================= FETCH ================= */
   useEffect(() => {
-    const load = async () => {
+    async function loadData() {
       try {
         const res = await fetch(`${API}/api/data`);
         const data = await res.json();
@@ -44,10 +44,10 @@ export default function Dashboard() {
       } finally {
         setLoading(false);
       }
-    };
+    }
 
-    load();
-  }, []);
+    loadData();
+  }, [API]);
 
   /* ================= AUTH ================= */
   useEffect(() => {
@@ -62,12 +62,12 @@ export default function Dashboard() {
         .then((d) => setIsPro(d?.plan === "PRO"))
         .catch(() => {});
     } catch {}
-  }, []);
+  }, [API]);
 
   /* ================= ACTIONS ================= */
 
   const addToParlay = (game) => {
-    if (!game) return;
+    if (!game || !game.homeOdds) return;
     setParlay((p) => [...p, game]);
   };
 
@@ -100,10 +100,10 @@ export default function Dashboard() {
   const totalOdds =
     parlay.length === 0
       ? 1
-      : parlay.reduce(
-          (acc, g) => acc * americanToDecimal(g?.homeOdds),
-          1
-        );
+      : parlay.reduce((acc, g) => {
+          if (!g || !g.homeOdds) return acc;
+          return acc * americanToDecimal(g.homeOdds);
+        }, 1);
 
   const payout = (stake * totalOdds).toFixed(2);
 
@@ -112,7 +112,7 @@ export default function Dashboard() {
   const buildAIParlay = (type) => {
     setMode(type);
 
-    let sorted = [...games].sort(
+    let sorted = [...games].filter(Boolean).sort(
       (a, b) => (b?.edgeScore || 0) - (a?.edgeScore || 0)
     );
 
@@ -123,7 +123,7 @@ export default function Dashboard() {
     setParlay(sorted);
   };
 
-  /* ================= LOADING GUARD ================= */
+  /* ================= LOADING ================= */
 
   if (loading) {
     return (
@@ -292,4 +292,4 @@ const styles = {
     padding: "15px",
     borderRadius: "10px",
   },
-};// force rebuild
+};
