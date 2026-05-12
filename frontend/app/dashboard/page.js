@@ -1,15 +1,15 @@
 "use client";
+
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  console.log("🔥 CLEAN SAFE BUILD");
-
   const API =
     process.env.NEXT_PUBLIC_API_URL || "https://kbetz.onrender.com";
 
   const [games, setGames] = useState([]);
   const [parlay, setParlay] = useState([]);
-  const [stake, setStake] = useState(10);
+  const [stake, setStake] = useState(100);
+  const [mode, setMode] = useState("balanced");
   const [isPro, setIsPro] = useState(false);
 
   /* ================= FETCH ================= */
@@ -20,11 +20,23 @@ export default function Dashboard() {
         if (Array.isArray(d.games)) {
           setGames(d.games);
         } else {
-          console.warn("Bad API response, using fallback");
-          setGames([]);
+          setGames([
+            {
+              away: "Warriors",
+              home: "Lakers",
+              homeOdds: -110,
+              edgeScore: 4.2,
+            },
+            {
+              away: "Heat",
+              home: "Celtics",
+              homeOdds: -105,
+              edgeScore: 5.8,
+            },
+          ]);
         }
       })
-      .catch(() => setGames([]));
+      .catch(() => {});
   }, []);
 
   /* ================= AUTH ================= */
@@ -43,7 +55,6 @@ export default function Dashboard() {
   /* ================= ACTIONS ================= */
 
   const addToParlay = (game) => {
-    if (!game) return;
     setParlay((p) => [...p, game]);
   };
 
@@ -56,7 +67,9 @@ export default function Dashboard() {
 
   const upgrade = async () => {
     try {
-      const res = await fetch(`${API}/api/checkout`, { method: "POST" });
+      const res = await fetch(`${API}/api/checkout`, {
+        method: "POST",
+      });
       const data = await res.json();
       if (data?.url) window.location.href = data.url;
     } catch {
@@ -64,7 +77,7 @@ export default function Dashboard() {
     }
   };
 
-  /* ================= CALC ================= */
+  /* ================= ODDS ================= */
 
   const americanToDecimal = (odds) => {
     if (!odds) return 1;
@@ -75,7 +88,7 @@ export default function Dashboard() {
     parlay.length === 0
       ? 1
       : parlay.reduce(
-          (acc, g) => acc * americanToDecimal(g?.homeOdds),
+          (acc, g) => acc * americanToDecimal(g.homeOdds),
           1
         );
 
@@ -83,30 +96,34 @@ export default function Dashboard() {
 
   /* ================= AI BUILDER ================= */
 
-  const buildAIParlay = () => {
-    const best = [...games]
-      .filter((g) => typeof g.edgeScore === "number")
-      .sort((a, b) => b.edgeScore - a.edgeScore)
-      .slice(0, 3);
+  const buildAIParlay = (type) => {
+    setMode(type);
 
-    setParlay(best);
+    let sorted = [...games].sort(
+      (a, b) => b.edgeScore - a.edgeScore
+    );
+
+    if (type === "safe") sorted = sorted.slice(0, 2);
+    if (type === "balanced") sorted = sorted.slice(0, 3);
+    if (type === "aggressive") sorted = sorted.slice(0, 4);
+
+    setParlay(sorted);
   };
 
   /* ================= UI ================= */
 
   return (
     <div style={styles.page}>
+      {/* HEADER */}
       <div style={styles.header}>
         <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
         <div style={styles.headerRight}>
-          <span style={styles.live}>LIVE</span>
+          <span style={styles.live}>• LIVE</span>
 
-          {isPro ? (
-            <span style={styles.proBadge}>PRO</span>
-          ) : (
-            <span style={styles.freeBadge}>FREE</span>
-          )}
+          <span style={styles.freeBadge}>
+            {isPro ? "PRO" : "FREE"}
+          </span>
 
           {!isPro && (
             <button style={styles.upgradeBtn} onClick={upgrade}>
@@ -120,68 +137,60 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* AI PICKS */}
-      <div style={styles.aiPanel}>
-        <h2>🧠 AI PICKS</h2>
-
-        {games.slice(0, 2).map((g, i) => (
-          <div key={i}>
-            {g?.away} @ {g?.home} — EV {g?.edgeScore || "N/A"}
-          </div>
+      {/* LIVE TICKER */}
+      <div style={styles.ticker}>
+        {games.map((g, i) => (
+          <span key={i}>
+            {g.away}@{g.home} {g.homeOdds}
+          </span>
         ))}
       </div>
 
-      {/* BUILDER */}
+      {/* ALERT HISTORY */}
+      <div style={styles.panel}>Alert History</div>
+
+      {/* AI BUILDER */}
       <div style={styles.builder}>
-        <button style={styles.btn} onClick={buildAIParlay}>
-          Build AI Parlay
-        </button>
+        <h3>AI Builder</h3>
+
+        <div>
+          <button onClick={() => buildAIParlay("safe")}>
+            Safe
+          </button>
+          <button onClick={() => buildAIParlay("balanced")}>
+            Balanced
+          </button>
+          <button onClick={() => buildAIParlay("aggressive")}>
+            Aggressive
+          </button>
+        </div>
       </div>
 
       {/* MARKETS */}
-      <div style={styles.marketPanel}>
-        <h2>Markets</h2>
+      <div style={styles.market}>
+        {games.map((g, i) => (
+          <div key={i} style={styles.row}>
+            <span>
+              {g.away} @ {g.home}
+            </span>
 
-        {Array.isArray(games) &&
-          games.map((g, i) => (
-            <div key={i} style={styles.row}>
-              <span>
-                {g?.away} @ {g?.home}
-              </span>
-
-              <span
-                style={styles.odds}
-                onClick={() => addToParlay(g)}
-              >
-                {g?.homeOdds || "--"}
-              </span>
-            </div>
-          ))}
-      </div>
-
-      {/* SLIP */}
-      <div style={styles.slip}>
-        <h3>Bet Slip</h3>
-
-        {parlay.map((p, i) => (
-          <div key={i}>
-            {p?.away} @ {p?.home}
+            <span
+              style={styles.odds}
+              onClick={() => addToParlay(g)}
+            >
+              {g.homeOdds}
+            </span>
           </div>
         ))}
+      </div>
 
-        <input
-          type="number"
-          value={stake}
-          onChange={(e) => setStake(Number(e.target.value))}
-          style={styles.input}
-        />
-
-        <div>Total Odds: {totalOdds.toFixed(2)}</div>
+      {/* BET SLIP */}
+      <div style={styles.slip}>
+        <div>${stake.toFixed(2)}</div>
+        <div>Parlay: {parlay.length} legs</div>
         <div>Payout: ${payout}</div>
 
-        <button style={styles.clearBtn} onClick={clearParlay}>
-          Clear
-        </button>
+        <button onClick={clearParlay}>Clear</button>
       </div>
     </div>
   );
@@ -191,26 +200,95 @@ export default function Dashboard() {
 
 const styles = {
   page: {
-    background: "#000",
-    color: "#fff",
-    padding: "20px",
     minHeight: "100vh",
+    padding: "20px",
+    color: "#00fff7",
+    background:
+      "radial-gradient(circle at 50% 100%, #5b21b6, #000)",
   },
-  header: { display: "flex", justifyContent: "space-between" },
-  headerRight: { display: "flex", gap: 10, alignItems: "center" },
-  logo: { fontSize: 30 },
-  live: { color: "#0ff" },
-  proBadge: { background: "#0ff", color: "#000", padding: 5 },
-  freeBadge: { background: "#333", padding: 5 },
-  upgradeBtn: { background: "#0ff", color: "#000", padding: 5 },
-  logoutBtn: { background: "#222", color: "#fff", padding: 5 },
-  aiPanel: { marginTop: 20 },
-  builder: { marginTop: 20 },
-  btn: { background: "#0ff", padding: 5 },
-  marketPanel: { marginTop: 20 },
-  row: { display: "flex", justifyContent: "space-between" },
-  odds: { color: "#0ff", cursor: "pointer" },
-  slip: { marginTop: 20 },
-  clearBtn: { background: "red", color: "#fff", padding: 5 },
-  input: { marginTop: 10 },
+
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+  },
+
+  headerRight: {
+    display: "flex",
+    gap: "10px",
+    alignItems: "center",
+  },
+
+  logo: {
+    fontSize: "32px",
+    fontWeight: "900",
+    background:
+      "linear-gradient(90deg,#8b5cf6,#22d3ee)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+  },
+
+  live: { color: "#00ffcc" },
+
+  freeBadge: {
+    background: "#333",
+    padding: "4px 10px",
+  },
+
+  upgradeBtn: {
+    background: "#00ffcc",
+    color: "#000",
+    padding: "6px 12px",
+  },
+
+  logoutBtn: {
+    background: "#222",
+    color: "#fff",
+    padding: "6px 12px",
+  },
+
+  ticker: {
+    marginTop: "10px",
+    display: "flex",
+    gap: "20px",
+  },
+
+  panel: {
+    marginTop: "20px",
+    background: "#111",
+    padding: "15px",
+    borderRadius: "10px",
+  },
+
+  builder: {
+    marginTop: "20px",
+    background:
+      "linear-gradient(90deg,#7c3aed,#22d3ee)",
+    padding: "15px",
+    borderRadius: "10px",
+  },
+
+  market: {
+    marginTop: "20px",
+  },
+
+  row: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "12px",
+    background: "#000",
+    marginBottom: "8px",
+    borderRadius: "10px",
+  },
+
+  odds: {
+    color: "#00ffcc",
+    cursor: "pointer",
+  },
+
+  slip: {
+    marginTop: "20px",
+    background: "#111",
+    padding: "15px",
+    borderRadius: "10px",
+  },
 };
