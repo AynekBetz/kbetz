@@ -3,119 +3,92 @@
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  const API =
-    process.env.NEXT_PUBLIC_API_URL || "https://kbetz.onrender.com";
+  const API = process.env.NEXT_PUBLIC_API_URL || "";
 
   const [games, setGames] = useState([]);
+  const [aiPicks, setAiPicks] = useState([]);
   const [parlay, setParlay] = useState([]);
-  const [stake, setStake] = useState(100);
-  const [isPro, setIsPro] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  /* ================= FETCH ================= */
   useEffect(() => {
-    async function load() {
+    const fetchData = async () => {
       try {
         const res = await fetch(`${API}/api/data`);
         const data = await res.json();
 
-        if (Array.isArray(data?.games)) {
-          setGames(data.games);
-        } else {
-          throw new Error();
+        // 🛑 CRASH PROTECTION (VERY IMPORTANT)
+        if (!data || !Array.isArray(data.games)) {
+          console.warn("Invalid API response", data);
+          return;
         }
-      } catch {
-        setGames([
-          { away: "Warriors", home: "Lakers", homeOdds: -110 },
-          { away: "Heat", home: "Celtics", homeOdds: -105 },
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    }
 
-    load();
+        setGames(data.games);
+
+        const picks = data.games
+          .map((g) => ({
+            game: `${g.away} @ ${g.home}`,
+            edge: g.edgeScore || 0,
+            odds: g.homeOdds || "-110",
+          }))
+          .sort((a, b) => b.edge - a.edge)
+          .slice(0, 3);
+
+        setAiPicks(picks);
+      } catch (err) {
+        console.error("Fetch crash:", err);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  /* ================= SAFE FUNCTIONS ================= */
-
-  const safeGames = Array.isArray(games) ? games : [];
-  const safeParlay = Array.isArray(parlay) ? parlay : [];
-
-  const add = (g) => {
-    if (!g || typeof g.homeOdds !== "number") return;
-
-    setParlay((prev) => {
-      if (!Array.isArray(prev)) return [g];
-      return [...prev, g];
-    });
+  const addToParlay = (pick) => {
+    setParlay((prev) => [...prev, pick]);
   };
-
-  const clear = () => setParlay([]);
-
-  const oddsToDecimal = (o) =>
-    typeof o === "number"
-      ? o > 0
-        ? 1 + o / 100
-        : 1 + 100 / Math.abs(o)
-      : 1;
-
-  const totalOdds =
-    safeParlay.length === 0
-      ? 1
-      : safeParlay.reduce((acc, g) => {
-          if (!g || typeof g.homeOdds !== "number") return acc;
-          return acc * oddsToDecimal(g.homeOdds);
-        }, 1);
-
-  const payout =
-    Number.isFinite(stake * totalOdds)
-      ? (stake * totalOdds).toFixed(2)
-      : "0.00";
-
-  if (loading) {
-    return (
-      <div style={{ padding: 40, color: "white" }}>
-        Loading KBETZ...
-      </div>
-    );
-  }
 
   return (
     <div style={styles.page}>
       {/* HEADER */}
       <div style={styles.header}>
         <h1 style={styles.logo}>KBETZ TERMINAL</h1>
-
         <div>
-          <span style={{ color: "#00ffcc" }}>LIVE</span>
+          <span style={{ color: "#00ffcc" }}>● LIVE</span>
+          <button style={styles.btn}>Logout</button>
         </div>
       </div>
 
-      {/* MARKETS */}
-      <div style={styles.box}>
-        {safeGames.map((g, i) => (
-          <div key={i} style={styles.row}>
-            <span>
-              {g?.away} @ {g?.home}
-            </span>
+      {/* AI PICKS */}
+      <div style={styles.card}>
+        <h2>🧠 AI PICKS</h2>
+        {aiPicks.map((p, i) => (
+          <div key={i} style={styles.pick}>
+            <span>{p.game}</span>
+            <span style={{ color: "#00ffcc" }}>EV: {p.edge}</span>
+            <button onClick={() => addToParlay(p)} style={styles.smallBtn}>
+              Add
+            </button>
+          </div>
+        ))}
+      </div>
 
-            <span style={styles.odds} onClick={() => add(g)}>
-              {typeof g?.homeOdds === "number"
-                ? g.homeOdds
-                : "--"}
+      {/* MARKETS */}
+      <div style={styles.card}>
+        <h2>Markets</h2>
+        {games.map((g, i) => (
+          <div key={i} style={styles.market}>
+            <span>{g.away} @ {g.home}</span>
+            <span style={{ color: "#00ffcc" }}>
+              {g.homeOdds || "-110"}
             </span>
           </div>
         ))}
       </div>
 
-      {/* SLIP */}
-      <div style={styles.box}>
-        <div>${stake}</div>
-        <div>Legs: {safeParlay.length}</div>
-        <div>Payout: ${payout}</div>
-
-        <button onClick={clear}>Clear</button>
+      {/* PARLAY BUILDER */}
+      <div style={styles.card}>
+        <h2>🔥 AI PARLAY BUILDER</h2>
+        {parlay.map((p, i) => (
+          <div key={i}>{p.game}</div>
+        ))}
       </div>
     </div>
   );
@@ -123,38 +96,46 @@ export default function Dashboard() {
 
 const styles = {
   page: {
+    background: "linear-gradient(180deg,#000,#2a0a5e)",
+    color: "white",
     minHeight: "100vh",
-    padding: 20,
-    background:
-      "radial-gradient(circle at bottom,#5b21b6,#000)",
-    color: "#00fff7",
+    padding: "20px",
   },
   header: {
     display: "flex",
     justifyContent: "space-between",
+    marginBottom: "20px",
   },
   logo: {
-    background:
-      "linear-gradient(90deg,#8b5cf6,#22d3ee)",
+    background: "linear-gradient(90deg,#7f00ff,#00ffff)",
     WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
+    color: "transparent",
   },
-  box: {
-    marginTop: 20,
-    background: "#111",
-    padding: 15,
-    borderRadius: 10,
+  card: {
+    background: "rgba(20,0,40,0.9)",
+    padding: "20px",
+    borderRadius: "12px",
+    marginBottom: "20px",
   },
-  row: {
+  pick: {
     display: "flex",
     justifyContent: "space-between",
-    padding: 10,
-    background: "#000",
-    marginBottom: 8,
-    borderRadius: 8,
+    marginTop: "10px",
   },
-  odds: {
-    color: "#00ffcc",
+  market: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: "10px",
+  },
+  btn: {
+    marginLeft: "10px",
+    padding: "5px 10px",
+  },
+  smallBtn: {
+    marginLeft: "10px",
+    background: "#00ffcc",
+    border: "none",
+    padding: "5px 10px",
     cursor: "pointer",
   },
 };
