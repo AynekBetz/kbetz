@@ -4,7 +4,16 @@ import dotenv from "dotenv";
 import Stripe from "stripe";
 import fetch from "node-fetch";
 
-dotenv.config();
+/* ================= ENV FIX ================= */
+dotenv.config({ override: true });
+
+// 🔥 DEBUG (YOU WILL SEE THIS IN LOGS)
+console.log("ENV CHECK:", {
+  CLIENT_URL: process.env.CLIENT_URL ? "✅" : "❌",
+  STRIPE_KEY: process.env.STRIPE_SECRET_KEY ? "✅" : "❌",
+  PRICE_ID: process.env.STRIPE_PRICE_ID ? "✅" : "❌",
+  MONGO: process.env.MONGO_URI ? "✅" : "❌",
+});
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -98,12 +107,11 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-/* ================= CHECKOUT (FIXED FULL) ================= */
+/* ================= CHECKOUT ================= */
 app.post("/api/checkout", async (req, res) => {
   try {
     let { email } = req.body || {};
 
-    // 🔥 FALLBACK EMAIL (prevents crash)
     if (!email) {
       email = "guest@kbetz.com";
       console.log("⚠️ No email sent — using fallback");
@@ -115,6 +123,10 @@ app.post("/api/checkout", async (req, res) => {
 
     if (!process.env.STRIPE_PRICE_ID) {
       return res.json({ error: "Missing STRIPE_PRICE_ID" });
+    }
+
+    if (!process.env.CLIENT_URL) {
+      return res.json({ error: "Missing CLIENT_URL" });
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -172,34 +184,12 @@ app.post("/api/stripe/webhook", async (req, res) => {
     }
   }
 
-  if (event.type === "customer.subscription.deleted") {
-    const customer = await stripe.customers.retrieve(event.data.object.customer);
-    const user = await User.findOne({ email: customer.email });
-    if (user) {
-      user.isPro = false;
-      await user.save();
-      console.log("❌ PRO removed:", customer.email);
-    }
-  }
-
-  if (event.type === "invoice.payment_failed") {
-    const customer = await stripe.customers.retrieve(event.data.object.customer);
-    const user = await User.findOne({ email: customer.email });
-    if (user) {
-      user.isPro = false;
-      await user.save();
-      console.log("❌ PRO removed (fail):", customer.email);
-    }
-  }
-
   res.sendStatus(200);
 });
 
 /* ================= DATA ENGINE ================= */
 const cache = {};
 const CACHE_TIME = 30000;
-
-const toDecimal = (o)=> o>0 ? (o/100)+1 : (100/Math.abs(o))+1;
 
 app.get("/api/data", async (req, res) => {
   try {
