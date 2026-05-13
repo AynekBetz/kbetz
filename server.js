@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 10000;
 console.log("🚀 KBETZ SERVER STARTING");
 
 /* ================= STRIPE ================= */
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 /* ================= MIDDLEWARE ================= */
 app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
@@ -98,34 +98,48 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-/* ================= CHECKOUT (FIXED) ================= */
+/* ================= CHECKOUT (FIXED FULL) ================= */
 app.post("/api/checkout", async (req, res) => {
   try {
-    const { email } = req.body;
+    let { email } = req.body || {};
 
+    // 🔥 FALLBACK EMAIL (prevents crash)
     if (!email) {
-      return res.status(400).json({ error: "Missing email" });
+      email = "guest@kbetz.com";
+      console.log("⚠️ No email sent — using fallback");
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.json({ error: "Missing STRIPE_SECRET_KEY" });
+    }
+
+    if (!process.env.STRIPE_PRICE_ID) {
+      return res.json({ error: "Missing STRIPE_PRICE_ID" });
     }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
       customer_email: email,
+
       line_items: [
         {
           price: process.env.STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],
+
       success_url: `${process.env.CLIENT_URL}/dashboard`,
       cancel_url: `${process.env.CLIENT_URL}/dashboard`,
     });
 
+    console.log("✅ Stripe session created:", session.id);
+
     res.json({ url: session.url });
 
   } catch (err) {
-    console.log("CHECKOUT ERROR:", err.message);
-    res.status(500).json({ error: "Checkout failed" });
+    console.log("❌ CHECKOUT ERROR:", err.message);
+    res.json({ error: err.message });
   }
 });
 
@@ -181,36 +195,12 @@ app.post("/api/stripe/webhook", async (req, res) => {
   res.sendStatus(200);
 });
 
-/* ================= BILLING ================= */
-app.post("/api/billing-portal", async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    const customers = await stripe.customers.list({ email });
-    if (!customers.data.length) {
-      return res.status(400).json({ error:"No customer found" });
-    }
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer: customers.data[0].id,
-      return_url: `${process.env.CLIENT_URL}/billing`
-    });
-
-    res.json({ url:session.url });
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error:"Billing failed" });
-  }
-});
-
-/* ================= CACHE ================= */
+/* ================= DATA ENGINE ================= */
 const cache = {};
 const CACHE_TIME = 30000;
 
 const toDecimal = (o)=> o>0 ? (o/100)+1 : (100/Math.abs(o))+1;
 
-/* ================= DATA ENGINE ================= */
 app.get("/api/data", async (req, res) => {
   try {
     const sport = req.query.sport || "basketball_nba";
@@ -247,26 +237,6 @@ app.get("/api/data", async (req, res) => {
 
       const homeOdds = books[0].home;
 
-      const last = await OddsHistory.findOne({gameId:g.id}).sort({timestamp:-1});
-
-      let move = 0;
-      let steam=false;
-      let steamStrength="none";
-
-      if(last){
-        move = homeOdds - last.odds;
-        if(Math.abs(move)>=3) steamStrength="medium";
-        if(Math.abs(move)>=5) steamStrength="strong";
-        steam = steamStrength !== "none";
-      }
-
-      let bestHome = Math.max(...books.map(b=>b.home));
-      const avgHome = books.reduce((s,b)=>s+b.home,0)/books.length;
-
-      const ev = ((1/toDecimal(avgHome) - 1/toDecimal(bestHome))*100);
-
-      let confidence = Math.min(95, 50 + ev*5);
-
       await OddsHistory.create({gameId:g.id, odds:homeOdds});
 
       games.push({
@@ -274,12 +244,6 @@ app.get("/api/data", async (req, res) => {
         home:g.home_team,
         away:g.away_team,
         homeOdds,
-        move,
-        steam,
-        steamStrength,
-        ev:Number(ev.toFixed(2)),
-        confidence,
-        books
       });
     }
 
