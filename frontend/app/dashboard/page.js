@@ -8,6 +8,7 @@ export default function Dashboard() {
   const [games, setGames] = useState([]);
   const [aiPicks, setAiPicks] = useState([]);
   const [parlay, setParlay] = useState([]);
+  const [isPro, setIsPro] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -15,7 +16,6 @@ export default function Dashboard() {
         const res = await fetch(`${API}/api/data`);
         const data = await res.json();
 
-        // 🛑 CRASH PROTECTION
         if (!data || !Array.isArray(data.games)) {
           console.warn("Bad API response", data);
           return;
@@ -28,6 +28,7 @@ export default function Dashboard() {
             game: `${g.away} @ ${g.home}`,
             edge: g.edgeScore || 0,
             odds: g.homeOdds || "-110",
+            winProb: Math.min(95, Math.max(50, 50 + (g.edgeScore || 0) * 5)),
           }))
           .sort((a, b) => b.edge - a.edge)
           .slice(0, 3);
@@ -45,6 +46,30 @@ export default function Dashboard() {
     setParlay((prev) => [...prev, pick]);
   };
 
+  // 🔥 STRIPE CONNECT
+  const handleUpgrade = async () => {
+    try {
+      const res = await fetch(`${API}/api/checkout`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Stripe not configured");
+      }
+    } catch (err) {
+      alert("Upgrade failed");
+    }
+  };
+
+  // 🔥 SIMPLE HEDGE ENGINE
+  const hedge =
+    parlay.length >= 2
+      ? "Hedge last leg to lock profit"
+      : "Build parlay to unlock hedge";
+
   return (
     <div style={styles.page}>
       {/* HEADER */}
@@ -53,8 +78,14 @@ export default function Dashboard() {
 
         <div>
           <span style={styles.live}>● LIVE</span>
-          <span style={styles.badge}>FREE</span>
-          <button style={styles.upgrade}>Upgrade</button>
+          <span style={styles.badge}>{isPro ? "PRO" : "FREE"}</span>
+
+          {!isPro && (
+            <button style={styles.upgrade} onClick={handleUpgrade}>
+              Upgrade
+            </button>
+          )}
+
           <button style={styles.btn}>Logout</button>
         </div>
       </div>
@@ -62,33 +93,46 @@ export default function Dashboard() {
       {/* AI PICKS */}
       <div style={styles.card}>
         <h2>🧠 AI PICKS</h2>
-        {aiPicks.length === 0 ? (
-          <p>No picks yet...</p>
-        ) : (
-          aiPicks.map((p, i) => (
-            <div key={i} style={styles.row}>
-              <span>{p.game}</span>
-              <span style={{ color: "#00ffcc" }}>EV: {p.edge}</span>
-              <button
-                style={styles.smallBtn}
-                onClick={() => addToParlay(p)}
-              >
-                Add
-              </button>
-            </div>
-          ))
-        )}
+
+        <div style={!isPro ? styles.blur : {}}>
+          {aiPicks.length === 0 ? (
+            <p>No picks yet...</p>
+          ) : (
+            aiPicks.map((p, i) => (
+              <div key={i} style={styles.row}>
+                <span>{p.game}</span>
+
+                <span style={{ color: "#00ffcc" }}>
+                  EV: {p.edge} | {p.winProb}% WIN
+                </span>
+
+                <button
+                  style={styles.smallBtn}
+                  onClick={() => addToParlay(p)}
+                >
+                  Add
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {!isPro && <div style={styles.lock}>🔒 PRO ONLY</div>}
       </div>
 
       {/* MARKETS */}
       <div style={styles.card}>
         <h2>Markets</h2>
+
         {games.length === 0 ? (
           <p>No live games...</p>
         ) : (
           games.map((g, i) => (
             <div key={i} style={styles.row}>
-              <span>{g.away} @ {g.home}</span>
+              <span>
+                {g.away} @ {g.home}
+              </span>
+
               <span style={{ color: "#00ffcc" }}>
                 {g.homeOdds || "-110"}
               </span>
@@ -114,6 +158,12 @@ export default function Dashboard() {
           <br />
           Parlay: {parlay.length} legs
         </div>
+      </div>
+
+      {/* HEDGE */}
+      <div style={styles.card}>
+        <h2>🛡 Hedge Insight</h2>
+        <p>{hedge}</p>
       </div>
     </div>
   );
@@ -204,6 +254,17 @@ const styles = {
     borderRadius: "6px",
     marginRight: "10px",
     cursor: "pointer",
+    fontWeight: "bold",
+  },
+
+  blur: {
+    filter: "blur(6px)",
+    pointerEvents: "none",
+  },
+
+  lock: {
+    marginTop: "10px",
+    color: "#ff4d4d",
     fontWeight: "bold",
   },
 };
