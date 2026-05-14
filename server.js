@@ -4,10 +4,9 @@ import dotenv from "dotenv";
 import Stripe from "stripe";
 import fetch from "node-fetch";
 
-/* ================= ENV FIX ================= */
+/* ================= ENV ================= */
 dotenv.config({ override: true });
 
-// 🔥 DEBUG (YOU WILL SEE THIS IN LOGS)
 console.log("ENV CHECK:", {
   CLIENT_URL: process.env.CLIENT_URL ? "✅" : "❌",
   STRIPE_KEY: process.env.STRIPE_SECRET_KEY ? "✅" : "❌",
@@ -19,9 +18,6 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 console.log("🚀 KBETZ SERVER STARTING");
-
-/* ================= STRIPE ================= */
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 /* ================= MIDDLEWARE ================= */
 app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
@@ -35,47 +31,62 @@ app.use((req, res, next) => {
 });
 
 /* ================= DB ================= */
-mongoose.connect(process.env.MONGO_URI)
-.then(()=>console.log("✅ MongoDB Connected"))
-.catch(err=>console.log(err));
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.log(err));
 
 /* ================= MODELS ================= */
-const User = mongoose.models.User || mongoose.model("User", new mongoose.Schema({
-  email:String,
-  isPro:{type:Boolean,default:false}
-}));
+const User =
+  mongoose.models.User ||
+  mongoose.model(
+    "User",
+    new mongoose.Schema({
+      email: String,
+      isPro: { type: Boolean, default: false },
+    })
+  );
 
-const OddsHistory = mongoose.models.OddsHistory || mongoose.model("OddsHistory", new mongoose.Schema({
-  gameId:String,
-  odds:Number,
-  timestamp:{type:Date,default:Date.now}
-}));
+const OddsHistory =
+  mongoose.models.OddsHistory ||
+  mongoose.model(
+    "OddsHistory",
+    new mongoose.Schema({
+      gameId: String,
+      odds: Number,
+      timestamp: { type: Date, default: Date.now },
+    })
+  );
 
-const Bet = mongoose.models.Bet || mongoose.model("Bet", new mongoose.Schema({
-  userId: mongoose.Schema.Types.ObjectId,
-  gameId:String,
-  pick:String,
-  odds:Number,
-  stake:Number,
-  result:{type:String,default:"pending"},
-  profit:{type:Number,default:0},
-  createdAt:{type:Date,default:Date.now}
-}));
+const Bet =
+  mongoose.models.Bet ||
+  mongoose.model(
+    "Bet",
+    new mongoose.Schema({
+      userId: mongoose.Schema.Types.ObjectId,
+      gameId: String,
+      pick: String,
+      odds: Number,
+      stake: Number,
+      result: { type: String, default: "pending" },
+      profit: { type: Number, default: 0 },
+      createdAt: { type: Date, default: Date.now },
+    })
+  );
 
 /* ================= PRO CHECK ================= */
 app.get("/api/me", async (req, res) => {
   try {
     const { email } = req.query;
-    if (!email) return res.json({ isPro:false });
+    if (!email) return res.json({ isPro: false });
 
     const user = await User.findOne({ email });
 
     res.json({
-      isPro: user?.isPro || false
+      isPro: user?.isPro || false,
     });
-
   } catch {
-    res.json({ isPro:false });
+    res.json({ isPro: false });
   }
 });
 
@@ -91,23 +102,22 @@ app.post("/api/login", async (req, res) => {
     let user = await User.findOne({ email });
 
     if (!user) {
-      user = await User.create({ email, isPro:false });
+      user = await User.create({ email, isPro: false });
       console.log("🆕 New user created:", email);
     }
 
     res.json({
-      success:true,
-      email:user.email,
-      isPro:user.isPro
+      success: true,
+      email: user.email,
+      isPro: user.isPro,
     });
-
   } catch (err) {
     console.log("LOGIN ERROR:", err);
-    res.status(500).json({ error:"Server error" });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-/* ================= CHECKOUT ================= */
+/* ================= CHECKOUT (FIXED) ================= */
 app.post("/api/checkout", async (req, res) => {
   try {
     let { email } = req.body || {};
@@ -117,17 +127,29 @@ app.post("/api/checkout", async (req, res) => {
       console.log("⚠️ No email sent — using fallback");
     }
 
+    /* 🔥 HARD FAIL CHECKS */
     if (!process.env.STRIPE_SECRET_KEY) {
-      return res.json({ error: "Missing STRIPE_SECRET_KEY" });
+      console.log("❌ STRIPE KEY MISSING");
+      return res.json({ error: "Stripe not configured" });
     }
 
     if (!process.env.STRIPE_PRICE_ID) {
-      return res.json({ error: "Missing STRIPE_PRICE_ID" });
+      console.log("❌ PRICE ID MISSING");
+      return res.json({ error: "Missing price ID" });
     }
 
-    if (!process.env.CLIENT_URL) {
-      return res.json({ error: "Missing CLIENT_URL" });
+    if (
+      !process.env.CLIENT_URL ||
+      !process.env.CLIENT_URL.startsWith("http")
+    ) {
+      console.log("❌ BAD CLIENT_URL:", process.env.CLIENT_URL);
+      return res.json({
+        error: "CLIENT_URL must start with https://",
+      });
     }
+
+    /* 🔥 SAFE STRIPE INIT (FIX) */
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -148,7 +170,6 @@ app.post("/api/checkout", async (req, res) => {
     console.log("✅ Stripe session created:", session.id);
 
     res.json({ url: session.url });
-
   } catch (err) {
     console.log("❌ CHECKOUT ERROR:", err.message);
     res.json({ error: err.message });
@@ -157,8 +178,9 @@ app.post("/api/checkout", async (req, res) => {
 
 /* ================= STRIPE WEBHOOK ================= */
 app.post("/api/stripe/webhook", async (req, res) => {
-
+  let stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const sig = req.headers["stripe-signature"];
+
   let event;
 
   try {
@@ -205,49 +227,49 @@ app.get("/api/data", async (req, res) => {
     const data = await response.json();
 
     if (!Array.isArray(data)) {
-      return res.json({ source:"fallback", games:[] });
+      return res.json({ source: "fallback", games: [] });
     }
 
     const games = [];
 
-    for (const g of data.slice(0,20)) {
+    for (const g of data.slice(0, 20)) {
+      const books = (g.bookmakers || [])
+        .slice(0, 2)
+        .map((b) => {
+          const h2h = b.markets?.find((m) => m.key === "h2h");
 
-      const books = (g.bookmakers || []).slice(0,2).map(b => {
-        const h2h = b.markets?.find(m => m.key === "h2h");
-
-        return {
-          name: b.title,
-          home: h2h?.outcomes?.find(o => o.name === g.home_team)?.price,
-          away: h2h?.outcomes?.find(o => o.name === g.away_team)?.price
-        };
-
-      }).filter(b => b.home && b.away);
+          return {
+            name: b.title,
+            home: h2h?.outcomes?.find((o) => o.name === g.home_team)?.price,
+            away: h2h?.outcomes?.find((o) => o.name === g.away_team)?.price,
+          };
+        })
+        .filter((b) => b.home && b.away);
 
       if (!books.length) continue;
 
       const homeOdds = books[0].home;
 
-      await OddsHistory.create({gameId:g.id, odds:homeOdds});
+      await OddsHistory.create({ gameId: g.id, odds: homeOdds });
 
       games.push({
-        id:g.id,
-        home:g.home_team,
-        away:g.away_team,
+        id: g.id,
+        home: g.home_team,
+        away: g.away_team,
         homeOdds,
       });
     }
 
-    const result = { source:"real", games };
-    cache[sport] = { data:result, time:Date.now() };
+    const result = { source: "real", games };
+    cache[sport] = { data: result, time: Date.now() };
 
     res.json(result);
-
   } catch {
-    res.json({ source:"fallback", games:[] });
+    res.json({ source: "fallback", games: [] });
   }
 });
 
 /* ================= START ================= */
-app.listen(PORT,()=>{
+app.listen(PORT, () => {
   console.log(`🔥 KBETZ API running on port ${PORT}`);
 });
