@@ -8,53 +8,26 @@ export default function Dashboard() {
   const [games, setGames] = useState([]);
   const [aiPicks, setAiPicks] = useState([]);
   const [parlay, setParlay] = useState([]);
+
   const [isPro, setIsPro] = useState(false);
   const [email, setEmail] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
 
-  /* ================= LOGIN ================= */
-  const handleLogin = async () => {
-    if (!email) return alert("Enter email");
-
-    const res = await fetch(`${API}/api/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email }),
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      localStorage.setItem("email", email);
-      setIsPro(data.isPro);
-      alert("Logged in");
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("email");
-    setIsPro(false);
-    setEmail("");
-    window.location.href = "/auth";
-  };
-
-  /* ================= LOAD USER ================= */
+  /* ================= SAFE LOCAL STORAGE ================= */
   useEffect(() => {
     const savedEmail = localStorage.getItem("email");
 
     if (!savedEmail) return;
 
     setEmail(savedEmail);
+    setLoggedIn(true);
 
     fetch(`${API}/api/me?email=${savedEmail}`)
       .then((res) => res.json())
-      .then((data) => {
-        setIsPro(data.isPro);
-      });
+      .then((data) => setIsPro(data.isPro));
   }, []);
 
-  /* ================= 🔥 FIXED PAYMENT SUCCESS ================= */
+  /* ================= PAYMENT SUCCESS ================= */
   useEffect(() => {
     const url = new URL(window.location.href);
     const emailFromUrl = url.searchParams.get("email");
@@ -69,11 +42,12 @@ export default function Dashboard() {
       }).then(async () => {
         localStorage.setItem("email", emailFromUrl);
 
-        // 🔥 RECHECK FROM BACKEND (IMPORTANT)
         const res = await fetch(`${API}/api/me?email=${emailFromUrl}`);
         const data = await res.json();
 
         setIsPro(data.isPro);
+        setLoggedIn(true);
+        setEmail(emailFromUrl);
 
         alert("🔥 PRO Activated!");
 
@@ -104,21 +78,44 @@ export default function Dashboard() {
       });
   }, []);
 
-  const addToParlay = (pick) => {
-    setParlay((prev) => [...prev, pick]);
+  /* ================= ACTIONS ================= */
+  const handleLogin = async () => {
+    if (!email) return alert("Enter email");
+
+    const res = await fetch(`${API}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      localStorage.setItem("email", email);
+      setLoggedIn(true);
+      setIsPro(data.isPro);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("email");
+    setLoggedIn(false);
+    setIsPro(false);
+    setEmail("");
+    window.location.href = "/auth";
   };
 
   const upgrade = async () => {
-    const email = localStorage.getItem("email");
+    const savedEmail = localStorage.getItem("email");
 
-    if (!email) return alert("Login first");
+    if (!savedEmail) return alert("Login first");
 
     const res = await fetch(`${API}/api/checkout`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email: savedEmail }),
     });
 
     const data = await res.json();
@@ -126,48 +123,51 @@ export default function Dashboard() {
     if (data.url) window.location.href = data.url;
   };
 
+  const addToParlay = (pick) => {
+    setParlay((prev) => [...prev, pick]);
+  };
+
   /* ================= UI ================= */
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <h1 style={styles.logo}>KBETZ TERMINAL</h1>
+        <h1>KBETZ TERMINAL</h1>
 
         <div>
-          <span style={styles.live}>● LIVE</span>
-          <span style={styles.badge}>
-            {isPro ? "PRO" : "FREE"}
-          </span>
+          <span>{isPro ? "PRO" : "FREE"}</span>
 
           {!isPro && (
-            <button style={styles.upgrade} onClick={upgrade}>
-              Upgrade
-            </button>
+            <button onClick={upgrade}>Upgrade</button>
           )}
 
-          <button style={styles.btn} onClick={handleLogout}>
-            Logout
-          </button>
+          <button onClick={handleLogout}>Logout</button>
         </div>
       </div>
 
-      {!localStorage.getItem("email") && (
+      {!loggedIn && (
         <div style={styles.card}>
           <h2>Login</h2>
           <input
-            placeholder="Enter email"
+            placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
           />
           <button onClick={handleLogin}>Enter</button>
         </div>
       )}
 
       <div style={styles.card}>
-        <h2>🧠 AI PICKS</h2>
-        {!isPro ? <p>🔒 PRO ONLY</p> : aiPicks.map((p, i) => (
-          <div key={i}>{p.game} (EV {p.edge})</div>
-        ))}
+        <h2>AI Picks</h2>
+        {!isPro ? (
+          <p>🔒 PRO ONLY</p>
+        ) : (
+          aiPicks.map((p, i) => (
+            <div key={i}>
+              {p.game}
+              <button onClick={() => addToParlay(p)}>Add</button>
+            </div>
+          ))
+        )}
       </div>
 
       <div style={styles.card}>
@@ -185,11 +185,5 @@ export default function Dashboard() {
 const styles = {
   page: { padding: 20, color: "white", background: "#000" },
   header: { display: "flex", justifyContent: "space-between" },
-  logo: { fontSize: 24 },
   card: { marginTop: 20, padding: 20, background: "#111" },
-  badge: { marginLeft: 10 },
-  live: { color: "#00ffcc" },
-  upgrade: { marginLeft: 10 },
-  btn: { marginLeft: 10 },
-  input: { padding: 8 },
 };
