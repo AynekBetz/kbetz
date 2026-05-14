@@ -1,18 +1,29 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const router = useRouter();
-
   useEffect(() => {
-    // redirect instantly to dashboard
-    router.push("/dashboard");
+    const email = localStorage.getItem("email");
+
+    if (email) {
+      window.location.href = "/dashboard";
+    } else {
+      window.location.href = "/auth";
+    }
   }, []);
 
   return (
-    <div style={{ color: "white", padding: "20px" }}>
+    <div
+      style={{
+        background: "#000",
+        color: "#fff",
+        height: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
       Loading KBETZ...
     </div>
   );

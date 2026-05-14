@@ -1,275 +1,267 @@
-import express from "express";
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-import Stripe from "stripe";
-import fetch from "node-fetch";
+"use client";
 
-/* ================= ENV ================= */
-dotenv.config({ override: true });
+import { useEffect, useState } from "react";
 
-console.log("ENV CHECK:", {
-  CLIENT_URL: process.env.CLIENT_URL ? "✅" : "❌",
-  STRIPE_KEY: process.env.STRIPE_SECRET_KEY ? "✅" : "❌",
-  PRICE_ID: process.env.STRIPE_PRICE_ID ? "✅" : "❌",
-  MONGO: process.env.MONGO_URI ? "✅" : "❌",
-});
+export default function Dashboard() {
+  const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-const app = express();
-const PORT = process.env.PORT || 10000;
+  const [games, setGames] = useState([]);
+  const [aiPicks, setAiPicks] = useState([]);
+  const [parlay, setParlay] = useState([]);
+  const [isPro, setIsPro] = useState(false);
+  const [email, setEmail] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
 
-console.log("🚀 KBETZ SERVER STARTING");
+  /* ================= LOGIN ================= */
+  const handleLogin = async () => {
+    if (!email) return alert("Enter email");
 
-/* ================= MIDDLEWARE ================= */
-app.use("/api/stripe/webhook", express.raw({ type: "application/json" }));
-app.use(express.json());
-
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "*");
-  if (req.method === "OPTIONS") return res.sendStatus(200);
-  next();
-});
-
-/* ================= DB ================= */
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.log(err));
-
-/* ================= MODELS ================= */
-const User =
-  mongoose.models.User ||
-  mongoose.model(
-    "User",
-    new mongoose.Schema({
-      email: String,
-      isPro: { type: Boolean, default: false },
-    })
-  );
-
-const OddsHistory =
-  mongoose.models.OddsHistory ||
-  mongoose.model(
-    "OddsHistory",
-    new mongoose.Schema({
-      gameId: String,
-      odds: Number,
-      timestamp: { type: Date, default: Date.now },
-    })
-  );
-
-const Bet =
-  mongoose.models.Bet ||
-  mongoose.model(
-    "Bet",
-    new mongoose.Schema({
-      userId: mongoose.Schema.Types.ObjectId,
-      gameId: String,
-      pick: String,
-      odds: Number,
-      stake: Number,
-      result: { type: String, default: "pending" },
-      profit: { type: Number, default: 0 },
-      createdAt: { type: Date, default: Date.now },
-    })
-  );
-
-/* ================= PRO CHECK ================= */
-app.get("/api/me", async (req, res) => {
-  try {
-    const { email } = req.query;
-    if (!email) return res.json({ isPro: false });
-
-    const user = await User.findOne({ email });
-
-    res.json({
-      isPro: user?.isPro || false,
+    const res = await fetch(`${API}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
     });
-  } catch {
-    res.json({ isPro: false });
-  }
-});
 
-/* ================= LOGIN ================= */
-app.post("/api/login", async (req, res) => {
-  try {
-    const { email } = req.body;
+    const data = await res.json();
 
-    if (!email) {
-      return res.status(400).json({ error: "Email required" });
+    if (data.success) {
+      localStorage.setItem("email", email);
+      setLoggedIn(true);
+
+      // 🔥 ALWAYS SYNC WITH BACKEND
+      checkProStatus(email);
+
+      alert("Logged in");
     }
+  };
 
-    let user = await User.findOne({ email });
+  const handleLogout = () => {
+    localStorage.removeItem("email");
+    setLoggedIn(false);
+    setIsPro(false);
+    setEmail("");
+  };
 
-    if (!user) {
-      user = await User.create({ email, isPro: false });
-      console.log("🆕 New user created:", email);
-    }
+  /* ================= 🔥 CHECK PRO FROM DB ================= */
+  const checkProStatus = async (userEmail) => {
+    const res = await fetch(`${API}/api/me?email=${userEmail}`);
+    const data = await res.json();
+    setIsPro(data.isPro);
+  };
 
-    res.json({
-      success: true,
-      email: user.email,
-      isPro: user.isPro,
-    });
-  } catch (err) {
-    console.log("LOGIN ERROR:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+  /* ================= LOAD USER ================= */
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("email");
 
-/* ================= CHECKOUT (FIXED) ================= */
-app.post("/api/checkout", async (req, res) => {
-  try {
-    let { email } = req.body || {};
+    if (!savedEmail) return;
 
-    if (!email) {
-      email = "guest@kbetz.com";
-      console.log("⚠️ No email sent — using fallback");
-    }
+    setEmail(savedEmail);
+    setLoggedIn(true);
 
-    /* 🔥 HARD FAIL CHECKS */
-    if (!process.env.STRIPE_SECRET_KEY) {
-      console.log("❌ STRIPE KEY MISSING");
-      return res.json({ error: "Stripe not configured" });
-    }
+    checkProStatus(savedEmail);
+  }, []);
 
-    if (!process.env.STRIPE_PRICE_ID) {
-      console.log("❌ PRICE ID MISSING");
-      return res.json({ error: "Missing price ID" });
-    }
+  /* ================= 🔥 PAYMENT SUCCESS ================= */
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const emailFromUrl = url.searchParams.get("email");
 
-    if (
-      !process.env.CLIENT_URL ||
-      !process.env.CLIENT_URL.startsWith("http")
-    ) {
-      console.log("❌ BAD CLIENT_URL:", process.env.CLIENT_URL);
-      return res.json({
-        error: "CLIENT_URL must start with https://",
+    if (emailFromUrl) {
+      fetch(`${API}/api/upgrade-success`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailFromUrl }),
+      }).then(async () => {
+        localStorage.setItem("email", emailFromUrl);
+        setLoggedIn(true);
+
+        // 🔥 THIS IS THE REAL FIX
+        await checkProStatus(emailFromUrl);
+
+        alert("🔥 PRO Activated!");
+
+        window.history.replaceState({}, "", "/dashboard");
       });
     }
+  }, []);
 
-    /* 🔥 SAFE STRIPE INIT (FIX) */
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  /* ================= DATA ================= */
+  useEffect(() => {
+    const fetchData = async () => {
+      const res = await fetch(`${API}/api/data`);
+      const data = await res.json();
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "subscription",
-      customer_email: email,
+      if (!data || !Array.isArray(data.games)) return;
 
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
+      setGames(data.games);
 
-      success_url: `${process.env.CLIENT_URL}/dashboard`,
-      cancel_url: `${process.env.CLIENT_URL}/dashboard`,
-    });
+      const picks = data.games
+        .map((g) => ({
+          game: `${g.away} @ ${g.home}`,
+          edge: g.edgeScore || 0,
+          odds: g.homeOdds || "-110",
+        }))
+        .sort((a, b) => b.edge - a.edge)
+        .slice(0, 3);
 
-    console.log("✅ Stripe session created:", session.id);
+      setAiPicks(picks);
+    };
 
-    res.json({ url: session.url });
-  } catch (err) {
-    console.log("❌ CHECKOUT ERROR:", err.message);
-    res.json({ error: err.message });
-  }
-});
+    fetchData();
+  }, []);
 
-/* ================= STRIPE WEBHOOK ================= */
-app.post("/api/stripe/webhook", async (req, res) => {
-  let stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  const sig = req.headers["stripe-signature"];
+  const addToParlay = (pick) => {
+    setParlay((prev) => [...prev, pick]);
+  };
 
-  let event;
+  /* ================= UI ================= */
+  return (
+    <div style={styles.page}>
+      <div style={styles.header}>
+        <h1 style={styles.logo}>KBETZ TERMINAL</h1>
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.log("❌ Webhook signature failed");
-    return res.sendStatus(400);
-  }
+        <div>
+          <span style={styles.live}>● LIVE</span>
+          <span style={styles.badge}>
+            {isPro ? "PRO" : "FREE"}
+          </span>
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const email = session.customer_email;
+          {!isPro && loggedIn && (
+            <button
+              style={styles.upgrade}
+              onClick={async () => {
+                const res = await fetch(`${API}/api/checkout`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ email }),
+                });
 
-    const user = await User.findOne({ email });
-    if (user) {
-      user.isPro = true;
-      await user.save();
-      console.log("✅ PRO unlocked:", email);
-    }
-  }
+                const data = await res.json();
+                if (data.url) window.location.href = data.url;
+              }}
+            >
+              Upgrade
+            </button>
+          )}
 
-  res.sendStatus(200);
-});
+          {loggedIn && (
+            <button style={styles.btn} onClick={handleLogout}>
+              Logout
+            </button>
+          )}
+        </div>
+      </div>
 
-/* ================= DATA ENGINE ================= */
-const cache = {};
-const CACHE_TIME = 30000;
+      {/* LOGIN */}
+      {!loggedIn && (
+        <div style={styles.card}>
+          <h2>Login / Signup</h2>
+          <input
+            placeholder="Enter email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={styles.input}
+          />
+          <button style={styles.smallBtn} onClick={handleLogin}>
+            Enter
+          </button>
+        </div>
+      )}
 
-app.get("/api/data", async (req, res) => {
-  try {
-    const sport = req.query.sport || "basketball_nba";
+      {/* AI PICKS */}
+      <div style={styles.card}>
+        <h2>🧠 AI PICKS</h2>
 
-    if (cache[sport] && Date.now() - cache[sport].time < CACHE_TIME) {
-      return res.json(cache[sport].data);
-    }
+        {!isPro && <p style={{ color: "red" }}>🔒 PRO ONLY</p>}
 
-    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${process.env.ODDS_API_KEY}&regions=us&markets=h2h`;
+        {isPro &&
+          aiPicks.map((p, i) => (
+            <div key={i} style={styles.row}>
+              <span>{p.game}</span>
+              <span style={{ color: "#00ffcc" }}>
+                EV: {p.edge}
+              </span>
+              <button
+                style={styles.smallBtn}
+                onClick={() => addToParlay(p)}
+              >
+                Add
+              </button>
+            </div>
+          ))}
+      </div>
 
-    const response = await fetch(url);
-    const data = await response.json();
+      {/* MARKETS */}
+      <div style={styles.card}>
+        <h2>Markets</h2>
+        {games.map((g, i) => (
+          <div key={i} style={styles.row}>
+            <span>{g.away} @ {g.home}</span>
+            <span style={{ color: "#00ffcc" }}>
+              {g.homeOdds}
+            </span>
+          </div>
+        ))}
+      </div>
 
-    if (!Array.isArray(data)) {
-      return res.json({ source: "fallback", games: [] });
-    }
+      {/* PARLAY */}
+      <div style={styles.card}>
+        <h2>🔥 AI PARLAY BUILDER</h2>
 
-    const games = [];
+        {parlay.map((p, i) => (
+          <div key={i}>{p.game}</div>
+        ))}
 
-    for (const g of data.slice(0, 20)) {
-      const books = (g.bookmakers || [])
-        .slice(0, 2)
-        .map((b) => {
-          const h2h = b.markets?.find((m) => m.key === "h2h");
+        <div style={{ marginTop: "15px" }}>
+          <strong>$100.00</strong>
+          <br />
+          Parlay: {parlay.length} legs
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          return {
-            name: b.title,
-            home: h2h?.outcomes?.find((o) => o.name === g.home_team)?.price,
-            away: h2h?.outcomes?.find((o) => o.name === g.away_team)?.price,
-          };
-        })
-        .filter((b) => b.home && b.away);
-
-      if (!books.length) continue;
-
-      const homeOdds = books[0].home;
-
-      await OddsHistory.create({ gameId: g.id, odds: homeOdds });
-
-      games.push({
-        id: g.id,
-        home: g.home_team,
-        away: g.away_team,
-        homeOdds,
-      });
-    }
-
-    const result = { source: "real", games };
-    cache[sport] = { data: result, time: Date.now() };
-
-    res.json(result);
-  } catch {
-    res.json({ source: "fallback", games: [] });
-  }
-});
-
-/* ================= START ================= */
-app.listen(PORT, () => {
-  console.log(`🔥 KBETZ API running on port ${PORT}`);
-});
+/* ================= STYLES ================= */
+const styles = {
+  page: {
+    background:
+      "radial-gradient(circle at 80% 0%, #003c3c, #000 40%, #1a0033 100%)",
+    color: "white",
+    minHeight: "100vh",
+    padding: "20px",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: "20px",
+  },
+  logo: {
+    fontSize: "28px",
+    background: "linear-gradient(90deg,#7f00ff,#00ffff)",
+    WebkitBackgroundClip: "text",
+    color: "transparent",
+  },
+  card: {
+    background: "rgba(10, 0, 25, 0.9)",
+    borderRadius: "14px",
+    padding: "20px",
+    marginBottom: "20px",
+  },
+  row: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: "10px",
+  },
+  input: {
+    padding: "8px",
+    marginRight: "10px",
+    background: "#111",
+    color: "#fff",
+  },
+  btn: { marginLeft: "10px" },
+  smallBtn: { marginLeft: "10px" },
+  live: { color: "#00ffcc", marginRight: "10px" },
+  badge: { background: "#222", padding: "4px 8px" },
+  upgrade: { background: "#00ffcc", color: "#000" },
+};

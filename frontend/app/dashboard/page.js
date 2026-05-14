@@ -3,23 +3,94 @@
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  const API = "https://kbetz-main.onrender.com"; // 🔥 FORCE CORRECT BACKEND
+  const API = process.env.NEXT_PUBLIC_API_URL || "";
 
   const [games, setGames] = useState([]);
   const [aiPicks, setAiPicks] = useState([]);
   const [parlay, setParlay] = useState([]);
   const [isPro, setIsPro] = useState(false);
+  const [email, setEmail] = useState("");
 
+  /* ================= LOGIN / SIGNUP ================= */
+  const handleLogin = async () => {
+    if (!email) return alert("Enter email");
+
+    const res = await fetch(`${API}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      localStorage.setItem("email", email);
+      setIsPro(data.isPro);
+      alert("Logged in");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("email");
+    setIsPro(false);
+    setEmail("");
+    alert("Logged out");
+  };
+
+  /* ================= LOAD USER ================= */
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("email");
+
+    if (!savedEmail) return;
+
+    setEmail(savedEmail);
+
+    fetch(`${API}/api/me?email=${savedEmail}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setIsPro(data.isPro);
+      });
+  }, []);
+
+  /* ================= 🔥 PAYMENT SUCCESS FIX ================= */
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const success = url.searchParams.get("success");
+
+    if (success) {
+      const email = localStorage.getItem("email");
+
+      if (!email) {
+        alert("No email found — login again");
+        return;
+      }
+
+      fetch(`${API}/api/upgrade-success`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      })
+        .then(() => {
+          alert("🔥 PRO Activated!");
+          setIsPro(true);
+          window.history.replaceState({}, "", "/dashboard");
+        })
+        .catch(() => {
+          alert("Upgrade failed");
+        });
+    }
+  }, []);
+
+  /* ================= DATA ================= */
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await fetch(`${API}/api/data`);
         const data = await res.json();
 
-        if (!data || !Array.isArray(data.games)) {
-          console.warn("Bad API response", data);
-          return;
-        }
+        if (!data || !Array.isArray(data.games)) return;
 
         setGames(data.games);
 
@@ -28,15 +99,12 @@ export default function Dashboard() {
             game: `${g.away} @ ${g.home}`,
             edge: g.edgeScore || 0,
             odds: g.homeOdds || "-110",
-            winProb: Math.min(95, Math.max(50, 50 + (g.edgeScore || 0) * 5)),
           }))
           .sort((a, b) => b.edge - a.edge)
           .slice(0, 3);
 
         setAiPicks(picks);
-      } catch (err) {
-        console.error("Fetch crash:", err);
-      }
+      } catch {}
     };
 
     fetchData();
@@ -46,36 +114,7 @@ export default function Dashboard() {
     setParlay((prev) => [...prev, pick]);
   };
 
-  // 🔥 FIXED STRIPE CONNECTION
-  const handleUpgrade = async () => {
-    try {
-      const res = await fetch(`${API}/api/checkout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: localStorage.getItem("email") || "test@kbetz.com",
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(data.error || "Stripe failed");
-      }
-    } catch (err) {
-      alert("Upgrade failed");
-    }
-  };
-
-  const hedge =
-    parlay.length >= 2
-      ? "Hedge last leg to lock profit"
-      : "Build parlay to unlock hedge";
-
+  /* ================= UI ================= */
   return (
     <div style={styles.page}>
       <div style={styles.header}>
@@ -83,30 +122,72 @@ export default function Dashboard() {
 
         <div>
           <span style={styles.live}>● LIVE</span>
-          <span style={styles.badge}>{isPro ? "PRO" : "FREE"}</span>
+          <span style={styles.badge}>
+            {isPro ? "PRO" : "FREE"}
+          </span>
 
           {!isPro && (
-            <button style={styles.upgrade} onClick={handleUpgrade}>
+            <button
+              style={styles.upgrade}
+              onClick={async () => {
+                const email = localStorage.getItem("email");
+
+                if (!email) return alert("Login first");
+
+                const res = await fetch(`${API}/api/checkout`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ email }),
+                });
+
+                const data = await res.json();
+
+                if (data.url) {
+                  window.location.href = data.url;
+                }
+              }}
+            >
               Upgrade
             </button>
           )}
 
-          <button style={styles.btn}>Logout</button>
+          <button style={styles.btn} onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </div>
 
+      {/* LOGIN BOX */}
+      {!localStorage.getItem("email") && (
+        <div style={styles.card}>
+          <h2>Login / Signup</h2>
+          <input
+            placeholder="Enter email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={styles.input}
+          />
+          <button onClick={handleLogin} style={styles.smallBtn}>
+            Enter
+          </button>
+        </div>
+      )}
+
+      {/* AI PICKS */}
       <div style={styles.card}>
         <h2>🧠 AI PICKS</h2>
 
-        <div style={!isPro ? styles.blur : {}}>
-          {aiPicks.map((p, i) => (
+        {!isPro && <p style={{ color: "red" }}>🔒 PRO ONLY</p>}
+
+        {isPro &&
+          aiPicks.map((p, i) => (
             <div key={i} style={styles.row}>
               <span>{p.game}</span>
-
               <span style={{ color: "#00ffcc" }}>
-                EV: {p.edge} | {p.winProb}% WIN
+                EV: {p.edge}
               </span>
-
               <button
                 style={styles.smallBtn}
                 onClick={() => addToParlay(p)}
@@ -115,25 +196,24 @@ export default function Dashboard() {
               </button>
             </div>
           ))}
-        </div>
-
-        {!isPro && <div style={styles.lock}>🔒 PRO ONLY</div>}
       </div>
 
+      {/* MARKETS */}
       <div style={styles.card}>
         <h2>Markets</h2>
-
         {games.map((g, i) => (
           <div key={i} style={styles.row}>
-            <span>{g.away} @ {g.home}</span>
-
+            <span>
+              {g.away} @ {g.home}
+            </span>
             <span style={{ color: "#00ffcc" }}>
-              {g.homeOdds || "-110"}
+              {g.homeOdds}
             </span>
           </div>
         ))}
       </div>
 
+      {/* PARLAY */}
       <div style={styles.card}>
         <h2>🔥 AI PARLAY BUILDER</h2>
 
@@ -147,16 +227,11 @@ export default function Dashboard() {
           Parlay: {parlay.length} legs
         </div>
       </div>
-
-      <div style={styles.card}>
-        <h2>🛡 Hedge Insight</h2>
-        <p>{hedge}</p>
-      </div>
     </div>
   );
 }
 
-/* SAME STYLES (UNCHANGED) */
+/* ================= STYLES ================= */
 const styles = {
   page: {
     background:
@@ -172,14 +247,12 @@ const styles = {
   },
   logo: {
     fontSize: "28px",
-    fontWeight: "bold",
     background: "linear-gradient(90deg,#7f00ff,#00ffff)",
     WebkitBackgroundClip: "text",
     color: "transparent",
   },
   card: {
-    background: "rgba(10,0,25,0.9)",
-    backdropFilter: "blur(10px)",
+    background: "rgba(10, 0, 25, 0.9)",
     borderRadius: "14px",
     padding: "20px",
     marginBottom: "20px",
@@ -189,11 +262,31 @@ const styles = {
     justifyContent: "space-between",
     marginTop: "10px",
   },
-  btn: { marginLeft: "10px", padding: "6px 12px" },
-  smallBtn: { marginLeft: "10px", background: "#00ffcc", padding: "5px" },
-  live: { color: "#00ffcc", marginRight: "10px" },
-  badge: { background: "#222", padding: "4px 8px" },
-  upgrade: { background: "#00ffcc", padding: "5px 10px" },
-  blur: { filter: "blur(6px)", pointerEvents: "none" },
-  lock: { marginTop: "10px", color: "red" },
+  btn: {
+    marginLeft: "10px",
+  },
+  smallBtn: {
+    marginLeft: "10px",
+  },
+  live: {
+    color: "#00ffcc",
+    marginRight: "10px",
+  },
+  badge: {
+    background: "#222",
+    padding: "4px 8px",
+    marginRight: "8px",
+  },
+  upgrade: {
+    background: "#00ffcc",
+    color: "#000",
+    marginRight: "10px",
+  },
+  input: {
+    padding: "8px",
+    marginRight: "10px",
+    background: "#111",
+    color: "#fff",
+    border: "1px solid #333",
+  },
 };
