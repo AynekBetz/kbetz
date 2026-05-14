@@ -14,16 +14,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div
-      style={{
-        background: "#000",
-        color: "#fff",
-        height: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
+    <div style={{ color: "white", background: "#000", height: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
       Loading KBETZ...
     </div>
   );
