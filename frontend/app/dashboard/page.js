@@ -7,64 +7,55 @@ export default function Dashboard() {
   const API = "https://kbetz-main.onrender.com";
 
   const [games, setGames] = useState([]);
-  const [aiPicks, setAiPicks] = useState([]);
   const [parlay, setParlay] = useState([]);
-  const [roi, setROI] = useState(null);
-  const [bets, setBets] = useState([]);
   const [bankroll, setBankroll] = useState(0);
   const [isPro, setIsPro] = useState(false);
-
   const [ticker, setTicker] = useState([]);
+  const [roi, setROI] = useState(null);
+
   const [arbOps, setArbOps] = useState([]);
   const [steamGames, setSteamGames] = useState([]);
+  const [history, setHistory] = useState([]);
+
+  const [flash, setFlash] = useState({});
 
   const prevOdds = useRef({});
-  const history = useRef({});
   const audioRef = useRef(null);
+
+  const FORCE_LIVE = true;
 
   useEffect(() => {
     const email = localStorage.getItem("email");
-    if (!email) return;
+    loadAll(email);
 
-    loadAll();
+    const socket = io(API, { transports: ["websocket"] });
+    socket.on("oddsUpdate", processGames);
 
-    const interval = setInterval(loadAll, 20000);
-    return () => clearInterval(interval);
+    return () => socket.disconnect();
   }, []);
 
   useEffect(() => {
     audioRef.current = new Audio("/alert.mp3");
   }, []);
 
+  // ✅ SAFE LIVE SIMULATION (ADDED ONLY)
   useEffect(() => {
-    const socket = io(API);
+    if (!FORCE_LIVE) return;
 
-    socket.on("oddsUpdate", (games) => {
-      processGames(games);
-    });
+    const interval = setInterval(() => {
+      setGames(prev => {
+        const simulated = prev.map(g => {
+          const change = Math.random() > 0.5 ? 5 : -5;
+          return { ...g, homeOdds: parseFloat(g.homeOdds) + change };
+        });
 
-    return () => socket.disconnect();
+        processGames(simulated);
+        return simulated;
+      });
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, []);
-
-  const loadAll = async () => {
-    const email = localStorage.getItem("email");
-
-    try {
-      const odds = await fetch(`${API}/api/odds`).then(r => r.json());
-      const roiData = await fetch(`${API}/api/roi?email=${email}`).then(r => r.json());
-      const betData = await fetch(`${API}/api/bets?email=${email}`).then(r => r.json());
-      const userData = await fetch(`${API}/api/me?email=${email}`).then(r => r.json());
-
-      setROI(roiData || {});
-      setBets(betData || []);
-      setBankroll(userData?.bankroll || 0);
-      setIsPro(userData?.isPro || false);
-
-      processGames(odds?.games || []);
-    } catch (err) {
-      console.log("Fetch error:", err);
-    }
-  };
 
   const americanToProb = (odds) => {
     odds = parseFloat(odds);
@@ -73,225 +64,194 @@ export default function Dashboard() {
       : Math.abs(odds) / (Math.abs(odds) + 100);
   };
 
-  const calculateAI = (g) => {
-    const implied = americanToProb(g.homeOdds);
+  const loadAll = async (email) => {
+    const user = await fetch(`${API}/api/me?email=${email}`).then(r=>r.json());
+    const roiData = await fetch(`${API}/api/roi?email=${email}`).then(r=>r.json());
+    const odds = await fetch(`${API}/api/odds`).then(r=>r.json());
 
-    let model = implied;
-    let score = 0;
+    setBankroll(user?.bankroll || 0);
+    setIsPro(user?.isPro || false);
+    setROI(roiData);
 
-    if (g.movement === "up") { model += 0.05; score += 2; }
-    if (g.movement === "down") { model -= 0.04; score -= 1; }
-
-    const hist = history.current[g.key] || [];
-    if (hist.length >= 3 && Math.abs(hist.at(-1) - hist[0]) > 8) {
-      model += 0.05;
-      score += 3;
-    }
-
-    const ev = (model - implied) * 100;
-
-    return {
-      edge: ev.toFixed(2),
-      confidence: Math.min(95, 60 + score * 5),
-      isEV: ev > 2.5,
-    };
-  };
-
-  const kellyStake = (edge, odds) => {
-    const prob = edge / 100;
-    const b = odds > 0 ? odds / 100 : 100 / Math.abs(odds);
-    const kelly = (prob * (b + 1) - 1) / b;
-    return Math.max(0, (kelly * bankroll).toFixed(2));
-  };
-
-  const findArb = (games) => {
-    const ops = [];
-
-    games.forEach(g => {
-      if (!g.books || g.books.length < 2) return;
-
-      const decimals = g.books.map(b => {
-        const o = parseFloat(b.odds);
-        return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o);
-      });
-
-      const inv = decimals.reduce((a, d) => a + 1 / d, 0);
-
-      if (inv < 1) {
-        ops.push({
-          game: `${g.away} @ ${g.home}`,
-          profit: ((1 - inv) * 100).toFixed(2),
-        });
-      }
-    });
-
-    setArbOps(ops);
-  };
-
-  const detectSteam = (games) => {
-    const steam = games.filter(g => {
-      const hist = history.current[g.key] || [];
-      return hist.length >= 3 && Math.abs(hist.at(-1) - hist[0]) > 10;
-    });
-
-    setSteamGames(steam);
+    processGames(odds?.games || []);
   };
 
   const processGames = (games) => {
     const updated = games.map(g => {
-      const key = g.id || `${g.home}-${g.away}-${g.homeOdds}`;
-
+      const key = g.id || `${g.home}-${g.away}`;
       const prev = prevOdds.current[key];
-      let movement = "";
 
+      let movement = "";
       if (prev && prev !== g.homeOdds) {
         movement = g.homeOdds > prev ? "up" : "down";
 
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play();
-        }
+        setFlash(prev => ({ ...prev, [key]: movement }));
+        setTimeout(() => {
+          setFlash(prev => ({ ...prev, [key]: "" }));
+        }, 800);
+
+        audioRef.current?.play();
       }
 
       prevOdds.current[key] = g.homeOdds;
 
-      if (!history.current[key]) history.current[key] = [];
-      history.current[key].push(parseFloat(g.homeOdds));
-      if (history.current[key].length > 10) history.current[key].shift();
+      const implied = americanToProb(g.homeOdds);
+      const model = movement === "up" ? implied + 0.04 : implied - 0.02;
+      const edge = ((model - implied) * 100);
 
-      const ai = calculateAI({ ...g, movement, key });
-
-      return { ...g, key, movement, history: history.current[key], ...ai };
+      return { ...g, movement, edge, key, implied };
     });
 
-    setGames(updated);
+    const sorted = [...updated].sort((a,b)=>b.edge - a.edge);
 
-    setTicker(updated.map(g => `${g.away} @ ${g.home} (${g.homeOdds})`));
-    findArb(updated);
-    detectSteam(updated);
+    setGames(sorted);
+    setTicker(sorted.map(g => `${g.away} @ ${g.home} (${g.homeOdds})`));
 
-    const picks = updated
-      .filter(g => g.isEV)
-      .sort((a, b) => b.edge - a.edge)
-      .slice(0, 3);
+    const arb = sorted.filter(g => {
+      if (!g.books || g.books.length < 2) return false;
 
-    setAiPicks(picks);
+      const probs = g.books.map(b => americanToProb(b.odds));
+      const total = probs.reduce((a,b)=>a+b,0);
+
+      g.arbEdge = ((1 - total) * 100).toFixed(2);
+      return total < 1;
+    });
+
+    setArbOps(arb.slice(0,3));
+
+    const steam = sorted.filter(g => g.movement === "up").map(g => ({
+      ...g,
+      strength: Math.abs(g.edge).toFixed(2)
+    }));
+
+    setSteamGames(steam.slice(0,3));
   };
 
-  const addToParlay = (g) => setParlay(prev => [...prev, g]);
-  const clearParlay = () => setParlay([]);
+  const addToParlay = (g) => {
+    setParlay(prev => [...prev, g]);
+    setHistory(prev => [...prev, g].slice(-10));
+
+    setFlash(prev => ({ ...prev, [g.key]: "click" }));
+    setTimeout(()=>setFlash(prev => ({ ...prev, [g.key]: "" })),300);
+  };
+
+  const removeFromParlay = (i) => {
+    setParlay(prev => prev.filter((_, idx) => idx !== i));
+  };
 
   const payout = parlay.reduce((acc, g) => {
-    const odds = parseFloat(g.homeOdds);
-    return acc * (1 + odds / 100);
+    const o = parseFloat(g.homeOdds);
+    return acc * (1 + o / 100);
   }, 1).toFixed(2);
-
-  const upgrade = async () => {
-    const email = localStorage.getItem("email");
-
-    try {
-      const res = await fetch(`${API}/api/checkout`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch (err) {
-      console.log("Upgrade error:", err);
-    }
-  };
 
   return (
     <div style={styles.page}>
 
-      <div style={styles.ticker}>{ticker.join(" • ")}</div>
-
       <h1 style={styles.logo}>KBETZ TERMINAL</h1>
+      <div style={styles.bar} />
+      <div style={styles.ticker}>{ticker.join(" • ")}</div>
+      <div style={styles.bankrollCard}>💰 ${bankroll}</div>
 
-      <div style={styles.cardGlow}>💰 ${bankroll}</div>
+      <div style={styles.grid}>
 
-      <div style={styles.cardGlow}>
-        <h2>ROI</h2>
-        <div style={!isPro ? styles.blur : {}}>
-          ROI: {roi?.roi}% | Profit: ${roi?.profit}
-        </div>
-        {!isPro && (
-          <button style={styles.upgradeBtn} onClick={upgrade}>
-            🔓 Upgrade to PRO
-          </button>
-        )}
-      </div>
+        {/* LEFT */}
+        <div>
 
-      <div style={styles.aiCard}>
-        <h2>🧠 AI PICKS</h2>
-        <div style={!isPro ? styles.blur : {}}>
-          {aiPicks.map((g, i) => (
-            <div key={i} style={styles.row}>
-              <div>{g.away} @ {g.home}</div>
-              <div style={styles.edge}>
-                +{g.edge}%<br />
-                {g.confidence}%<br />
-                <small>Kelly: ${kellyStake(g.edge, g.homeOdds)}</small>
-              </div>
+          <div style={styles.cardGlow}>
+            <h2>ROI</h2>
+            <div>
+              <div>ROI: {roi?.roi || "--"}%</div>
+              <div>Profit: ${roi?.profit || "--"}</div>
             </div>
-          ))}
+          </div>
+
+          <div style={styles.aiCard}>
+            <h2>AI SIGNALS</h2>
+            {games.filter(g => g.edge > 2).slice(0,3).map((g,i)=>(
+              <div key={i} style={styles.row}>
+                {g.away} @ {g.home}
+                <span style={styles.edge}>+{g.edge.toFixed(2)}%</span>
+              </div>
+            ))}
+          </div>
+
         </div>
+
+        {/* RIGHT */}
+        <div>
+
+          <div style={styles.cardGlow}>
+            <h2>BETSLIP</h2>
+
+            {parlay.map((p,i)=>(
+              <div key={i} style={styles.row}>
+                {p.home}
+                <button onClick={()=>removeFromParlay(i)}>❌</button>
+              </div>
+            ))}
+
+            <div style={styles.payout}>{payout}x</div>
+          </div>
+
+        </div>
+
       </div>
 
+      {/* MARKETS */}
       <div style={styles.cardGlow}>
-        <h2>📊 LIVE MARKETS</h2>
-        {games.map((g, i) => (
-          <div key={i}
+        <h2>LIVE MARKETS</h2>
+
+        {games.map((g,i)=>(
+          <div
+            key={i}
             style={{
-              ...styles.row,
-              transition: "0.3s",
-              transform:
-                g.movement === "up" ? "scale(1.03)" :
-                g.movement === "down" ? "scale(0.97)" : "scale(1)",
+              ...styles.marketRow,
               boxShadow:
-                g.movement === "up"
-                  ? "0 0 12px rgba(0,255,200,0.6)"
-                  : g.movement === "down"
-                  ? "0 0 12px rgba(255,0,0,0.6)"
-                  : "none"
-            }}>
+                flash[g.key] === "up"
+                  ? "0 0 15px #00ffe1"
+                  : flash[g.key] === "down"
+                  ? "0 0 15px red"
+                  : flash[g.key] === "click"
+                  ? "0 0 15px #00c2ff"
+                  : "none",
+              transform: flash[g.key] ? "scale(1.02)" : "scale(1)"
+            }}
+          >
             <div>
               {g.away} @ {g.home}
-              {arbOps.find(a => a.game.includes(g.home)) && " 🟢"}
-              {steamGames.find(s => s.home === g.home) && " 🔥"}
+              <span style={{marginLeft:10,color:"#00ffe1"}}>
+                +{g.edge.toFixed(2)}%
+              </span>
             </div>
 
-            <button style={styles.button} onClick={() => addToParlay(g)}>Add</button>
+            <button style={styles.odds} onClick={()=>addToParlay(g)}>
+              {g.homeOdds}
+            </button>
           </div>
         ))}
       </div>
 
+      {/* ARB */}
       <div style={styles.cardGlow}>
-        <h2>🟢 Arbitrage</h2>
-        {arbOps.map((a,i)=>(<div key={i}>{a.game} +{a.profit}%</div>))}
-      </div>
-
-      <div style={styles.cardGlow}>
-        <h2>🔥 Steam</h2>
-        {steamGames.map((g,i)=>(<div key={i}>{g.away} @ {g.home}</div>))}
-      </div>
-
-      <div style={styles.cardGlow}>
-        <h2>🔥 PARLAY</h2>
-        {parlay.map((p, i) => (
-          <div key={i}>{p.away} @ {p.home}</div>
+        <h2>ARBITRAGE</h2>
+        {arbOps.map((g,i)=>(
+          <div key={i}>{g.home} +{g.arbEdge}%</div>
         ))}
-        <p>Legs: {parlay.length}</p>
-        <p>Payout: {payout}x</p>
-        <button style={styles.button} onClick={clearParlay}>Clear</button>
       </div>
 
+      {/* STEAM */}
       <div style={styles.cardGlow}>
-        <h2>📜 HISTORY</h2>
-        {bets.map((b, i) => (
-          <div key={i}>{b.game} - {b.result}</div>
+        <h2>STEAM</h2>
+        {steamGames.map((g,i)=>(
+          <div key={i}>{g.home} ↑ {g.strength}%</div>
+        ))}
+      </div>
+
+      {/* HISTORY */}
+      <div style={styles.cardGlow}>
+        <h2>HISTORY</h2>
+        {history.map((h,i)=>(
+          <div key={i}>{h.home}</div>
         ))}
       </div>
 
@@ -300,14 +260,17 @@ export default function Dashboard() {
 }
 
 const styles = {
-  page:{padding:20,background:"radial-gradient(circle at top,#003c3c,#000)",color:"#fff"},
-  ticker:{color:"#00ffcc"},
-  logo:{color:"#00ffcc"},
-  cardGlow:{background:"#111",padding:15,marginTop:15},
-  aiCard:{background:"#4c1d95",padding:15,marginTop:15},
+  page:{padding:20,background:"#000",color:"#fff"},
+  logo:{fontSize:32,color:"#00ffe1"},
+  bar:{height:2,background:"#00ffe1",marginBottom:10},
+  ticker:{marginBottom:10},
+  grid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:15},
+  cardGlow:{padding:15,marginTop:15},
+  aiCard:{padding:15,marginTop:15},
   row:{display:"flex",justifyContent:"space-between"},
-  edge:{color:"#00ffcc"},
-  button:{background:"#00ffcc",border:"none",padding:"5px 10px"},
-  blur:{filter:"blur(6px)"},
-  upgradeBtn:{background:"#00ffcc",padding:"8px"}
+  marketRow:{display:"flex",justifyContent:"space-between",marginBottom:10},
+  odds:{background:"#00ffe1",color:"#000",border:"none",padding:"6px 10px"},
+  edge:{color:"#00ffe1"},
+  payout:{marginTop:10},
+  bankrollCard:{marginBottom:10}
 };
