@@ -1,27 +1,48 @@
 export const dynamic = "force-dynamic";
 
-import Stripe from "stripe";
+const BACKEND_URL = "https://kbetz-main.onrender.com";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      mode: "subscription",
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-      success_url: "https://kbetz-frontend.vercel.app/dashboard",
-      cancel_url: "https://kbetz-frontend.vercel.app/dashboard",
+    const body = await req.json();
+
+    const response = await fetch(`${BACKEND_URL}/api/checkout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
     });
 
-    return Response.json({ url: session.url });
-  } catch (err) {
-    console.log(err);
-    return Response.json({ error: "Stripe failed" });
+    const data = await response.json();
+
+    return Response.json(data, {
+      status: response.status,
+    });
+  } catch (error) {
+    console.error("KBETZ frontend checkout proxy error:", error);
+
+    return Response.json(
+      {
+        error: "Checkout connection failed",
+      },
+      {
+        status: 500,
+      }
+    );
   }
+}
+
+export async function GET() {
+  return Response.json(
+    {
+      ok: true,
+      route: "KBETZ checkout proxy",
+      backend: BACKEND_URL,
+    },
+    {
+      status: 200,
+    }
+  );
 }
