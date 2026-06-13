@@ -327,7 +327,7 @@ export default function Dashboard() {
     const email = getStoredEmail();
 
     try {
-      const res = await fetch(`${API}/api/checkout`, {
+      const res = await fetch(`/api/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
