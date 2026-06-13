@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [hovered, setHovered] = useState(null);
   const [lineHistory, setLineHistory] = useState({});
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   const prevOdds = useRef({});
   const audioRef = useRef(null);
@@ -35,6 +36,10 @@ export default function Dashboard() {
     SOUND: true,
     FLASH: true,
   };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fallbackGames = [
     {
@@ -227,7 +232,8 @@ export default function Dashboard() {
 
         if (FLAGS.SOUND) {
           try {
-            audioRef.current?.play();
+            const playPromise = audioRef.current?.play();
+            if (playPromise?.catch) playPromise.catch(() => {});
           } catch {}
         }
       }
@@ -344,6 +350,27 @@ export default function Dashboard() {
   const profitValue = roi?.profit ?? (isPro ? "4529.10" : "--");
   const winsValue = roi?.wins ?? (isPro ? "128" : "--");
   const winRateValue = roi?.winRate ?? (isPro ? "68.8" : "--");
+
+  if (!mounted) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.glowTop}></div>
+        <header style={styles.header}>
+          <div style={styles.logoLeft}>
+            KBETZ <span style={styles.logoTerminal}>TERMINAL</span>
+          </div>
+          <div style={styles.logoRight}>KBETZ</div>
+        </header>
+        <section style={styles.bankrollPanel}>
+          <div style={styles.iconBox}>⚡</div>
+          <div>
+            <div style={styles.smallLabel}>LOADING KBETZ</div>
+            <div style={styles.bigNumber}>SIGNATURE TERMINAL</div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
