@@ -32,7 +32,7 @@ export default function Dashboard() {
   const FLAGS = { SOUND:true, FLASH:true };
 
   useEffect(() => {
-    const email = localStorage.getItem("email");
+    const email = (typeof window !== "undefined" ? localStorage.getItem("email") : "");
     loadAll(email);
 
     const socket = io(API, { transports:["websocket"] });
@@ -145,7 +145,7 @@ export default function Dashboard() {
   },1).toFixed(2);
 
   const upgrade=async()=>{
-    const email=localStorage.getItem("email");
+    const email=(typeof window !== "undefined" ? localStorage.getItem("email") : "");
     const res=await fetch(`${API}/api/checkout`,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
