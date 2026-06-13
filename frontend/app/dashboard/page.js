@@ -177,21 +177,22 @@ export default function Dashboard() {
 
   const trackLineHistory = (incomingGames) => {
     setLineHistory((prev) => {
-      const updated = { ...prev };
+      const updated = {};
+
+      Object.keys(prev || {}).forEach((key) => {
+        updated[key] = Array.isArray(prev[key]) ? [...prev[key]] : [];
+      });
 
       normalizeGames(incomingGames).forEach((g) => {
         const key = g.id || `${g.home}-${g.away}`;
+        const existing = Array.isArray(updated[key]) ? [...updated[key]] : [];
 
-        if (!updated[key]) updated[key] = [];
-
-        const last = updated[key][updated[key].length - 1]?.value;
+        const last = existing[existing.length - 1]?.value;
         const base = Number(g.homeOdds || -110);
         const drift = Math.floor(Math.random() * 9) - 4;
         const nextValue = Number.isFinite(last) ? last + drift : base;
 
-        updated[key].push({ value: nextValue });
-
-        if (updated[key].length > 30) updated[key].shift();
+        updated[key] = [...existing, { value: nextValue }].slice(-30);
       });
 
       return updated;
