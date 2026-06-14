@@ -1,74 +1,56 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function AuthPage() {
-  const API = "https://kbetz-main.onrender.com";
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLogin, setIsLogin] = useState(false);
+export default function AuthRedirectPage() {
+  const router = useRouter();
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem("email");
-    if (savedEmail) {
-      window.location.href = "/dashboard";
-    }
-  }, []);
-
-  const handleSubmit = async () => {
-    if (!email || !password) {
-      return alert("Enter email & password");
-    }
-
-    const endpoint = isLogin ? "/api/login" : "/api/signup";
-
-    const res = await fetch(`${API}${endpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      localStorage.setItem("email", email);
-      window.location.href = "/dashboard";
-    } else {
-      alert(data.error || "Auth failed");
-    }
-  };
+    router.replace("/login");
+  }, [router]);
 
   return (
-    <div style={{ height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#000", color: "#fff" }}>
-      <div style={{ padding: 30, background: "#111", borderRadius: 10 }}>
-        <h1>KBETZ</h1>
-
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ display: "block", marginBottom: 10, padding: 10 }}
-        />
-
-        <input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ display: "block", marginBottom: 10, padding: 10 }}
-        />
-
-        <button onClick={handleSubmit} style={{ padding: 10 }}>
-          {isLogin ? "Log In" : "Create Account"}
-        </button>
-
-        <p onClick={() => setIsLogin(!isLogin)} style={{ cursor: "pointer" }}>
-          {isLogin ? "Sign up" : "Log in"}
+    <main
+      style={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(circle at 18% 20%, rgba(0,255,214,.18), transparent 30%), radial-gradient(circle at 86% 18%, rgba(210,45,255,.24), transparent 30%), linear-gradient(135deg, #020707, #041313 42%, #090212)",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "Inter, system-ui, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          padding: 28,
+          borderRadius: 20,
+          border: "1px solid rgba(0,255,214,.45)",
+          background:
+            "linear-gradient(145deg, rgba(3,19,22,.95), rgba(12,3,24,.93))",
+          boxShadow: "0 0 38px rgba(0,255,214,.18)",
+          textAlign: "center",
+        }}
+      >
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 42,
+            fontWeight: 1000,
+            letterSpacing: 2,
+            background: "linear-gradient(90deg, #00ffd6, #63eaff, #d72dff)",
+            WebkitBackgroundClip: "text",
+            color: "transparent",
+          }}
+        >
+          KBETZ
+        </h1>
+        <p style={{ color: "rgba(255,255,255,.72)", fontWeight: 900 }}>
+          Opening Signature Login...
         </p>
       </div>
-    </div>
+    </main>
   );
 }
