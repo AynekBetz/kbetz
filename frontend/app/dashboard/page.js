@@ -147,7 +147,7 @@ export default function Dashboard() {
     const wrap = document.createElement("div");
     wrap.id = "kbetz-session-control";
     wrap.style.position = "fixed";
-    wrap.style.top = "14px";
+    wrap.style.top = "70px";
     wrap.style.right = "16px";
     wrap.style.zIndex = "999999";
     wrap.style.display = "flex";
