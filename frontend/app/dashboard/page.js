@@ -4,6 +4,7 @@
 // Purple + Teal Blend • KBETZ on both sides • Upgrade to PRO • Full app functions
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 
