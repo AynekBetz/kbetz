@@ -43,6 +43,194 @@ export default function Dashboard() {
 
   const [flash, setFlash] = useState({});
   const [hovered, setHovered] = useState(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const existing = document.getElementById("kbetz-session-control");
+    if (existing) existing.remove();
+
+    const token = localStorage.getItem("token");
+    const email = localStorage.getItem("email");
+
+    const wrap = document.createElement("div");
+    wrap.id = "kbetz-session-control";
+    wrap.style.position = "fixed";
+    wrap.style.top = "14px";
+    wrap.style.right = "16px";
+    wrap.style.zIndex = "999999";
+    wrap.style.display = "flex";
+    wrap.style.alignItems = "center";
+    wrap.style.gap = "8px";
+    wrap.style.padding = "8px 10px";
+    wrap.style.borderRadius = "14px";
+    wrap.style.border = "1px solid rgba(0,255,214,.55)";
+    wrap.style.background = "linear-gradient(135deg, rgba(2,12,14,.94), rgba(18,4,30,.94))";
+    wrap.style.boxShadow = "0 0 22px rgba(0,255,214,.22), 0 0 18px rgba(210,45,255,.14)";
+    wrap.style.backdropFilter = "blur(12px)";
+
+    if (token || email) {
+      const label = document.createElement("span");
+      label.textContent = email || "Logged in";
+      label.style.color = "#00ffd6";
+      label.style.fontWeight = "900";
+      label.style.fontSize = "11px";
+      label.style.maxWidth = "140px";
+      label.style.overflow = "hidden";
+      label.style.textOverflow = "ellipsis";
+      label.style.whiteSpace = "nowrap";
+
+      const logout = document.createElement("button");
+      logout.textContent = "Logout";
+      logout.style.border = "1px solid rgba(210,45,255,.7)";
+      logout.style.background = "rgba(210,45,255,.14)";
+      logout.style.color = "#f2b7ff";
+      logout.style.borderRadius = "10px";
+      logout.style.padding = "8px 12px";
+      logout.style.fontWeight = "1000";
+      logout.style.cursor = "pointer";
+      logout.style.fontSize = "12px";
+
+      logout.onclick = () => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("email");
+        localStorage.removeItem("plan");
+        window.location.href = "/login";
+      };
+
+      wrap.appendChild(label);
+      wrap.appendChild(logout);
+    } else {
+      const login = document.createElement("button");
+      login.textContent = "Login";
+      login.style.border = "1px solid rgba(0,255,214,.65)";
+      login.style.background = "rgba(0,255,214,.12)";
+      login.style.color = "#00ffd6";
+      login.style.borderRadius = "10px";
+      login.style.padding = "8px 12px";
+      login.style.fontWeight = "1000";
+      login.style.cursor = "pointer";
+      login.style.fontSize = "12px";
+      login.onclick = () => {
+        window.location.href = "/login";
+      };
+
+      const signup = document.createElement("button");
+      signup.textContent = "Signup";
+      signup.style.border = "1px solid rgba(210,45,255,.7)";
+      signup.style.background = "rgba(210,45,255,.14)";
+      signup.style.color = "#f2b7ff";
+      signup.style.borderRadius = "10px";
+      signup.style.padding = "8px 12px";
+      signup.style.fontWeight = "1000";
+      signup.style.cursor = "pointer";
+      signup.style.fontSize = "12px";
+      signup.onclick = () => {
+        window.location.href = "/signup";
+      };
+
+      wrap.appendChild(login);
+      wrap.appendChild(signup);
+    }
+
+    document.body.appendChild(wrap);
+
+    return () => {
+      const node = document.getElementById("kbetz-session-control");
+      if (node) node.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handler = (event) => {
+      const target = event.target;
+      if (!target) return;
+
+      const button = target.closest ? target.closest("button") : null;
+      if (!button) return;
+
+      const text = (button.textContent || "").trim().toLowerCase();
+
+      if (text.includes("upgrade")) return;
+
+      if (text.includes("deposit")) {
+        event.preventDefault();
+        alert("KBETZ Deposit wallet is coming next. PRO checkout is already active.");
+        return;
+      }
+
+      if (text.includes("view pick")) {
+        event.preventDefault();
+        alert("KBETZ AI Pick details are coming next. This pick is already being shown on the dashboard.");
+        return;
+      }
+
+      if (text.includes("view history")) {
+        event.preventDefault();
+        alert("KBETZ bet history database is coming next. This panel is showing your current demo history.");
+        return;
+      }
+
+      if (text.includes("clear parlay")) {
+        event.preventDefault();
+        setParlay([]);
+        return;
+      }
+
+      if (text.includes("add to parlay")) {
+        event.preventDefault();
+
+        const cardText =
+          button.closest("tr")?.textContent ||
+          button.closest("div")?.parentElement?.textContent ||
+          "";
+
+        let selectedGame =
+          games.find((g) => {
+            const home = String(g.home || "").toLowerCase();
+            const away = String(g.away || "").toLowerCase();
+            const hay = String(cardText || "").toLowerCase();
+            return home && away && hay.includes(home) && hay.includes(away);
+          }) || games[0];
+
+        if (!selectedGame) {
+          alert("No live game is available to add yet.");
+          return;
+        }
+
+        const leg = {
+          id:
+            selectedGame.id ||
+            `${selectedGame.away || "Away"}-${selectedGame.home || "Home"}-${Date.now()}`,
+          game: `${selectedGame.away || "Away"} @ ${selectedGame.home || "Home"}`,
+          pick:
+            selectedGame.bestLine ||
+            selectedGame.recommended ||
+            selectedGame.home ||
+            selectedGame.away ||
+            "Best Line",
+          odds: selectedGame.homeOdds || selectedGame.awayOdds || -110,
+        };
+
+        setParlay((prev) => {
+          const exists = prev.some((item) => item.id === leg.id);
+          if (exists) return prev;
+          return [...prev, leg];
+        });
+
+        return;
+      }
+    };
+
+    document.addEventListener("click", handler, true);
+
+    return () => {
+      document.removeEventListener("click", handler, true);
+    };
+  }, [games]);
+
   const [lineHistory, setLineHistory] = useState({});
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
