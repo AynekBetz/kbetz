@@ -47,6 +47,102 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const existing = document.getElementById("kbetz-public-launch-mobile-fit");
+    if (existing) existing.remove();
+
+    const style = document.createElement("style");
+    style.id = "kbetz-public-launch-mobile-fit";
+    style.innerHTML = `
+      html,
+      body {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        background: #020707 !important;
+      }
+
+      * {
+        box-sizing: border-box !important;
+      }
+
+      button,
+      a {
+        touch-action: manipulation !important;
+      }
+
+      @media (max-width: 768px) {
+        main {
+          width: 100% !important;
+          max-width: 100vw !important;
+          overflow-x: hidden !important;
+          padding-left: 10px !important;
+          padding-right: 10px !important;
+        }
+
+        header,
+        footer,
+        section,
+        main > div {
+          max-width: calc(100vw - 20px) !important;
+        }
+
+        section {
+          overflow: hidden !important;
+        }
+
+        table {
+          width: 100% !important;
+          max-width: 100% !important;
+          display: block !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
+        button {
+          min-height: 42px !important;
+        }
+
+        #kbetz-session-control {
+          top: auto !important;
+          bottom: 12px !important;
+          right: 10px !important;
+          max-width: calc(100vw - 20px) !important;
+          transform: scale(0.9) !important;
+          transform-origin: bottom right !important;
+        }
+      }
+
+      @media (max-width: 480px) {
+        main {
+          padding-left: 8px !important;
+          padding-right: 8px !important;
+        }
+
+        header,
+        footer,
+        section,
+        main > div {
+          max-width: calc(100vw - 16px) !important;
+        }
+
+        #kbetz-session-control {
+          transform: scale(0.86) !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      const node = document.getElementById("kbetz-public-launch-mobile-fit");
+      if (node) node.remove();
+    };
+  }, []);
+
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const existing = document.getElementById("kbetz-mobile-fit");
     if (existing) existing.remove();
 
