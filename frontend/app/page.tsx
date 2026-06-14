@@ -13,7 +13,7 @@ export default function HomePage() {
     if (token) {
       router.replace("/dashboard");
     } else {
-      router.replace("/login");
+      router.replace("/signup");
     }
   }, [router]);
 
@@ -55,7 +55,7 @@ export default function HomePage() {
           KBETZ
         </h1>
         <p style={{ color: "rgba(255,255,255,.72)", fontWeight: 900 }}>
-          Opening Terminal...
+          Opening Signature Terminal...
         </p>
       </div>
     </main>
