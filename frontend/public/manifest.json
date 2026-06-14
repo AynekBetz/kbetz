@@ -1,0 +1,19 @@
+{
+  "name": "KBETZ Terminal",
+  "short_name": "KBETZ",
+  "description": "AI sports betting analytics terminal with live odds, picks, parlays, arbitrage, steam alerts, and PRO tools.",
+  "start_url": "/signup",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020707",
+  "theme_color": "#00ffd6",
+  "icons": [
+    {
+      "src": "/kbetz-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import PWARegister from "./pwa-register";
 export const metadata = {
 title: "KBETZ",
 description: "Elite Betting Terminal",
@@ -14,6 +15,6 @@ color: "white",
 fontFamily: "Inter, sans-serif",
 }}
 >
-{children} </body> </html>
+<PWARegister />{children} </body> </html>
 );
 }
