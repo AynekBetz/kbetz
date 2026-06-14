@@ -10,6 +10,23 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 export const dynamic = "force-dynamic";
 
 export default function Dashboard() {
+  const router = useRouter();
+  const [authEmail, setAuthEmail] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAuthEmail(localStorage.getItem("email") || "");
+    }
+  }, []);
+
+  const handleKBETZLogout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("token");
+      localStorage.removeItem("email");
+    }
+    router.push("/login");
+  };
+
   const API = "https://kbetz-main.onrender.com";
 
   const [games, setGames] = useState([]);

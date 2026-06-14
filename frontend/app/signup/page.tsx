@@ -5,42 +5,13 @@ import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const getToken = (data: any) => {
-    return (
-      data?.token ||
-      data?.accessToken ||
-      data?.jwt ||
-      data?.session?.token ||
-      data?.user?.token ||
-      ""
-    );
-  };
-
-  const loginAfterSignup = async () => {
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        password,
-      }),
-    });
-
-    const data = await res.json();
-    return {
-      ok: res.ok,
-      data,
-      token: getToken(data),
-    };
-  };
+  const getToken = (data: any) =>
+    data?.token || data?.accessToken || data?.jwt || data?.user?.token || "";
 
   const handleSignup = async () => {
     setMessage("");
@@ -60,9 +31,7 @@ export default function SignupPage() {
 
       const signupRes = await fetch("/api/signup", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           password,
@@ -78,18 +47,23 @@ export default function SignupPage() {
       }
 
       if (!token) {
-        const loginResult = await loginAfterSignup();
+        const loginRes = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            password,
+          }),
+        });
 
-        if (!loginResult.ok) {
-          setMessage(
-            loginResult.data?.error ||
-              loginResult.data?.message ||
-              "Signup worked, but login failed."
-          );
+        const loginData = await loginRes.json();
+
+        if (!loginRes.ok) {
+          setMessage(loginData?.error || loginData?.message || "Signup worked, but login failed.");
           return;
         }
 
-        token = loginResult.token;
+        token = getToken(loginData);
       }
 
       if (!token) {
@@ -101,7 +75,7 @@ export default function SignupPage() {
       localStorage.setItem("email", email.trim().toLowerCase());
 
       router.push("/dashboard");
-    } catch (err) {
+    } catch {
       setMessage("Connection failed. Try again in a moment.");
     } finally {
       setLoading(false);
@@ -110,23 +84,17 @@ export default function SignupPage() {
 
   return (
     <main style={styles.page}>
-      <div style={styles.glowOne}></div>
-      <div style={styles.glowTwo}></div>
+      <div style={styles.glowA}></div>
+      <div style={styles.glowB}></div>
 
       <section style={styles.card}>
-        <div style={styles.liveBadge}>
-          <span style={styles.liveDot}></span> LIVE
-        </div>
+        <div style={styles.live}>● LIVE</div>
 
-        <div style={styles.logoRow}>
-          <div>
-            <h1 style={styles.logo}>KBETZ</h1>
-            <p style={styles.subLogo}>AI BETTING TERMINAL</p>
-          </div>
-        </div>
+        <h1 style={styles.logo}>KBETZ</h1>
+        <p style={styles.kicker}>AI BETTING TERMINAL</p>
 
         <h2 style={styles.title}>Create Account</h2>
-        <p style={styles.subtitle}>Join KBETZ and open the betting terminal.</p>
+        <p style={styles.subtitle}>Open your KBETZ dashboard and start tracking AI edges.</p>
 
         <input
           style={styles.input}
@@ -152,21 +120,14 @@ export default function SignupPage() {
         {message ? <p style={styles.message}>{message}</p> : null}
 
         <button
-          style={{
-            ...styles.button,
-            opacity: loading ? 0.7 : 1,
-            cursor: loading ? "wait" : "pointer",
-          }}
+          style={{ ...styles.button, opacity: loading ? 0.7 : 1 }}
           onClick={handleSignup}
           disabled={loading}
         >
           {loading ? "Creating Account..." : "Create Account"}
         </button>
 
-        <button
-          style={styles.secondaryButton}
-          onClick={() => router.push("/login")}
-        >
+        <button style={styles.secondary} onClick={() => router.push("/login")}>
           Already have an account? Login
         </button>
       </section>
@@ -178,99 +139,82 @@ const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at 18% 20%, rgba(0,255,214,.18), transparent 28%), radial-gradient(circle at 84% 18%, rgba(209,45,255,.24), transparent 28%), linear-gradient(135deg, #020707 0%, #041313 42%, #090212 100%)",
+      "radial-gradient(circle at 18% 20%, rgba(0,255,214,.18), transparent 30%), radial-gradient(circle at 86% 18%, rgba(210,45,255,.24), transparent 30%), linear-gradient(135deg, #020707, #041313 42%, #090212)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: 22,
-    fontFamily:
-      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
-    color: "#ffffff",
-    overflow: "hidden",
+    color: "#fff",
+    fontFamily: "Inter, system-ui, sans-serif",
     position: "relative",
+    overflow: "hidden",
   },
-  glowOne: {
-    position: "absolute",
-    width: 380,
-    height: 380,
-    borderRadius: 999,
-    background: "rgba(0,255,214,.15)",
-    filter: "blur(80px)",
-    left: -120,
-    top: 60,
-  },
-  glowTwo: {
+  glowA: {
     position: "absolute",
     width: 420,
     height: 420,
     borderRadius: 999,
+    background: "rgba(0,255,214,.15)",
+    filter: "blur(90px)",
+    left: -130,
+    top: 60,
+  },
+  glowB: {
+    position: "absolute",
+    width: 440,
+    height: 440,
+    borderRadius: 999,
     background: "rgba(210,45,255,.16)",
     filter: "blur(90px)",
-    right: -100,
-    top: -80,
+    right: -120,
+    top: -90,
   },
   card: {
     width: "100%",
-    maxWidth: 470,
+    maxWidth: 480,
+    padding: "44px 34px",
+    borderRadius: 24,
     border: "1px solid rgba(0,255,214,.45)",
-    borderRadius: 22,
-    padding: "42px 34px",
-    background:
-      "linear-gradient(145deg, rgba(3,19,22,.94), rgba(9,4,20,.92))",
-    boxShadow:
-      "0 0 38px rgba(0,255,214,.17), inset 0 0 28px rgba(202,45,255,.08)",
+    background: "linear-gradient(145deg, rgba(3,19,22,.95), rgba(12,3,24,.93))",
+    boxShadow: "0 0 38px rgba(0,255,214,.18), inset 0 0 32px rgba(210,45,255,.08)",
     position: "relative",
     zIndex: 2,
   },
-  liveBadge: {
+  live: {
     position: "absolute",
     right: 22,
     top: 18,
-    color: "#00ffd6",
-    fontWeight: 900,
+    color: "#00ff88",
+    fontWeight: 1000,
     fontSize: 13,
-    textShadow: "0 0 12px rgba(0,255,214,.7)",
-  },
-  liveDot: {
-    display: "inline-block",
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-    background: "#00ff88",
-    marginRight: 6,
-    boxShadow: "0 0 12px rgba(0,255,136,.9)",
-  },
-  logoRow: {
-    display: "flex",
-    justifyContent: "center",
-    textAlign: "center",
-    marginBottom: 22,
+    textShadow: "0 0 12px rgba(0,255,136,.8)",
   },
   logo: {
     margin: 0,
-    fontSize: 42,
+    textAlign: "center",
+    fontSize: 44,
     letterSpacing: 2,
     fontWeight: 1000,
-    background: "linear-gradient(90deg, #00ffd6, #5ee7ff, #d72dff)",
+    background: "linear-gradient(90deg, #00ffd6, #63eaff, #d72dff)",
     WebkitBackgroundClip: "text",
     color: "transparent",
-    textShadow: "0 0 22px rgba(0,255,214,.3)",
   },
-  subLogo: {
-    margin: "6px 0 0",
-    color: "rgba(255,255,255,.74)",
-    fontSize: 13,
-    fontWeight: 800,
+  kicker: {
+    textAlign: "center",
+    color: "rgba(255,255,255,.72)",
+    fontWeight: 900,
     letterSpacing: 3,
+    fontSize: 12,
+    margin: "6px 0 28px",
   },
   title: {
     margin: "0 0 8px",
     textAlign: "center",
-    fontSize: 26,
+    fontSize: 27,
     fontWeight: 1000,
   },
   subtitle: {
-    margin: "0 0 26px",
+    margin: "0 0 25px",
     textAlign: "center",
     color: "rgba(255,255,255,.72)",
     fontSize: 14,
@@ -280,40 +224,40 @@ const styles: Record<string, React.CSSProperties> = {
     boxSizing: "border-box",
     marginBottom: 14,
     padding: "16px 18px",
-    borderRadius: 12,
-    border: "1px solid rgba(0,255,214,.32)",
+    borderRadius: 13,
+    border: "1px solid rgba(0,255,214,.35)",
     background: "rgba(255,255,255,.92)",
-    color: "#071018",
-    outline: "none",
+    color: "#061011",
     fontWeight: 800,
     fontSize: 15,
+    outline: "none",
   },
   message: {
     color: "#ff4d6d",
     textAlign: "center",
     fontWeight: 900,
     fontSize: 13,
-    margin: "4px 0 14px",
   },
   button: {
     width: "100%",
     border: "1px solid rgba(0,255,214,.75)",
-    borderRadius: 12,
+    borderRadius: 13,
     padding: "16px 18px",
     background: "linear-gradient(90deg, #00ffd6, #00ff88)",
     color: "#00100f",
     fontWeight: 1000,
     fontSize: 15,
+    cursor: "pointer",
     boxShadow: "0 0 24px rgba(0,255,214,.3)",
   },
-  secondaryButton: {
+  secondary: {
     width: "100%",
-    border: "1px solid rgba(209,45,255,.55)",
-    borderRadius: 12,
-    padding: "14px 18px",
     marginTop: 12,
-    background: "rgba(209,45,255,.08)",
-    color: "#f0b8ff",
+    border: "1px solid rgba(210,45,255,.58)",
+    borderRadius: 13,
+    padding: "14px 18px",
+    background: "rgba(210,45,255,.09)",
+    color: "#f2b7ff",
     fontWeight: 1000,
     cursor: "pointer",
   },
