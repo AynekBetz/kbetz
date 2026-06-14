@@ -369,13 +369,16 @@ export default function Dashboard() {
   const winsValue = roi?.wins ?? (isPro ? "128" : "--");
   const winRateValue = roi?.winRate ?? (isPro ? "68.8" : "--");
 
-  if (!mounted) {
-    const handleDeposit = () => {
+  const handleDeposit = () => {
     alert("Deposit wallet is coming next. For now, use Upgrade to PRO for checkout.");
   };
 
   const handleViewPick = (pick) => {
-    const label = typeof pick === "string" ? pick : pick?.team || pick?.pick || pick?.name || "AI Pick";
+    const label =
+      typeof pick === "string"
+        ? pick
+        : pick?.team || pick?.pick || pick?.name || "AI Pick";
+
     alert(`KBETZ AI Pick: ${label}`);
   };
 
@@ -387,21 +390,7 @@ export default function Dashboard() {
     setParlay([]);
   };
 
-  const handleAddGameToParlay = (game) => {
-    const leg = {
-      id: game?.id || `${game?.home || "Home"}-${game?.away || "Away"}-${Date.now()}`,
-      game: `${game?.away || "Away"} @ ${game?.home || "Home"}`,
-      pick: game?.bestLine || game?.home || game?.away || "Best Line",
-      odds: game?.homeOdds || game?.awayOdds || -110,
-    };
-
-    setParlay((prev) => {
-      const exists = prev.some((item) => item.id === leg.id);
-      if (exists) return prev;
-      return [...prev, leg];
-    });
-  };
-
+  if (!mounted) {
   return (
       <div style={styles.page}>
         <div style={styles.glowTop}></div>
