@@ -370,7 +370,39 @@ export default function Dashboard() {
   const winRateValue = roi?.winRate ?? (isPro ? "68.8" : "--");
 
   if (!mounted) {
-    return (
+    const handleDeposit = () => {
+    alert("Deposit wallet is coming next. For now, use Upgrade to PRO for checkout.");
+  };
+
+  const handleViewPick = (pick) => {
+    const label = typeof pick === "string" ? pick : pick?.team || pick?.pick || pick?.name || "AI Pick";
+    alert(`KBETZ AI Pick: ${label}`);
+  };
+
+  const handleViewHistory = () => {
+    alert("Bet history is active. Saved bet tracking is coming next.");
+  };
+
+  const handleClearParlayClick = () => {
+    setParlay([]);
+  };
+
+  const handleAddGameToParlay = (game) => {
+    const leg = {
+      id: game?.id || `${game?.home || "Home"}-${game?.away || "Away"}-${Date.now()}`,
+      game: `${game?.away || "Away"} @ ${game?.home || "Home"}`,
+      pick: game?.bestLine || game?.home || game?.away || "Best Line",
+      odds: game?.homeOdds || game?.awayOdds || -110,
+    };
+
+    setParlay((prev) => {
+      const exists = prev.some((item) => item.id === leg.id);
+      if (exists) return prev;
+      return [...prev, leg];
+    });
+  };
+
+  return (
       <div style={styles.page}>
         <div style={styles.glowTop}></div>
         <header style={styles.header}>
@@ -414,7 +446,7 @@ export default function Dashboard() {
           <div style={styles.greenMoney}>+$1,356.30</div>
         </div>
 
-        <button style={styles.depositBtn}>💳 Deposit</button>
+        <button style={styles.depositBtn} onClick={handleDeposit}>💳 Deposit</button>
       </section>
 
       <section style={styles.roiPanel}>
@@ -612,7 +644,7 @@ export default function Dashboard() {
           <em>+18.47u</em>
         </div>
 
-        <button style={styles.historyBtn}>View History</button>
+        <button style={styles.historyBtn} onClick={handleViewHistory}>View History</button>
 
         <div style={styles.rightBadgePurple}>{history.length} BETS</div>
       </section>
