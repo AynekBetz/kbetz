@@ -496,7 +496,7 @@ export default function Dashboard() {
                   {g.home} {formatOdds(g.homeOdds)}
                 </span>
                 <span style={styles.confidence}>EDGE {g.edge.toFixed(1)}%</span>
-                <button style={styles.smallViewBtn} onClick={() => addToParlay(g)}>
+                <button style={styles.smallViewBtn} onClick={() => handleViewPick(g)}>
                   View Pick
                 </button>
               </div>
