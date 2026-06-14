@@ -47,6 +47,97 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const existing = document.getElementById("kbetz-mobile-fit");
+    if (existing) existing.remove();
+
+    const style = document.createElement("style");
+    style.id = "kbetz-mobile-fit";
+    style.innerHTML = `
+      html,
+      body {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        background: #020707 !important;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      button {
+        touch-action: manipulation;
+      }
+
+      @media (max-width: 768px) {
+        main {
+          width: 100% !important;
+          max-width: 100vw !important;
+          overflow-x: hidden !important;
+          padding-left: 10px !important;
+          padding-right: 10px !important;
+        }
+
+        main > section,
+        main > div,
+        header,
+        footer {
+          max-width: calc(100vw - 20px) !important;
+        }
+
+        section {
+          overflow: hidden !important;
+        }
+
+        table,
+        [role="table"] {
+          max-width: 100% !important;
+          overflow-x: auto !important;
+          display: block !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
+        #kbetz-session-control {
+          top: auto !important;
+          right: 10px !important;
+          bottom: 12px !important;
+          max-width: calc(100vw - 20px) !important;
+          transform: scale(0.88) !important;
+          transform-origin: bottom right !important;
+        }
+      }
+
+      @media (max-width: 480px) {
+        main {
+          padding-left: 8px !important;
+          padding-right: 8px !important;
+        }
+
+        main > section,
+        main > div,
+        header,
+        footer {
+          max-width: calc(100vw - 16px) !important;
+        }
+
+        button {
+          min-height: 42px;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      const node = document.getElementById("kbetz-mobile-fit");
+      if (node) node.remove();
+    };
+  }, []);
+
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const existing = document.getElementById("kbetz-session-control");
     if (existing) existing.remove();
 
@@ -558,7 +649,12 @@ export default function Dashboard() {
   const winRateValue = roi?.winRate ?? (isPro ? "68.8" : "--");
 
   const handleDeposit = () => {
-    alert("Deposit wallet is coming next. For now, use Upgrade to PRO for checkout.");
+    if (isPro) {
+      alert("KBETZ PRO is active. Billing portal management is coming next.");
+      return;
+    }
+
+    upgrade();
   };
 
   const handleViewPick = (pick) => {
@@ -623,7 +719,7 @@ export default function Dashboard() {
           <div style={styles.greenMoney}>+$1,356.30</div>
         </div>
 
-        <button style={styles.depositBtn} onClick={handleDeposit}>💳 Deposit</button>
+        <button style={styles.depositBtn} onClick={handleDeposit}>💎 Billing</button>
       </section>
 
       <section style={styles.roiPanel}>
