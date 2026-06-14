@@ -1,177 +1,280 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-const API = "https://kbetz.onrender.com";
+export default function LoginPage() {
+  const router = useRouter();
 
-export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const handleLogin = async (e: any) => {
-    e.preventDefault();
-    if (loading) return;
+  const getToken = (data: any) => {
+    return (
+      data?.token ||
+      data?.accessToken ||
+      data?.jwt ||
+      data?.session?.token ||
+      data?.user?.token ||
+      ""
+    );
+  };
 
-    setLoading(true);
-    setError("");
+  const handleLogin = async () => {
+    setMessage("");
+
+    if (!email || !password) {
+      setMessage("Enter your email and password.");
+      return;
+    }
 
     try {
-      await fetch(`${API}/api/health`);
+      setLoading(true);
 
-      const res = await fetch(`${API}/api/login`, {
+      const res = await fetch("/api/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
       });
 
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        throw new Error("Server response error");
-      }
+      const data = await res.json();
+      const token = getToken(data);
 
       if (!res.ok) {
-        throw new Error(data?.message || "Login failed");
+        setMessage(data?.error || data?.message || "Login failed.");
+        return;
       }
 
-      if (!data?.token) {
-        throw new Error("No token returned");
+      if (!token) {
+        setMessage("Login connected, but no token returned from backend.");
+        return;
       }
 
-      localStorage.setItem("token", data.token);
-      window.location.href = "/dashboard";
+      localStorage.setItem("token", token);
+      localStorage.setItem("email", email.trim().toLowerCase());
 
-    } catch (err: any) {
-      console.error("LOGIN ERROR:", err);
-      setError(err.message || "Connection failed");
+      router.push("/dashboard");
+    } catch (err) {
+      setMessage("Connection failed. Try again in a moment.");
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.glow}></div>
+    <main style={styles.page}>
+      <div style={styles.glowOne}></div>
+      <div style={styles.glowTwo}></div>
 
-      <div style={styles.card}>
-        <div style={styles.live}>● LIVE</div>
+      <section style={styles.card}>
+        <div style={styles.liveBadge}>
+          <span style={styles.liveDot}></span> LIVE
+        </div>
 
-        <h1 style={styles.title}>KBETZ</h1>
-        <p style={styles.subtitle}>Elite Betting Terminal</p>
+        <div style={styles.logoRow}>
+          <div>
+            <h1 style={styles.logo}>KBETZ</h1>
+            <p style={styles.subLogo}>AI BETTING TERMINAL</p>
+          </div>
+        </div>
 
-        <form onSubmit={handleLogin} style={styles.form}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
-          />
+        <h2 style={styles.title}>Welcome Back</h2>
+        <p style={styles.subtitle}>Log in to access the KBETZ dashboard.</p>
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-          />
+        <input
+          style={styles.input}
+          type="email"
+          placeholder="Email"
+          value={email}
+          autoComplete="email"
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-          {error && <div style={styles.error}>{error}</div>}
+        <input
+          style={styles.input}
+          type="password"
+          placeholder="Password"
+          value={password}
+          autoComplete="current-password"
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleLogin();
+          }}
+        />
 
-          <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? "Entering..." : "Enter Dashboard"}
-          </button>
-        </form>
-      </div>
-    </div>
+        {message ? <p style={styles.message}>{message}</p> : null}
+
+        <button
+          style={{
+            ...styles.button,
+            opacity: loading ? 0.7 : 1,
+            cursor: loading ? "wait" : "pointer",
+          }}
+          onClick={handleLogin}
+          disabled={loading}
+        >
+          {loading ? "Connecting..." : "Enter Dashboard"}
+        </button>
+
+        <button
+          style={styles.secondaryButton}
+          onClick={() => router.push("/signup")}
+        >
+          Create new account
+        </button>
+      </section>
+    </main>
   );
 }
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   page: {
-    height: "100vh",
-    background: "#050505",
+    minHeight: "100vh",
+    background:
+      "radial-gradient(circle at 18% 20%, rgba(0,255,214,.18), transparent 28%), radial-gradient(circle at 84% 18%, rgba(209,45,255,.24), transparent 28%), linear-gradient(135deg, #020707 0%, #041313 42%, #090212 100%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 22,
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    color: "#ffffff",
+    overflow: "hidden",
+    position: "relative",
+  },
+  glowOne: {
+    position: "absolute",
+    width: 380,
+    height: 380,
+    borderRadius: 999,
+    background: "rgba(0,255,214,.15)",
+    filter: "blur(80px)",
+    left: -120,
+    top: 60,
+  },
+  glowTwo: {
+    position: "absolute",
+    width: 420,
+    height: 420,
+    borderRadius: 999,
+    background: "rgba(210,45,255,.16)",
+    filter: "blur(90px)",
+    right: -100,
+    top: -80,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 470,
+    border: "1px solid rgba(0,255,214,.45)",
+    borderRadius: 22,
+    padding: "42px 34px",
+    background:
+      "linear-gradient(145deg, rgba(3,19,22,.94), rgba(9,4,20,.92))",
+    boxShadow:
+      "0 0 38px rgba(0,255,214,.17), inset 0 0 28px rgba(202,45,255,.08)",
+    position: "relative",
+    zIndex: 2,
+  },
+  liveBadge: {
+    position: "absolute",
+    right: 22,
+    top: 18,
+    color: "#00ffd6",
+    fontWeight: 900,
+    fontSize: 13,
+    textShadow: "0 0 12px rgba(0,255,214,.7)",
+  },
+  liveDot: {
+    display: "inline-block",
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    background: "#00ff88",
+    marginRight: 6,
+    boxShadow: "0 0 12px rgba(0,255,136,.9)",
+  },
+  logoRow: {
     display: "flex",
     justifyContent: "center",
-    alignItems: "center",
-    color: "white",
-    position: "relative" as const, // ✅ FIX
-    overflow: "hidden",
-    fontFamily: "Inter, sans-serif",
+    textAlign: "center",
+    marginBottom: 22,
   },
-
-  glow: {
-    position: "absolute" as const, // ✅ FIX
-    width: "700px",
-    height: "700px",
-    background: "radial-gradient(circle, rgba(0,255,150,0.25), transparent)",
-    filter: "blur(140px)",
-    pointerEvents: "none" as const, // ✅ FIX
+  logo: {
+    margin: 0,
+    fontSize: 42,
+    letterSpacing: 2,
+    fontWeight: 1000,
+    background: "linear-gradient(90deg, #00ffd6, #5ee7ff, #d72dff)",
+    WebkitBackgroundClip: "text",
+    color: "transparent",
+    textShadow: "0 0 22px rgba(0,255,214,.3)",
   },
-
-  card: {
-    background: "rgba(255,255,255,0.05)",
-    backdropFilter: "blur(20px)",
-    padding: "40px",
-    borderRadius: "16px",
-    border: "1px solid rgba(255,255,255,0.1)",
-    textAlign: "center" as const,
-    width: "340px",
-    boxShadow: "0 0 50px rgba(0,255,150,0.2)",
-    position: "relative" as const, // ✅ FIX
+  subLogo: {
+    margin: "6px 0 0",
+    color: "rgba(255,255,255,.74)",
+    fontSize: 13,
+    fontWeight: 800,
+    letterSpacing: 3,
   },
-
-  live: {
-    position: "absolute" as const, // ✅ FIX
-    top: "10px",
-    right: "15px",
-    fontSize: "12px",
-    color: "#00ff99",
-    fontWeight: "bold",
-  },
-
   title: {
-    fontSize: "28px",
-    marginBottom: "5px",
-    letterSpacing: "2px",
+    margin: "0 0 8px",
+    textAlign: "center",
+    fontSize: 26,
+    fontWeight: 1000,
   },
-
   subtitle: {
-    fontSize: "12px",
-    opacity: 0.7,
-    marginBottom: "25px",
+    margin: "0 0 26px",
+    textAlign: "center",
+    color: "rgba(255,255,255,.72)",
+    fontSize: 14,
   },
-
-  form: {
-    display: "flex",
-    flexDirection: "column" as const, // ✅ FIX
-    gap: "12px",
-  },
-
   input: {
-    padding: "12px",
-    borderRadius: "8px",
-    border: "1px solid rgba(255,255,255,0.1)",
-    background: "#111",
-    color: "white",
+    width: "100%",
+    boxSizing: "border-box",
+    marginBottom: 14,
+    padding: "16px 18px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,255,214,.32)",
+    background: "rgba(255,255,255,.92)",
+    color: "#071018",
+    outline: "none",
+    fontWeight: 800,
+    fontSize: 15,
   },
-
-  error: {
-    color: "#ff4d4d",
-    fontSize: "12px",
+  message: {
+    color: "#ff4d6d",
+    textAlign: "center",
+    fontWeight: 900,
+    fontSize: 13,
+    margin: "4px 0 14px",
   },
-
   button: {
-    padding: "12px",
-    borderRadius: "8px",
-    border: "none",
-    background: "linear-gradient(90deg, #00ff99, #00cc66)",
-    color: "black",
-    fontWeight: "bold",
+    width: "100%",
+    border: "1px solid rgba(0,255,214,.75)",
+    borderRadius: 12,
+    padding: "16px 18px",
+    background: "linear-gradient(90deg, #00ffd6, #00ff88)",
+    color: "#00100f",
+    fontWeight: 1000,
+    fontSize: 15,
+    boxShadow: "0 0 24px rgba(0,255,214,.3)",
+  },
+  secondaryButton: {
+    width: "100%",
+    border: "1px solid rgba(209,45,255,.55)",
+    borderRadius: 12,
+    padding: "14px 18px",
+    marginTop: 12,
+    background: "rgba(209,45,255,.08)",
+    color: "#f0b8ff",
+    fontWeight: 1000,
     cursor: "pointer",
   },
 };
