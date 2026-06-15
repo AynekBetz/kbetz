@@ -20,24 +20,6 @@ export default function LoginPage() {
       data?.user?.token ||
       ""
     );
-  
-  legalFooter: {
-    marginTop: 22,
-    display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 8,
-    color: "rgba(255,255,255,.58)",
-    fontSize: 12,
-    fontWeight: 800,
-  },
-  legalLink: {
-    color: "#00ffd6",
-    textDecoration: "none",
-  },
-  legalDot: {
-    color: "rgba(255,255,255,.35)",
-  },
 };
 
   const handleLogin = async () => {
@@ -326,5 +308,23 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#f0b8ff",
     fontWeight: 1000,
     cursor: "pointer",
+  },
+
+  legalFooter: {
+    marginTop: 22,
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    color: "rgba(255,255,255,.58)",
+    fontSize: 12,
+    fontWeight: 800,
+  },
+  legalLink: {
+    color: "#00ffd6",
+    textDecoration: "none",
+  },
+  legalDot: {
+    color: "rgba(255,255,255,.35)",
   },
 };
