@@ -1185,6 +1185,16 @@ export default function Dashboard() {
       <footer style={styles.footer}>
         REAL-TIME DATA • AI POWERED • SHARP ADVANTAGE
       </footer>
+      <div style={styles.legalFooter}>
+        <a style={styles.legalLink} href="/terms">Terms</a>
+        <span style={styles.legalDot}>•</span>
+        <a style={styles.legalLink} href="/privacy">Privacy</a>
+        <span style={styles.legalDot}>•</span>
+        <a style={styles.legalLink} href="/responsible-gambling">Responsible Gambling</a>
+        <span style={styles.legalDot}>•</span>
+        <a style={styles.legalLink} href="/support">Support</a>
+      </div>
+
     </div>
   );
 }
