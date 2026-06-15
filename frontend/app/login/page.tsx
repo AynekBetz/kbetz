@@ -20,7 +20,25 @@ export default function LoginPage() {
       data?.user?.token ||
       ""
     );
-  };
+  
+  legalFooter: {
+    marginTop: 22,
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    color: "rgba(255,255,255,.58)",
+    fontSize: 12,
+    fontWeight: 800,
+  },
+  legalLink: {
+    color: "#00ffd6",
+    textDecoration: "none",
+  },
+  legalDot: {
+    color: "rgba(255,255,255,.35)",
+  },
+};
 
   const handleLogin = async () => {
     setMessage("");
@@ -151,6 +169,16 @@ export default function LoginPage() {
         >
           Create new account
         </button>
+
+      <div style={styles.legalFooter}>
+        <a style={styles.legalLink} href="/terms">Terms</a>
+        <span style={styles.legalDot}>•</span>
+        <a style={styles.legalLink} href="/privacy">Privacy</a>
+        <span style={styles.legalDot}>•</span>
+        <a style={styles.legalLink} href="/responsible-gambling">Responsible Gambling</a>
+        <span style={styles.legalDot}>•</span>
+        <a style={styles.legalLink} href="/support">Support</a>
+      </div>
       </section>
     </main>
   );

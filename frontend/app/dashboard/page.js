@@ -1924,4 +1924,22 @@ const styles = {
     padding: 22,
     color: "rgba(255,255,255,0.72)",
   },
+
+  legalFooter: {
+    marginTop: 22,
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    color: "rgba(255,255,255,.58)",
+    fontSize: 12,
+    fontWeight: 800,
+  },
+  legalLink: {
+    color: "#00ffd6",
+    textDecoration: "none",
+  },
+  legalDot: {
+    color: "rgba(255,255,255,.35)",
+  },
 };
