@@ -348,12 +348,6 @@ export default function Dashboard() {
         return;
       }
 
-      if (text.includes("view pick")) {
-        event.preventDefault();
-        alert("KBETZ AI Pick details are coming next. This pick is already being shown on the dashboard.");
-        return;
-      }
-
       if (text.includes("view history")) {
         event.preventDefault();
         alert("KBETZ bet history database is coming next. This panel is showing your current demo history.");
