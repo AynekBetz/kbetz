@@ -432,7 +432,7 @@ async function getCachedOdds() {
     };
   }
 
-  const games = await fetchAllOdds();
+  const games = await fetchOdds();
   const source = games.some((g) => g.source === "live") ? "live" : "fallback";
 
   oddsCache = {
