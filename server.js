@@ -410,26 +410,79 @@ async function fetchOdds() {
 }
 
 /* ================= ODDS ROUTES ================= */
-app.get("/api/odds", async (req, res) => {
-  const games = await fetchOdds();
 
-  res.json({
+/* ================= ODDS CACHE ================= */
+const ODDS_CACHE_MS = Number(process.env.ODDS_CACHE_MS || 90000);
+let oddsCache = null;
+
+async function getCachedOdds() {
+  const now = Date.now();
+
+  if (
+    oddsCache &&
+    Array.isArray(oddsCache.games) &&
+    oddsCache.games.length &&
+    now - oddsCache.updatedAt < ODDS_CACHE_MS
+  ) {
+    return {
+      ...oddsCache,
+      cached: true,
+      cacheAgeSeconds: Math.round((now - oddsCache.updatedAt) / 1000),
+      cacheMs: ODDS_CACHE_MS,
+    };
+  }
+
+  const games = await fetchAllOdds();
+  const source = games.some((g) => g.source === "live") ? "live" : "fallback";
+
+  oddsCache = {
     success: true,
     count: games.length,
-    source: games.some((g) => g.source === "live") ? "live" : "fallback",
+    source,
     games,
-  });
+    updatedAt: now,
+  };
+
+  return {
+    ...oddsCache,
+    cached: false,
+    cacheAgeSeconds: 0,
+    cacheMs: ODDS_CACHE_MS,
+  };
+}
+
+app.get("/api/odds", async (req, res) => {
+  try {
+    const oddsPayload = await getCachedOdds();
+    res.json(oddsPayload);
+  } catch (err) {
+    console.error("❌ /api/odds error:", err.message);
+    res.status(500).json({
+      success: false,
+      source: "error",
+      cached: false,
+      count: 0,
+      games: [],
+      error: "Could not load odds",
+    });
+  }
 });
 
 app.get("/api/data", async (req, res) => {
-  const games = await fetchOdds();
-
-  res.json({
-    success: true,
-    count: games.length,
-    source: games.some((g) => g.source === "live") ? "live" : "fallback",
-    games,
-  });
+  try {
+    const oddsPayload = await getCachedOdds();
+    res.json(oddsPayload);
+  } catch (err) {
+    console.error("❌ /api/data error:", err.message);
+    res.status(500).json({
+      success: false,
+      source: "error",
+      cached: false,
+      count: 0,
+      games: [],
+      error: "Could not load data",
+    });
+  }
 });
 
 /* ================= SOCKET ================= */
