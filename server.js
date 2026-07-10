@@ -108,6 +108,38 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+
+/* ================= PICK LOG MODEL ================= */
+const pickLogSchema = new mongoose.Schema(
+  {
+    pickKey: { type: String, unique: true, index: true },
+    gameId: String,
+    sport: String,
+    league: String,
+    home: String,
+    away: String,
+    recommended: String,
+    bestLine: String,
+    homeOdds: Number,
+    awayOdds: Number,
+    edge: Number,
+    confidence: Number,
+    commenceTime: String,
+    oddsSource: { type: String, default: "live" },
+    modelVersion: { type: String, default: "kbetz-live-odds-v1" },
+    result: { type: String, default: "pending" },
+    status: { type: String, default: "pending" },
+    finalScore: { type: String, default: "" },
+    profit: { type: Number, default: 0 },
+    notes: { type: String, default: "" },
+    postedAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+
+const PickLog =
+  mongoose.models.PickLog || mongoose.model("PickLog", pickLogSchema);
+
 /* ================= AUTH ================= */
 app.post("/api/signup", async (req, res) => {
   try {
@@ -481,6 +513,139 @@ app.get("/api/data", async (req, res) => {
       count: 0,
       games: [],
       error: "Could not load data",
+    });
+  }
+});
+
+
+/* ================= PICK LOG / PUBLIC RECORD ================= */
+function buildPickFromGame(game, oddsPayload) {
+  const recommended =
+    game.recommended || game.bestLine || `${game.home || "Home"} ML`;
+
+  return {
+    pickKey: `${game.id}:${recommended}:${game.commenceTime || ""}`,
+    gameId: game.id,
+    sport: game.sport || game.league || "SPORT",
+    league: game.league || game.sport || "SPORT",
+    home: game.home,
+    away: game.away,
+    recommended,
+    bestLine: game.bestLine || recommended,
+    homeOdds: Number(game.homeOdds || 0),
+    awayOdds: Number(game.awayOdds || 0),
+    edge: Number(game.edge || 0),
+    confidence: Number(game.confidence || 0),
+    commenceTime: game.commenceTime || "",
+    oddsSource: oddsPayload?.source || game.source || "live",
+    modelVersion: "kbetz-live-odds-v1",
+    result: "pending",
+    status: "pending",
+    postedAt: new Date(),
+  };
+}
+
+app.post("/api/picks/snapshot", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 10), 25);
+    const oddsPayload = await getCachedOdds();
+
+    const games = (oddsPayload.games || [])
+      .filter((game) => game && game.source === "live")
+      .sort((a, b) => {
+        const scoreA = Number(a.confidence || 0) + Number(a.edge || 0);
+        const scoreB = Number(b.confidence || 0) + Number(b.edge || 0);
+        return scoreB - scoreA;
+      })
+      .slice(0, limit);
+
+    const pickKeys = [];
+
+    for (const game of games) {
+      const pick = buildPickFromGame(game, oddsPayload);
+      pickKeys.push(pick.pickKey);
+
+      await PickLog.updateOne(
+        { pickKey: pick.pickKey },
+        { $setOnInsert: pick },
+        { upsert: true }
+      );
+    }
+
+    const picks = await PickLog.find({ pickKey: { $in: pickKeys } })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      source: oddsPayload.source,
+      cached: oddsPayload.cached,
+      cacheAgeSeconds: oddsPayload.cacheAgeSeconds,
+      saved: picks.length,
+      picks,
+    });
+  } catch (err) {
+    console.error("❌ /api/picks/snapshot error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: "Could not save pick snapshot",
+    });
+  }
+});
+
+app.get("/api/picks/public", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 50), 100);
+
+    const picks = await PickLog.find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json({
+      success: true,
+      count: picks.length,
+      picks,
+    });
+  } catch (err) {
+    console.error("❌ /api/picks/public error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: "Could not load public picks",
+    });
+  }
+});
+
+app.get("/api/picks/record", async (req, res) => {
+  try {
+    const picks = await PickLog.find({}).lean();
+
+    const wins = picks.filter((p) => p.result === "win").length;
+    const losses = picks.filter((p) => p.result === "loss").length;
+    const pushes = picks.filter((p) => p.result === "push").length;
+    const pending = picks.filter((p) => p.result === "pending").length;
+
+    const graded = wins + losses + pushes;
+    const profit = picks.reduce((sum, p) => sum + Number(p.profit || 0), 0);
+    const roi = graded ? Number(((profit / graded) * 100).toFixed(2)) : 0;
+
+    res.json({
+      success: true,
+      total: picks.length,
+      graded,
+      pending,
+      wins,
+      losses,
+      pushes,
+      profit,
+      roi,
+      modelVersion: "kbetz-live-odds-v1",
+    });
+  } catch (err) {
+    console.error("❌ /api/picks/record error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: "Could not load pick record",
     });
   }
 });
