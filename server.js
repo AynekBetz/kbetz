@@ -26,11 +26,16 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || "";
 
 const SPORTS_TO_FETCH = [
-  { key: "basketball_nba", label: "NBA" },
   { key: "americanfootball_nfl", label: "NFL" },
-  { key: "baseball_mlb", label: "MLB" },
+  { key: "americanfootball_nfl_preseason", label: "NFL Preseason" },
   { key: "americanfootball_ncaaf", label: "NCAAF" },
-  { key: "basketball_ncaab", label: "NCAAB" },
+  { key: "baseball_mlb", label: "MLB" },
+  { key: "basketball_wnba", label: "WNBA" },
+  { key: "basketball_nba_summer_league", label: "NBA Summer League" },
+  { key: "mma_mixed_martial_arts", label: "MMA" },
+  { key: "boxing_boxing", label: "Boxing" },
+  { key: "soccer_usa_mls", label: "MLS" },
+  { key: "soccer_epl", label: "EPL" },
 ];
 
 /* ================= STRIPE ================= */
