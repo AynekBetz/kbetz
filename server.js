@@ -621,6 +621,143 @@ app.get("/api/picks/public", async (req, res) => {
   }
 });
 
+
+function calculatePickProfit(pick, result) {
+  const normalized = String(result || "").toLowerCase();
+
+  if (normalized === "loss") return -1;
+  if (normalized === "push") return 0;
+  if (normalized !== "win") return 0;
+
+  const recommended = String(pick.recommended || pick.bestLine || "");
+  const away = String(pick.away || "");
+  const home = String(pick.home || "");
+
+  let odds = Number(pick.awayOdds || 0);
+
+  if (recommended.includes(home)) {
+    odds = Number(pick.homeOdds || 0);
+  } else if (recommended.includes(away)) {
+    odds = Number(pick.awayOdds || 0);
+  }
+
+  if (!odds) return 0;
+
+  if (odds > 0) {
+    return Number((odds / 100).toFixed(2));
+  }
+
+  return Number((100 / Math.abs(odds)).toFixed(2));
+}
+
+function requireGradeSecret(req, res) {
+  const expected = process.env.PICK_GRADE_SECRET;
+
+  if (!expected) {
+    res.status(500).json({
+      success: false,
+      error: "PICK_GRADE_SECRET is not configured",
+    });
+    return false;
+  }
+
+  const provided =
+    req.headers["x-kbetz-grade-secret"] ||
+    req.headers["authorization"]?.replace("Bearer ", "") ||
+    req.body?.secret;
+
+  if (!provided || provided !== expected) {
+    res.status(401).json({
+      success: false,
+      error: "Unauthorized grading request",
+    });
+    return false;
+  }
+
+  return true;
+}
+
+app.get("/api/picks/pending", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit || 25), 100);
+
+    const picks = await PickLog.find({ result: "pending" })
+      .sort({ commenceTime: 1, createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json({
+      success: true,
+      count: picks.length,
+      picks,
+    });
+  } catch (err) {
+    console.error("❌ /api/picks/pending error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: "Could not load pending picks",
+    });
+  }
+});
+
+app.post("/api/picks/grade", async (req, res) => {
+  try {
+    if (!requireGradeSecret(req, res)) return;
+
+    const { pickKey, id, result, finalScore, notes } = req.body || {};
+    const normalizedResult = String(result || "").toLowerCase();
+
+    if (!["win", "loss", "push", "pending"].includes(normalizedResult)) {
+      return res.status(400).json({
+        success: false,
+        error: "Result must be win, loss, push, or pending",
+      });
+    }
+
+    if (!pickKey && !id) {
+      return res.status(400).json({
+        success: false,
+        error: "pickKey or id is required",
+      });
+    }
+
+    const query = pickKey ? { pickKey } : { _id: id };
+    const pick = await PickLog.findOne(query);
+
+    if (!pick) {
+      return res.status(404).json({
+        success: false,
+        error: "Pick not found",
+      });
+    }
+
+    const profit =
+      normalizedResult === "pending"
+        ? 0
+        : calculatePickProfit(pick, normalizedResult);
+
+    pick.result = normalizedResult;
+    pick.status = normalizedResult;
+    pick.finalScore = finalScore || pick.finalScore || "";
+    pick.notes = notes || pick.notes || "";
+    pick.profit = profit;
+
+    await pick.save();
+
+    res.json({
+      success: true,
+      message: "Pick graded",
+      pick,
+    });
+  } catch (err) {
+    console.error("❌ /api/picks/grade error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: "Could not grade pick",
+    });
+  }
+});
+
 app.get("/api/picks/record", async (req, res) => {
   try {
     const picks = await PickLog.find({}).lean();
