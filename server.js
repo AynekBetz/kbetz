@@ -569,6 +569,61 @@ app.get("/api/sportsdata/status", async (req, res) => {
   }
 });
 
+
+app.get("/api/sportsdata/nfl/scores", async (req, res) => {
+  try {
+    const season = req.query.season || "2026REG";
+    const week = req.query.week || "1";
+
+    const url =
+      `https://api.sportsdata.io/v3/nfl/scores/json/ScoresByWeek/${season}/${week}`;
+
+    const data = await fetchSportsDataIO(url);
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      season,
+      week,
+      count: Array.isArray(data) ? data.length : 0,
+      games: data,
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/scores error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+app.get("/api/sportsdata/nfl/boxscores", async (req, res) => {
+  try {
+    const season = req.query.season || "2026REG";
+    const week = req.query.week || "1";
+
+    const url =
+      `https://api.sportsdata.io/v3/nfl/stats/json/BoxScores/${season}/${week}`;
+
+    const data = await fetchSportsDataIO(url);
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      season,
+      week,
+      count: Array.isArray(data) ? data.length : 0,
+      games: data,
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/boxscores error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
 app.get("/api/sportsdata/nfl/timeframes", async (req, res) => {
   try {
     const url =
