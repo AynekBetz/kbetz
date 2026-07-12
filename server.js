@@ -523,6 +523,73 @@ app.get("/api/data", async (req, res) => {
 });
 
 
+
+/* ================= SPORTSDATAIO TEST ROUTES ================= */
+const SPORTSDATAIO_KEY = process.env.SPORTSDATAIO_KEY || "";
+
+async function fetchSportsDataIO(url) {
+  if (!SPORTSDATAIO_KEY) {
+    throw new Error("SPORTSDATAIO_KEY is not configured");
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      "Ocp-Apim-Subscription-Key": SPORTSDATAIO_KEY,
+    },
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+        data?.Message ||
+        data?.error ||
+        `SportsDataIO request failed with status ${response.status}`
+    );
+  }
+
+  return data;
+}
+
+app.get("/api/sportsdata/status", async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      configured: Boolean(SPORTSDATAIO_KEY),
+      message: SPORTSDATAIO_KEY
+        ? "SportsDataIO key is configured"
+        : "SportsDataIO key is missing",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+app.get("/api/sportsdata/nfl/timeframes", async (req, res) => {
+  try {
+    const url =
+      "https://api.sportsdata.io/v3/nfl/scores/json/Timeframes/current";
+
+    const data = await fetchSportsDataIO(url);
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      data,
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/timeframes error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
 /* ================= PICK LOG / PUBLIC RECORD ================= */
 function buildPickFromGame(game, oddsPayload) {
   const recommended =
