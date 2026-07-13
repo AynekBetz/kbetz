@@ -700,6 +700,101 @@ app.get("/api/sportsdata/nfl/injuries", async (req, res) => {
   }
 });
 
+
+app.get("/api/sportsdata/nfl/teams", async (req, res) => {
+  try {
+    const url = "https://api.sportsdata.io/v3/nfl/scores/json/Teams";
+
+    const data = await fetchSportsDataIO(url);
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      count: Array.isArray(data) ? data.length : 0,
+      teams: data,
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/teams error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+app.get("/api/sportsdata/nfl/roster", async (req, res) => {
+  try {
+    const team = String(req.query.team || "CAR").toUpperCase();
+
+    const url =
+      `https://api.sportsdata.io/v3/nfl/scores/json/Players/${team}`;
+
+    const data = await fetchSportsDataIO(url);
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      team,
+      count: Array.isArray(data) ? data.length : 0,
+      players: data,
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/roster error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+app.get("/api/sportsdata/nfl/player-search", async (req, res) => {
+  try {
+    const q = String(req.query.q || "").toLowerCase().trim();
+    const team = req.query.team
+      ? String(req.query.team).toUpperCase()
+      : "";
+
+    const url = team
+      ? `https://api.sportsdata.io/v3/nfl/scores/json/Players/${team}`
+      : "https://api.sportsdata.io/v3/nfl/scores/json/Players";
+
+    const data = await fetchSportsDataIO(url);
+    const players = Array.isArray(data) ? data : [];
+
+    const filtered = q
+      ? players.filter((p) => {
+          const name = String(
+            p.Name || p.FullName || `${p.FirstName || ""} ${p.LastName || ""}`
+          ).toLowerCase();
+
+          const position = String(p.Position || "").toLowerCase();
+          const playerTeam = String(p.Team || "").toLowerCase();
+
+          return (
+            name.includes(q) ||
+            position.includes(q) ||
+            playerTeam.includes(q)
+          );
+        })
+      : players;
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      team: team || "ALL",
+      query: q,
+      count: filtered.length,
+      players: filtered.slice(0, 100),
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/player-search error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
 app.get("/api/sportsdata/nfl/timeframes", async (req, res) => {
   try {
     const url =
