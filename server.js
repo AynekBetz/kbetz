@@ -880,6 +880,206 @@ app.post("/api/picks/grade", async (req, res) => {
   }
 });
 
+
+/* ================= NFL AUTO GRADING ================= */
+const NFL_TEAM_ABBR = {
+  "Arizona Cardinals": "ARI",
+  "Atlanta Falcons": "ATL",
+  "Baltimore Ravens": "BAL",
+  "Buffalo Bills": "BUF",
+  "Carolina Panthers": "CAR",
+  "Chicago Bears": "CHI",
+  "Cincinnati Bengals": "CIN",
+  "Cleveland Browns": "CLE",
+  "Dallas Cowboys": "DAL",
+  "Denver Broncos": "DEN",
+  "Detroit Lions": "DET",
+  "Green Bay Packers": "GB",
+  "Houston Texans": "HOU",
+  "Indianapolis Colts": "IND",
+  "Jacksonville Jaguars": "JAX",
+  "Kansas City Chiefs": "KC",
+  "Las Vegas Raiders": "LV",
+  "Los Angeles Chargers": "LAC",
+  "Los Angeles Rams": "LAR",
+  "Miami Dolphins": "MIA",
+  "Minnesota Vikings": "MIN",
+  "New England Patriots": "NE",
+  "New Orleans Saints": "NO",
+  "New York Giants": "NYG",
+  "New York Jets": "NYJ",
+  "Philadelphia Eagles": "PHI",
+  "Pittsburgh Steelers": "PIT",
+  "San Francisco 49ers": "SF",
+  "Seattle Seahawks": "SEA",
+  "Tampa Bay Buccaneers": "TB",
+  "Tennessee Titans": "TEN",
+  "Washington Commanders": "WAS"
+};
+
+function nflAbbr(nameOrAbbr) {
+  const value = String(nameOrAbbr || "").trim();
+
+  if (!value) return "";
+  if (value.length <= 4) return value.toUpperCase();
+
+  return NFL_TEAM_ABBR[value] || value.toUpperCase();
+}
+
+function gameMatchKey(away, home) {
+  return [nflAbbr(away), nflAbbr(home)].sort().join("@");
+}
+
+function pickTeamAbbr(pick) {
+  const recommended = String(pick.recommended || pick.bestLine || "");
+  const home = String(pick.home || "");
+  const away = String(pick.away || "");
+
+  if (recommended.includes(home)) return nflAbbr(home);
+  if (recommended.includes(away)) return nflAbbr(away);
+
+  return "";
+}
+
+function scoreIsFinal(score) {
+  if (!score) return false;
+
+  const status = String(score.Status || "").toLowerCase();
+
+  return Boolean(
+    score.IsOver === true ||
+      score.IsClosed === true ||
+      score.Closed === true ||
+      status === "final" ||
+      status === "f" ||
+      status === "closed" ||
+      status === "completed"
+  );
+}
+
+function scoreHasNumbers(score) {
+  return (
+    score &&
+    score.AwayScore !== null &&
+    score.AwayScore !== undefined &&
+    score.HomeScore !== null &&
+    score.HomeScore !== undefined &&
+    !Number.isNaN(Number(score.AwayScore)) &&
+    !Number.isNaN(Number(score.HomeScore))
+  );
+}
+
+app.post("/api/picks/auto-grade-nfl", async (req, res) => {
+  try {
+    if (!requireGradeSecret(req, res)) return;
+
+    const season = req.query.season || req.body?.season || "2026REG";
+    const week = req.query.week || req.body?.week || "1";
+
+    const url =
+      `https://api.sportsdata.io/v3/nfl/scores/json/ScoresByWeek/${season}/${week}`;
+
+    const games = await fetchSportsDataIO(url);
+    const scoreList = Array.isArray(games) ? games : [];
+
+    const scoresByMatch = new Map();
+
+    for (const score of scoreList) {
+      const key = gameMatchKey(score.AwayTeam, score.HomeTeam);
+      if (key && key !== "@") scoresByMatch.set(key, score);
+    }
+
+    const pendingPicks = await PickLog.find({
+      result: "pending",
+      sport: "NFL",
+    });
+
+    const graded = [];
+    const skipped = [];
+
+    for (const pick of pendingPicks) {
+      const key = gameMatchKey(pick.away, pick.home);
+      const score = scoresByMatch.get(key);
+
+      if (!score) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          reason: "No matching SportsDataIO game",
+        });
+        continue;
+      }
+
+      if (!scoreIsFinal(score)) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          reason: "Game is not final",
+          status: score.Status || "unknown",
+          isOver: score.IsOver,
+          isClosed: score.IsClosed,
+        });
+        continue;
+      }
+
+      if (!scoreHasNumbers(score)) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          reason: "Final score missing",
+        });
+        continue;
+      }
+
+      const awayScore = Number(score.AwayScore);
+      const homeScore = Number(score.HomeScore);
+      const awayAbbr = nflAbbr(score.AwayTeam);
+      const homeAbbr = nflAbbr(score.HomeTeam);
+      const selectedTeam = pickTeamAbbr(pick);
+
+      let result = "push";
+
+      if (awayScore !== homeScore) {
+        const winner = awayScore > homeScore ? awayAbbr : homeAbbr;
+        result = selectedTeam === winner ? "win" : "loss";
+      }
+
+      const profit = calculatePickProfit(pick, result);
+
+      pick.result = result;
+      pick.status = result;
+      pick.finalScore = `${score.AwayTeam} ${awayScore} - ${score.HomeTeam} ${homeScore}`;
+      pick.notes = `Auto-graded from SportsDataIO NFL ${season} Week ${week}`;
+      pick.profit = profit;
+
+      await pick.save();
+
+      graded.push({
+        pickKey: pick.pickKey,
+        recommended: pick.recommended,
+        result,
+        profit,
+        finalScore: pick.finalScore,
+      });
+    }
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      season,
+      week,
+      checked: pendingPicks.length,
+      gradedCount: graded.length,
+      skippedCount: skipped.length,
+      graded,
+      skipped,
+    });
+  } catch (err) {
+    console.error("❌ /api/picks/auto-grade-nfl error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message || "Could not auto-grade NFL picks",
+    });
+  }
+});
+
 app.get("/api/picks/record", async (req, res) => {
   try {
     const picks = await PickLog.find({}).lean();
