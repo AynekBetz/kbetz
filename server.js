@@ -624,6 +624,82 @@ app.get("/api/sportsdata/nfl/boxscores", async (req, res) => {
   }
 });
 
+
+app.get("/api/sportsdata/nfl/players", async (req, res) => {
+  try {
+    const url = "https://api.sportsdata.io/v3/nfl/scores/json/Players";
+
+    const data = await fetchSportsDataIO(url);
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      count: Array.isArray(data) ? data.length : 0,
+      players: data,
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/players error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+app.get("/api/sportsdata/nfl/player-stats", async (req, res) => {
+  try {
+    const season = req.query.season || "2026REG";
+    const week = req.query.week || "1";
+
+    const url =
+      `https://api.sportsdata.io/v3/nfl/stats/json/PlayerGameStatsByWeek/${season}/${week}`;
+
+    const data = await fetchSportsDataIO(url);
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      season,
+      week,
+      count: Array.isArray(data) ? data.length : 0,
+      players: data,
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/player-stats error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+app.get("/api/sportsdata/nfl/injuries", async (req, res) => {
+  try {
+    const season = req.query.season || "2026REG";
+    const week = req.query.week || "1";
+
+    const url =
+      `https://api.sportsdata.io/v3/nfl/scores/json/Injuries/${season}/${week}`;
+
+    const data = await fetchSportsDataIO(url);
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      season,
+      week,
+      count: Array.isArray(data) ? data.length : 0,
+      injuries: data,
+    });
+  } catch (err) {
+    console.error("❌ /api/sportsdata/nfl/injuries error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
 app.get("/api/sportsdata/nfl/timeframes", async (req, res) => {
   try {
     const url =
