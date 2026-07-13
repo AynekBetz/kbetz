@@ -231,6 +231,86 @@ export default function Dashboard() {
   }, []);
 
 
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const existing = document.getElementById("kbetz-quick-links");
+    if (existing) existing.remove();
+
+    const wrap = document.createElement("div");
+    wrap.id = "kbetz-quick-links";
+    wrap.style.position = "fixed";
+    wrap.style.top = "16px";
+    wrap.style.right = "16px";
+    wrap.style.zIndex = "999999";
+    wrap.style.display = "flex";
+    wrap.style.alignItems = "center";
+    wrap.style.gap = "8px";
+    wrap.style.flexWrap = "wrap";
+
+    const playerLink = document.createElement("a");
+    playerLink.href = "/players";
+    playerLink.textContent = "🏈 Player Stats";
+    playerLink.style.color = "#ffffff";
+    playerLink.style.textDecoration = "none";
+    playerLink.style.fontWeight = "1000";
+    playerLink.style.fontSize = "12px";
+    playerLink.style.padding = "10px 13px";
+    playerLink.style.borderRadius = "999px";
+    playerLink.style.border = "1px solid rgba(0,255,214,.65)";
+    playerLink.style.background = "linear-gradient(90deg, rgba(0,255,214,.22), rgba(210,45,255,.22))";
+    playerLink.style.boxShadow = "0 0 22px rgba(0,255,214,.18), 0 0 18px rgba(210,45,255,.14)";
+    playerLink.style.backdropFilter = "blur(12px)";
+
+    const recordLink = document.createElement("a");
+    recordLink.href = "/record";
+    recordLink.textContent = "📊 Public Record";
+    recordLink.style.color = "#ffffff";
+    recordLink.style.textDecoration = "none";
+    recordLink.style.fontWeight = "1000";
+    recordLink.style.fontSize = "12px";
+    recordLink.style.padding = "10px 13px";
+    recordLink.style.borderRadius = "999px";
+    recordLink.style.border = "1px solid rgba(210,45,255,.7)";
+    recordLink.style.background = "rgba(210,45,255,.16)";
+    recordLink.style.boxShadow = "0 0 22px rgba(210,45,255,.18)";
+    recordLink.style.backdropFilter = "blur(12px)";
+
+    wrap.appendChild(playerLink);
+    wrap.appendChild(recordLink);
+    document.body.appendChild(wrap);
+
+    const mobileStyle = document.createElement("style");
+    mobileStyle.id = "kbetz-quick-links-mobile-style";
+    mobileStyle.innerHTML = `
+      @media (max-width: 768px) {
+        #kbetz-quick-links {
+          top: auto !important;
+          right: 10px !important;
+          left: 10px !important;
+          bottom: 76px !important;
+          justify-content: center !important;
+        }
+
+        #kbetz-quick-links a {
+          flex: 1 !important;
+          text-align: center !important;
+          max-width: 180px !important;
+        }
+      }
+    `;
+    document.head.appendChild(mobileStyle);
+
+    return () => {
+      const node = document.getElementById("kbetz-quick-links");
+      if (node) node.remove();
+
+      const styleNode = document.getElementById("kbetz-quick-links-mobile-style");
+      if (styleNode) styleNode.remove();
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
