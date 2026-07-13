@@ -241,8 +241,9 @@ export default function Dashboard() {
     const wrap = document.createElement("div");
     wrap.id = "kbetz-quick-links";
     wrap.style.position = "fixed";
-    wrap.style.top = "16px";
+    wrap.style.top = "auto";
     wrap.style.right = "16px";
+    wrap.style.bottom = "18px";
     wrap.style.zIndex = "999999";
     wrap.style.display = "flex";
     wrap.style.alignItems = "center";
