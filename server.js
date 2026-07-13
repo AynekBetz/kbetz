@@ -1080,6 +1080,169 @@ app.post("/api/picks/auto-grade-nfl", async (req, res) => {
   }
 });
 
+
+app.post("/api/picks/auto-grade-nfl-all", async (req, res) => {
+  try {
+    if (!requireGradeSecret(req, res)) return;
+
+    const season = req.query.season || req.body?.season || "2026REG";
+
+    const startWeek = Math.max(
+      1,
+      Number(req.query.startWeek || req.body?.startWeek || 1)
+    );
+
+    const endWeek = Math.min(
+      22,
+      Number(req.query.endWeek || req.body?.endWeek || 18)
+    );
+
+    if (startWeek > endWeek) {
+      return res.status(400).json({
+        success: false,
+        error: "startWeek cannot be greater than endWeek",
+      });
+    }
+
+    const scoresByMatch = new Map();
+    const weeksChecked = [];
+
+    for (let week = startWeek; week <= endWeek; week++) {
+      const url =
+        `https://api.sportsdata.io/v3/nfl/scores/json/ScoresByWeek/${season}/${week}`;
+
+      try {
+        const games = await fetchSportsDataIO(url);
+        const scoreList = Array.isArray(games) ? games : [];
+
+        weeksChecked.push({
+          week,
+          count: scoreList.length,
+          success: true,
+        });
+
+        for (const score of scoreList) {
+          const key = gameMatchKey(score.AwayTeam, score.HomeTeam);
+          if (key && key !== "@") {
+            scoresByMatch.set(key, {
+              ...score,
+              KBetzWeek: week,
+            });
+          }
+        }
+      } catch (weekErr) {
+        weeksChecked.push({
+          week,
+          count: 0,
+          success: false,
+          error: weekErr.message,
+        });
+      }
+    }
+
+    const pendingPicks = await PickLog.find({
+      result: "pending",
+      sport: "NFL",
+    });
+
+    const graded = [];
+    const skipped = [];
+
+    for (const pick of pendingPicks) {
+      const key = gameMatchKey(pick.away, pick.home);
+      const score = scoresByMatch.get(key);
+
+      if (!score) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          recommended: pick.recommended,
+          game: `${pick.away} @ ${pick.home}`,
+          reason: "No matching SportsDataIO game in checked weeks",
+        });
+        continue;
+      }
+
+      if (!scoreIsFinal(score)) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          recommended: pick.recommended,
+          game: `${pick.away} @ ${pick.home}`,
+          week: score.KBetzWeek,
+          reason: "Game is not final",
+          status: score.Status || "unknown",
+          isOver: score.IsOver,
+          isClosed: score.IsClosed,
+        });
+        continue;
+      }
+
+      if (!scoreHasNumbers(score)) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          recommended: pick.recommended,
+          game: `${pick.away} @ ${pick.home}`,
+          week: score.KBetzWeek,
+          reason: "Final score missing",
+        });
+        continue;
+      }
+
+      const awayScore = Number(score.AwayScore);
+      const homeScore = Number(score.HomeScore);
+      const awayAbbr = nflAbbr(score.AwayTeam);
+      const homeAbbr = nflAbbr(score.HomeTeam);
+      const selectedTeam = pickTeamAbbr(pick);
+
+      let result = "push";
+
+      if (awayScore !== homeScore) {
+        const winner = awayScore > homeScore ? awayAbbr : homeAbbr;
+        result = selectedTeam === winner ? "win" : "loss";
+      }
+
+      const profit = calculatePickProfit(pick, result);
+
+      pick.result = result;
+      pick.status = result;
+      pick.finalScore = `${score.AwayTeam} ${awayScore} - ${score.HomeTeam} ${homeScore}`;
+      pick.notes = `Auto-graded from SportsDataIO NFL ${season} Week ${score.KBetzWeek}`;
+      pick.profit = profit;
+
+      await pick.save();
+
+      graded.push({
+        pickKey: pick.pickKey,
+        recommended: pick.recommended,
+        week: score.KBetzWeek,
+        result,
+        profit,
+        finalScore: pick.finalScore,
+      });
+    }
+
+    res.json({
+      success: true,
+      source: "sportsdataio",
+      season,
+      startWeek,
+      endWeek,
+      weeksChecked,
+      checked: pendingPicks.length,
+      matchedGames: scoresByMatch.size,
+      gradedCount: graded.length,
+      skippedCount: skipped.length,
+      graded,
+      skipped,
+    });
+  } catch (err) {
+    console.error("❌ /api/picks/auto-grade-nfl-all error:", err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message || "Could not auto-grade NFL picks across weeks",
+    });
+  }
+});
+
 app.get("/api/picks/record", async (req, res) => {
   try {
     const picks = await PickLog.find({}).lean();
