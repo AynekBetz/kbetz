@@ -33,6 +33,151 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const existing = document.getElementById("kbetz-final-phone-fit");
+    if (existing) existing.remove();
+
+    const style = document.createElement("style");
+    style.id = "kbetz-final-phone-fit";
+    style.innerHTML = `
+      html,
+      body {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        background: #020707 !important;
+      }
+
+      * {
+        box-sizing: border-box !important;
+      }
+
+      img,
+      svg,
+      canvas,
+      video {
+        max-width: 100% !important;
+      }
+
+      main {
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+      }
+
+      @media (max-width: 768px) {
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        main {
+          width: 100vw !important;
+          max-width: 100vw !important;
+          padding-left: 8px !important;
+          padding-right: 8px !important;
+          overflow-x: hidden !important;
+        }
+
+        main > div,
+        header,
+        section,
+        footer,
+        article {
+          width: 100% !important;
+          max-width: calc(100vw - 16px) !important;
+          overflow-x: hidden !important;
+        }
+
+        .recharts-wrapper,
+        .recharts-responsive-container {
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        table {
+          width: 100% !important;
+          max-width: 100% !important;
+          display: block !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
+        button,
+        a,
+        input,
+        select {
+          max-width: 100% !important;
+        }
+
+        #kbetz-session-control {
+          top: auto !important;
+          right: 10px !important;
+          bottom: 12px !important;
+          max-width: calc(100vw - 20px) !important;
+          transform: scale(0.88) !important;
+          transform-origin: bottom right !important;
+        }
+
+        #kbetz-quick-links {
+          top: auto !important;
+          left: 8px !important;
+          right: 8px !important;
+          bottom: 72px !important;
+          justify-content: center !important;
+          max-width: calc(100vw - 16px) !important;
+        }
+
+        #kbetz-quick-links a {
+          flex: 1 1 42% !important;
+          min-width: 0 !important;
+          max-width: 180px !important;
+          text-align: center !important;
+          font-size: 11px !important;
+          padding: 9px 8px !important;
+          white-space: nowrap !important;
+        }
+      }
+
+      @media (max-width: 420px) {
+        main {
+          padding-left: 6px !important;
+          padding-right: 6px !important;
+        }
+
+        main > div,
+        header,
+        section,
+        footer,
+        article {
+          max-width: calc(100vw - 12px) !important;
+        }
+
+        #kbetz-quick-links {
+          left: 6px !important;
+          right: 6px !important;
+          bottom: 72px !important;
+        }
+
+        #kbetz-quick-links a {
+          font-size: 10px !important;
+          padding: 8px 6px !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      const node = document.getElementById("kbetz-final-phone-fit");
+      if (node) node.remove();
+    };
+  }, []);
+
+
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
     const success = params.get("success");
