@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* FORCE CLEAN ENVIRONMENT */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background-image: none !important;
+}
+
+html, body {
+  background: #000 !important;
+  color: #fff !important;
+}
