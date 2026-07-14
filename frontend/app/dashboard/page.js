@@ -315,6 +315,20 @@ export default function Dashboard() {
     parlayLink.style.boxShadow = "0 0 22px rgba(103,232,249,.18)";
     parlayLink.style.backdropFilter = "blur(12px)";
 
+    const howToLink = document.createElement("a");
+    howToLink.href = "/how-to-use";
+    howToLink.textContent = "❓ How to Use";
+    howToLink.style.color = "#ffffff";
+    howToLink.style.textDecoration = "none";
+    howToLink.style.fontWeight = "1000";
+    howToLink.style.fontSize = "12px";
+    howToLink.style.padding = "10px 13px";
+    howToLink.style.borderRadius = "999px";
+    howToLink.style.border = "1px solid rgba(255,255,255,.24)";
+    howToLink.style.background = "rgba(255,255,255,.12)";
+    howToLink.style.boxShadow = "0 0 22px rgba(255,255,255,.12)";
+    howToLink.style.backdropFilter = "blur(12px)";
+
     const recordLink = document.createElement("a");
     recordLink.href = "/record";
     recordLink.textContent = "📊 Public Record";
@@ -331,6 +345,7 @@ export default function Dashboard() {
 
     wrap.appendChild(playerLink);
     wrap.appendChild(parlayLink);
+    wrap.appendChild(howToLink);
     wrap.appendChild(recordLink);
     document.body.appendChild(wrap);
 
