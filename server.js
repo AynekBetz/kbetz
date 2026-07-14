@@ -1577,10 +1577,13 @@ app.post("/api/checkout", async (req, res) => {
       payment_method_types: ["card"],
       mode: "subscription",
       customer_email: email,
+      client_reference_id: email,
+      metadata: { email },
+      subscription_data: {
+        metadata: { email },
+      },
       line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
-      success_url: `${CLIENT_URL}/dashboard?email=${encodeURIComponent(
-        email
-      )}&success=true`,
+      success_url: `${CLIENT_URL}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${CLIENT_URL}/dashboard?canceled=true`,
     });
 
@@ -1594,6 +1597,80 @@ app.post("/api/checkout", async (req, res) => {
     res.status(500).json({
       success: false,
       error: err?.message || "Checkout failed",
+    });
+  }
+});
+
+
+/* ================= STRIPE PRO CONFIRM ================= */
+app.post("/api/pro/confirm", async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({
+        success: false,
+        error: "Stripe is not configured",
+      });
+    }
+
+    const sessionId = String(req.body.sessionId || req.body.session_id || "").trim();
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: "Stripe session ID is required",
+      });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["subscription"],
+    });
+
+    const email = normalizeEmail(
+      session.customer_email ||
+        session.customer_details?.email ||
+        session.metadata?.email ||
+        session.client_reference_id
+    );
+
+    const paid =
+      session.payment_status === "paid" ||
+      session.status === "complete" ||
+      session.subscription?.status === "active" ||
+      session.subscription?.status === "trialing";
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: "No email found on Stripe session",
+      });
+    }
+
+    if (!paid) {
+      return res.status(402).json({
+        success: false,
+        error: "Stripe session is not paid or active yet",
+        status: session.status,
+        payment_status: session.payment_status,
+      });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { email },
+      { isPro: true },
+      { new: true, upsert: true }
+    );
+
+    res.json({
+      success: true,
+      email: user.email,
+      isPro: true,
+      plan: "pro",
+    });
+  } catch (err) {
+    console.error("❌ /api/pro/confirm error:", err?.message || err);
+    res.status(500).json({
+      success: false,
+      error: err?.message || "Could not confirm PRO payment",
     });
   }
 });

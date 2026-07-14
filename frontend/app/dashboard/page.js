@@ -30,6 +30,43 @@ export default function Dashboard() {
 
   const API = "https://kbetz-main.onrender.com";
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    const success = params.get("success");
+
+    if (!sessionId || success !== "true") return;
+
+    async function confirmProPayment() {
+      try {
+        const res = await fetch(`${API}/api/pro/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+
+        const data = await res.json();
+
+        if (data.success && data.isPro) {
+          localStorage.setItem("plan", "pro");
+          alert("✅ KBETZ PRO is active. Thank you for upgrading!");
+          window.history.replaceState({}, "", "/dashboard");
+          window.location.reload();
+          return;
+        }
+
+        alert(data.error || "Payment received, but PRO did not unlock yet.");
+      } catch (err) {
+        alert("Payment received, but KBETZ could not confirm PRO yet.");
+      }
+    }
+
+    confirmProPayment();
+  }, []);
+
+
   const [games, setGames] = useState([]);
   const [parlay, setParlay] = useState([]);
   const [bankroll, setBankroll] = useState(0);
