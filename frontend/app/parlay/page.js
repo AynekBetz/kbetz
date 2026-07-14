@@ -247,6 +247,12 @@ export default function ParlayPage() {
             KBETZ scans live moneyline odds, ranks stronger legs, and labels
             risk honestly. Parlays are never guaranteed.
           </p>
+
+          <div className="trustBanner">
+            <strong>Trust Notice:</strong> KBETZ provides sports analytics,
+            odds insights, and AI-assisted picks. No pick, parlay, hedge, or
+            prediction is guaranteed. Bet responsibly and track results honestly.
+          </div>
         </div>
 
         <div className="heroLinks">
@@ -406,6 +412,22 @@ export default function ParlayPage() {
           max-width: 760px;
           color: rgba(255, 255, 255, 0.72);
           line-height: 1.6;
+        }
+
+        .trustBanner {
+          max-width: 820px;
+          margin-top: 14px;
+          padding: 14px 16px;
+          border-radius: 18px;
+          color: rgba(255, 255, 255, 0.86);
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(103, 232, 249, 0.22);
+          line-height: 1.55;
+          font-weight: 800;
+        }
+
+        .trustBanner strong {
+          color: #67e8f9;
         }
 
         .heroLinks {
