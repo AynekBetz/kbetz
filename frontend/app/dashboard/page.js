@@ -301,6 +301,20 @@ export default function Dashboard() {
     playerLink.style.boxShadow = "0 0 22px rgba(0,255,214,.18), 0 0 18px rgba(210,45,255,.14)";
     playerLink.style.backdropFilter = "blur(12px)";
 
+    const parlayLink = document.createElement("a");
+    parlayLink.href = "/parlay";
+    parlayLink.textContent = "🧠 AI Parlay";
+    parlayLink.style.color = "#ffffff";
+    parlayLink.style.textDecoration = "none";
+    parlayLink.style.fontWeight = "1000";
+    parlayLink.style.fontSize = "12px";
+    parlayLink.style.padding = "10px 13px";
+    parlayLink.style.borderRadius = "999px";
+    parlayLink.style.border = "1px solid rgba(103,232,249,.65)";
+    parlayLink.style.background = "rgba(103,232,249,.16)";
+    parlayLink.style.boxShadow = "0 0 22px rgba(103,232,249,.18)";
+    parlayLink.style.backdropFilter = "blur(12px)";
+
     const recordLink = document.createElement("a");
     recordLink.href = "/record";
     recordLink.textContent = "📊 Public Record";
@@ -316,6 +330,7 @@ export default function Dashboard() {
     recordLink.style.backdropFilter = "blur(12px)";
 
     wrap.appendChild(playerLink);
+    wrap.appendChild(parlayLink);
     wrap.appendChild(recordLink);
     document.body.appendChild(wrap);
 
