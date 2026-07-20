@@ -11,8 +11,6 @@ import Header from "./components/Header";
 import AIPicks from "./components/AIPicks";
 import LiveMarketsCard from "./components/LiveMarketsCard";
 import MarketsTable from "./components/MarketsTable";
-import AIGameDrawer from "./components/AIGameDrawer";
-import { predictGame } from "../lib/aiEngine";
 
 export const dynamic = "force-dynamic";
 
@@ -219,9 +217,7 @@ export default function Dashboard() {
 
 
   const [games, setGames] = useState([]);
-  const [selectedSport, setSelectedSport] = useState("ALL");
   const [parlay, setParlay] = useState([]);
-  const [activeGame, setActiveGame] = useState(null);
   const [bankroll, setBankroll] = useState(0);
   const [isPro, setIsPro] = useState(false);
   const [ticker, setTicker] = useState([]);
@@ -820,29 +816,15 @@ export default function Dashboard() {
 
     return source.map((g, index) => ({
       id: g.id || `game-${index}`,
-
       away: g.away || g.awayTeam || g.teams?.away || "Away",
       home: g.home || g.homeTeam || g.teams?.home || "Home",
-
       homeOdds: g.homeOdds ?? g.odds ?? g.price ?? -110,
-      awayOdds: g.awayOdds ?? -110,
-
       books:
         Array.isArray(g.books) && g.books.length
           ? g.books
           : [{ name: "DK" }, { name: "FD" }, { name: "MGM" }],
-
       sport: g.sport || "LIVE",
-      league: g.league || g.sport || "LIVE",
-
-      time: g.time || g.commenceTime || "Live",
-      commenceTime: g.commenceTime || g.time || "Live",
-
-      spread: g.spread ?? "N/A",
-      total: g.total ?? "N/A",
-
-      homeLogo: g.homeLogo || "",
-      awayLogo: g.awayLogo || "",
+      time: g.time || "Live",
     }));
   };
 
@@ -906,14 +888,6 @@ export default function Dashboard() {
     });
   };
 
-  const filteredGames =
-    selectedSport === "ALL"
-      ? games
-      : games.filter((g) => {
-          const sport = String(g.sport || "").toLowerCase();
-          return sport.includes(selectedSport.toLowerCase());
-        });
-
   const processGames = (incomingGames) => {
     const cleanGames = normalizeGames(incomingGames);
 
@@ -951,51 +925,9 @@ export default function Dashboard() {
       prevOdds.current[key] = g.homeOdds;
 
       const implied = americanToProb(g.homeOdds);
-
-      const movementBoost =
-        movement === "up"
-          ? 0.035
-          : movement === "down"
-          ? 0.012
-          : 0.018;
-
-      // Reward stronger implied probabilities.
-      const probabilityBoost =
-        implied >= 0.60
-          ? 0.020
-          : implied >= 0.50
-          ? 0.010
-          : 0;
-
-      const model = Math.min(
-        0.99,
-        implied + movementBoost + probabilityBoost
-      );
-
+      const modelBoost = movement === "up" ? 0.035 : movement === "down" ? 0.012 : 0.018;
+      const model = implied + modelBoost;
       const edge = (model - implied) * 100;
-
-      const ai = predictGame(
-        g,
-        movement,
-        implied,
-        {
-          recentForm: 0,
-          homeAdvantage: false,
-          restDays: 0,
-          injuries: 0,
-        }
-      );
-
-      const {
-        confidence,
-        expectedValue,
-        winProbability,
-        recommendation,
-        aiRating,
-        riskLevel,
-        betSize,
-      } = ai;
-
 
       return {
         ...g,
@@ -1003,14 +935,6 @@ export default function Dashboard() {
         movement,
         implied,
         edge,
-        confidence,
-        expectedValue,
-        winProbability,
-        recommendation,
-        analysis: `${recommendation} projects as the stronger AI play based on confidence, market movement, and sportsbook consensus.`,
-        aiRating,
-        riskLevel,
-        betSize,
       };
     });
 
@@ -1226,7 +1150,7 @@ export default function Dashboard() {
 
       <LiveMarketsCard
         styles={styles}
-        games={filteredGames}
+        games={games}
         lineHistory={lineHistory}
       />
 
@@ -1331,10 +1255,6 @@ export default function Dashboard() {
         lineHistory={lineHistory}
         formatOdds={formatOdds}
         addToParlay={addToParlay}
-        activeGame={activeGame}
-        setActiveGame={setActiveGame}
-        selectedSport={selectedSport}
-        setSelectedSport={setSelectedSport}
       />
 
       <section style={styles.lowerGrid}>
@@ -1393,11 +1313,6 @@ export default function Dashboard() {
         <span style={styles.legalDot}>•</span>
         <a style={styles.legalLink} href="/support">Support</a>
       </div>
-
-      <AIGameDrawer
-        activeGame={activeGame}
-        onClose={() => setActiveGame(null)}
-      />
 
     </div>
   );

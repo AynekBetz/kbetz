@@ -1,7 +1,6 @@
 "use client";
 
 import { ResponsiveContainer, LineChart, Line } from "recharts";
-import { SPORTS } from "../../lib/sports";
 
 export default function MarketsTable({
   games,
@@ -15,8 +14,6 @@ export default function MarketsTable({
   addToParlay,
   activeGame,
   setActiveGame,
-  selectedSport,
-  setSelectedSport,
 }) {
   return (
 
@@ -29,26 +26,12 @@ export default function MarketsTable({
           </div>
 
           <div style={styles.filterTabs}>
-            <span
-              style={selectedSport === "ALL" ? styles.activeTab : styles.tab}
-              onClick={() => setSelectedSport("ALL")}
-            >
-              ALL
-            </span>
-
-            {SPORTS.map((sport) => (
-              <span
-                key={sport.id}
-                onClick={() => setSelectedSport(sport.id)}
-                style={
-                  selectedSport === sport.id
-                    ? styles.activeTab
-                    : styles.tab
-                }
-              >
-                {sport.icon} {sport.name}
-              </span>
-            ))}
+            <span style={styles.activeTab}>ALL</span>
+            <span style={styles.tab}>NBA</span>
+            <span style={styles.tab}>MLB</span>
+            <span style={styles.tab}>NHL</span>
+            <span style={styles.tab}>NFL</span>
+            <span style={styles.tab}>NCAAB</span>
           </div>
 
           <div style={styles.liveOnly}>LIVE ONLY 🟢</div>

@@ -15,8 +15,6 @@ export default function MarketsTable({
   addToParlay,
   activeGame,
   setActiveGame,
-  selectedSport,
-  setSelectedSport,
 }) {
   return (
 
@@ -29,23 +27,9 @@ export default function MarketsTable({
           </div>
 
           <div style={styles.filterTabs}>
-            <span
-              style={selectedSport === "ALL" ? styles.activeTab : styles.tab}
-              onClick={() => setSelectedSport("ALL")}
-            >
-              ALL
-            </span>
-
+            <span style={styles.activeTab}>ALL</span>
             {SPORTS.map((sport) => (
-              <span
-                key={sport.id}
-                onClick={() => setSelectedSport(sport.id)}
-                style={
-                  selectedSport === sport.id
-                    ? styles.activeTab
-                    : styles.tab
-                }
-              >
+              <span key={sport.id} style={styles.tab}>
                 {sport.icon} {sport.name}
               </span>
             ))}

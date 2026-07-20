@@ -12,7 +12,6 @@ import AIPicks from "./components/AIPicks";
 import LiveMarketsCard from "./components/LiveMarketsCard";
 import MarketsTable from "./components/MarketsTable";
 import AIGameDrawer from "./components/AIGameDrawer";
-import { predictGame } from "../lib/aiEngine";
 
 export const dynamic = "force-dynamic";
 
@@ -219,7 +218,6 @@ export default function Dashboard() {
 
 
   const [games, setGames] = useState([]);
-  const [selectedSport, setSelectedSport] = useState("ALL");
   const [parlay, setParlay] = useState([]);
   const [activeGame, setActiveGame] = useState(null);
   const [bankroll, setBankroll] = useState(0);
@@ -906,14 +904,6 @@ export default function Dashboard() {
     });
   };
 
-  const filteredGames =
-    selectedSport === "ALL"
-      ? games
-      : games.filter((g) => {
-          const sport = String(g.sport || "").toLowerCase();
-          return sport.includes(selectedSport.toLowerCase());
-        });
-
   const processGames = (incomingGames) => {
     const cleanGames = normalizeGames(incomingGames);
 
@@ -974,28 +964,26 @@ export default function Dashboard() {
 
       const edge = (model - implied) * 100;
 
-      const ai = predictGame(
-        g,
-        movement,
-        implied,
-        {
-          recentForm: 0,
-          homeAdvantage: false,
-          restDays: 0,
-          injuries: 0,
-        }
+      const confidence = Math.min(
+        99,
+        Math.max(55, Math.round(55 + edge * 5))
       );
 
-      const {
-        confidence,
-        expectedValue,
-        winProbability,
-        recommendation,
-        aiRating,
-        riskLevel,
-        betSize,
-      } = ai;
+      const expectedValue = Number(edge.toFixed(2));
 
+      const winProbability = Math.round(model * 100);
+
+      const recommendation =
+        edge >= 2
+          ? g.home
+          : g.away;
+
+      const analysis =
+        movement === "up"
+          ? "Positive line movement detected."
+          : movement === "down"
+          ? "Market moving against this side."
+          : "Stable betting market.";
 
       return {
         ...g,
@@ -1007,10 +995,7 @@ export default function Dashboard() {
         expectedValue,
         winProbability,
         recommendation,
-        analysis: `${recommendation} projects as the stronger AI play based on confidence, market movement, and sportsbook consensus.`,
-        aiRating,
-        riskLevel,
-        betSize,
+        analysis,
       };
     });
 
@@ -1226,7 +1211,7 @@ export default function Dashboard() {
 
       <LiveMarketsCard
         styles={styles}
-        games={filteredGames}
+        games={games}
         lineHistory={lineHistory}
       />
 
@@ -1333,8 +1318,6 @@ export default function Dashboard() {
         addToParlay={addToParlay}
         activeGame={activeGame}
         setActiveGame={setActiveGame}
-        selectedSport={selectedSport}
-        setSelectedSport={setSelectedSport}
       />
 
       <section style={styles.lowerGrid}>

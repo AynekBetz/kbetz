@@ -906,14 +906,6 @@ export default function Dashboard() {
     });
   };
 
-  const filteredGames =
-    selectedSport === "ALL"
-      ? games
-      : games.filter((g) => {
-          const sport = String(g.sport || "").toLowerCase();
-          return sport.includes(selectedSport.toLowerCase());
-        });
-
   const processGames = (incomingGames) => {
     const cleanGames = normalizeGames(incomingGames);
 
@@ -1007,7 +999,7 @@ export default function Dashboard() {
         expectedValue,
         winProbability,
         recommendation,
-        analysis: `${recommendation} projects as the stronger AI play based on confidence, market movement, and sportsbook consensus.`,
+        analysis,
         aiRating,
         riskLevel,
         betSize,
@@ -1226,7 +1218,7 @@ export default function Dashboard() {
 
       <LiveMarketsCard
         styles={styles}
-        games={filteredGames}
+        games={games}
         lineHistory={lineHistory}
       />
 
@@ -1333,8 +1325,6 @@ export default function Dashboard() {
         addToParlay={addToParlay}
         activeGame={activeGame}
         setActiveGame={setActiveGame}
-        selectedSport={selectedSport}
-        setSelectedSport={setSelectedSport}
       />
 
       <section style={styles.lowerGrid}>

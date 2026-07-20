@@ -1,7 +1,6 @@
 "use client";
 
 import { ResponsiveContainer, LineChart, Line } from "recharts";
-import { SPORTS } from "../../lib/sports";
 
 export default function MarketsTable({
   games,
@@ -15,8 +14,6 @@ export default function MarketsTable({
   addToParlay,
   activeGame,
   setActiveGame,
-  selectedSport,
-  setSelectedSport,
 }) {
   return (
 
@@ -29,26 +26,12 @@ export default function MarketsTable({
           </div>
 
           <div style={styles.filterTabs}>
-            <span
-              style={selectedSport === "ALL" ? styles.activeTab : styles.tab}
-              onClick={() => setSelectedSport("ALL")}
-            >
-              ALL
-            </span>
-
-            {SPORTS.map((sport) => (
-              <span
-                key={sport.id}
-                onClick={() => setSelectedSport(sport.id)}
-                style={
-                  selectedSport === sport.id
-                    ? styles.activeTab
-                    : styles.tab
-                }
-              >
-                {sport.icon} {sport.name}
-              </span>
-            ))}
+            <span style={styles.activeTab}>ALL</span>
+            <span style={styles.tab}>NBA</span>
+            <span style={styles.tab}>MLB</span>
+            <span style={styles.tab}>NHL</span>
+            <span style={styles.tab}>NFL</span>
+            <span style={styles.tab}>NCAAB</span>
           </div>
 
           <div style={styles.liveOnly}>LIVE ONLY 🟢</div>
@@ -110,73 +93,6 @@ export default function MarketsTable({
                   <strong>{g.away}</strong>
                   <br />
                   <span>@ {g.home}</span>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 6,
-                      flexWrap: "wrap",
-                      marginTop: 8,
-                    }}
-                  >
-                    <span
-                      style={{
-                        background: "#00b894",
-                        color: "#fff",
-                        borderRadius: 999,
-                        padding: "2px 8px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                      }}
-                    >
-                      ⭐ {g.aiRating}
-                    </span>
-
-                    <span
-                      style={{
-                        background:
-                          g.riskLevel === "Low"
-                            ? "#16a34a"
-                            : g.riskLevel === "Medium"
-                            ? "#ca8a04"
-                            : "#dc2626",
-                        color: "#fff",
-                        borderRadius: 999,
-                        padding: "2px 8px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {g.riskLevel} Risk
-                    </span>
-
-                    <span
-                      style={{
-                        background: "#2563eb",
-                        color: "#fff",
-                        borderRadius: 999,
-                        padding: "2px 8px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                      }}
-                    >
-                      💰 {g.betSize}
-                    </span>
-
-                    <span
-                      style={{
-                        background: "#111827",
-                        color: "#00ffe1",
-                        border: "1px solid #00ffe1",
-                        borderRadius: 999,
-                        padding: "2px 8px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {g.confidence}%
-                    </span>
-                  </div>
                 </div>
               </div>
 

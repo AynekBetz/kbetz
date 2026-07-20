@@ -1007,7 +1007,7 @@ export default function Dashboard() {
         expectedValue,
         winProbability,
         recommendation,
-        analysis: `${recommendation} projects as the stronger AI play based on confidence, market movement, and sportsbook consensus.`,
+        analysis,
         aiRating,
         riskLevel,
         betSize,
