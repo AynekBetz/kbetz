@@ -10,7 +10,6 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 import Header from "./components/Header";
 import AIPicks from "./components/AIPicks";
 import LiveMarketsSummary from "./components/LiveMarketsSummary";
-import LowerGrid from "../../components/dashboard/LowerGrid";
 import SplitSummary from "./components/SplitSummary";
 import ParlayBuilder from "./components/ParlayBuilder";
 import HistoryPanel from "../../components/dashboard/HistoryPanel";
@@ -1214,13 +1213,49 @@ ${analysis}`
   addToParlay={addToParlay}
 />
 
-     <LowerGrid
-  styles={styles}
-  arbOps={arbOps}
-  steamGames={steamGames}
-  history={history}
-  formatOdds={formatOdds}
-/>
+      <section style={styles.lowerGrid}>
+        <div style={styles.lowerCardGreen}>
+          <h2>ARBITRAGE</h2>
+          {arbOps.length === 0 ? (
+            <div style={styles.mutedLine}>0 opportunities</div>
+          ) : (
+            arbOps.map((g, i) => (
+              <div key={i} style={styles.lowerRow}>
+                <span>{g.away} @ {g.home}</span>
+                <strong>+{g.arbEdge}%</strong>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={styles.lowerCardOrange}>
+          <h2>STEAM</h2>
+          {steamGames.length === 0 ? (
+            <div style={styles.mutedLine}>0 games</div>
+          ) : (
+            steamGames.map((g, i) => (
+              <div key={i} style={styles.lowerRow}>
+                <span>{g.away} @ {g.home}</span>
+                <strong>↑ {g.strength}%</strong>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={styles.lowerCardPurple}>
+          <h2>HISTORY</h2>
+          {history.length === 0 ? (
+            <div style={styles.mutedLine}>0 bets</div>
+          ) : (
+            history.map((h, i) => (
+              <div key={i} style={styles.lowerRow}>
+                <span>{h.home}</span>
+                <strong>{formatOdds(h.homeOdds)}</strong>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
 
       <footer style={styles.footer}>
         REAL-TIME DATA • AI POWERED • SHARP ADVANTAGE
