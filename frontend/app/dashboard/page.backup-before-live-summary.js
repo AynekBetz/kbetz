@@ -9,8 +9,6 @@ import { io } from "socket.io-client";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import Header from "./components/Header";
 import AIPicks from "./components/AIPicks";
-import LiveMarketsSummary from "./components/LiveMarketsSummary";
-import SplitSummary from "./components/SplitSummary";
 export const dynamic = "force-dynamic";
 
 export default function Dashboard() {
@@ -1173,16 +1171,73 @@ ${analysis}`
   formatOdds={formatOdds}
   handleViewPick={handleViewPick}
 />
-     <LiveMarketsSummary
-  styles={styles}
-  games={games}
-  lineHistory={lineHistory}
-/>
-     <SplitSummary
-  styles={styles}
-  arbOps={arbOps}
-  steamGames={steamGames}
-/>
+      <section style={styles.summaryCardTeal}>
+        <div style={styles.sectionIcon}>📊</div>
+
+        <div>
+          <h2 style={styles.featureTitle}>LIVE MARKETS</h2>
+          <p style={styles.featureSubtitle}>Real-time odds from multiple sportsbooks</p>
+        </div>
+
+        <div style={styles.marketMiniData}>
+          <div>NBA</div>
+          <strong>BOS 68</strong>
+          <strong>MIA 61</strong>
+          <span>Q3 6:42</span>
+        </div>
+
+        <div style={styles.marketMiniData}>
+          <div>SPREAD</div>
+          <strong>BOS -4.5</strong>
+          <span>-110</span>
+        </div>
+
+        <div style={styles.marketMiniData}>
+          <div>MONEYLINE</div>
+          <strong>BOS -210</strong>
+          <span>MIA +175</span>
+        </div>
+
+        <div style={styles.sparkLineLong}>
+          <ResponsiveContainer>
+            <LineChart data={(lineHistory[games[0]?.key] || []).slice(-24)}>
+              <Line dataKey="value" stroke="#00ffe1" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div style={styles.livePill}>● LIVE</div>
+      </section>
+
+      <section style={styles.splitSummary}>
+        <div style={styles.summaryCardGreen}>
+          <div style={styles.iconGreen}>$</div>
+
+          <div>
+            <h2 style={styles.featureTitle}>ARBITRAGE</h2>
+            <p style={styles.featureSubtitle}>Positive EV across books</p>
+          </div>
+
+          <div style={styles.rightBadgeGreen}>
+            {arbOps.length}
+            <span>OPPORTUNITIES</span>
+          </div>
+        </div>
+
+        <div style={styles.summaryCardPurpleOrange}>
+          <div style={styles.iconPurple}>🔥</div>
+
+          <div>
+            <h2 style={styles.featureTitle}>STEAM</h2>
+            <p style={styles.featureSubtitle}>Sharp money & line movement</p>
+          </div>
+
+          <div style={styles.rightBadgePurple}>
+            {steamGames.length}
+            <span>GAMES</span>
+          </div>
+        </div>
+      </section>
 
       <section style={styles.parlayWide}>
         <div style={styles.sectionIcon}>🧾</div>

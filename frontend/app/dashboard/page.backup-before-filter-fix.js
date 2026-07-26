@@ -9,8 +9,11 @@ import { io } from "socket.io-client";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import Header from "./components/Header";
 import AIPicks from "./components/AIPicks";
-import LiveMarketsSummary from "./components/LiveMarketsSummary";
-import SplitSummary from "./components/SplitSummary";
+import LiveMarketsCard from "./components/LiveMarketsCard";
+import MarketsTable from "./components/MarketsTable";
+import AIGameDrawer from "./components/AIGameDrawer";
+import { predictGame } from "../lib/aiEngine";
+
 export const dynamic = "force-dynamic";
 
 export default function Dashboard() {
@@ -216,7 +219,9 @@ export default function Dashboard() {
 
 
   const [games, setGames] = useState([]);
+  const [selectedSport, setSelectedSport] = useState("ALL");
   const [parlay, setParlay] = useState([]);
+  const [activeGame, setActiveGame] = useState(null);
   const [bankroll, setBankroll] = useState(0);
   const [isPro, setIsPro] = useState(false);
   const [ticker, setTicker] = useState([]);
@@ -815,15 +820,29 @@ export default function Dashboard() {
 
     return source.map((g, index) => ({
       id: g.id || `game-${index}`,
+
       away: g.away || g.awayTeam || g.teams?.away || "Away",
       home: g.home || g.homeTeam || g.teams?.home || "Home",
+
       homeOdds: g.homeOdds ?? g.odds ?? g.price ?? -110,
+      awayOdds: g.awayOdds ?? -110,
+
       books:
         Array.isArray(g.books) && g.books.length
           ? g.books
           : [{ name: "DK" }, { name: "FD" }, { name: "MGM" }],
+
       sport: g.sport || "LIVE",
-      time: g.time || "Live",
+      league: g.league || g.sport || "LIVE",
+
+      time: g.time || g.commenceTime || "Live",
+      commenceTime: g.commenceTime || g.time || "Live",
+
+      spread: g.spread ?? "N/A",
+      total: g.total ?? "N/A",
+
+      homeLogo: g.homeLogo || "",
+      awayLogo: g.awayLogo || "",
     }));
   };
 
@@ -887,6 +906,14 @@ export default function Dashboard() {
     });
   };
 
+  const filteredGames =
+    selectedSport === "ALL"
+      ? games
+      : games.filter((g) => {
+          const sport = String(g.sport || "").toLowerCase();
+          return sport.includes(selectedSport.toLowerCase());
+        });
+
   const processGames = (incomingGames) => {
     const cleanGames = normalizeGames(incomingGames);
 
@@ -924,9 +951,51 @@ export default function Dashboard() {
       prevOdds.current[key] = g.homeOdds;
 
       const implied = americanToProb(g.homeOdds);
-      const modelBoost = movement === "up" ? 0.035 : movement === "down" ? 0.012 : 0.018;
-      const model = implied + modelBoost;
+
+      const movementBoost =
+        movement === "up"
+          ? 0.035
+          : movement === "down"
+          ? 0.012
+          : 0.018;
+
+      // Reward stronger implied probabilities.
+      const probabilityBoost =
+        implied >= 0.60
+          ? 0.020
+          : implied >= 0.50
+          ? 0.010
+          : 0;
+
+      const model = Math.min(
+        0.99,
+        implied + movementBoost + probabilityBoost
+      );
+
       const edge = (model - implied) * 100;
+
+      const ai = predictGame(
+        g,
+        movement,
+        implied,
+        {
+          recentForm: 0,
+          homeAdvantage: false,
+          restDays: 0,
+          injuries: 0,
+        }
+      );
+
+      const {
+        confidence,
+        expectedValue,
+        winProbability,
+        recommendation,
+        aiRating,
+        riskLevel,
+        betSize,
+      } = ai;
+
 
       return {
         ...g,
@@ -934,6 +1003,14 @@ export default function Dashboard() {
         movement,
         implied,
         edge,
+        confidence,
+        expectedValue,
+        winProbability,
+        recommendation,
+        analysis: `${recommendation} projects as the stronger AI play based on confidence, market movement, and sportsbook consensus.`,
+        aiRating,
+        riskLevel,
+        betSize,
       };
     });
 
@@ -1043,43 +1120,16 @@ export default function Dashboard() {
     upgrade();
   };
 
- const handleViewPick = (pick) => {
-  if (typeof pick === "string") {
-    alert(`KBETZ AI Pick\n\n${pick}`);
-    return;
-  }
+  const handleViewPick = (pick) => {
+    const label =
+      typeof pick === "string"
+        ? pick
+        : pick?.team || pick?.pick || pick?.name || "AI Pick";
 
-  const label = pick?.team || pick?.pick || pick?.name || "AI Pick";
+    alert(`KBETZ AI Pick: ${label}`);
+  };
 
-  const confidence =
-    pick?.confidence != null ? `${Math.round(pick.confidence)}%` : "N/A";
-
-  const edge =
-    pick?.edge != null ? `${pick.edge.toFixed(1)}%` : "N/A";
-
-  const risk = pick?.riskLevel || "N/A";
-
-  const recommendation = pick?.recommendation || "No recommendation";
-
-  const analysis =
-    pick?.analysis || "AI analysis is being generated.";
-
-  alert(
-`🧠 KBETZ AI ANALYSIS
-
-${label}
-
-Confidence: ${confidence}
-Edge: ${edge}
-Risk: ${risk}
-
-Recommendation:
-${recommendation}
-
-Analysis:
-${analysis}`
-  );
-};  const handleViewHistory = () => {
+  const handleViewHistory = () => {
     alert("Bet history is active. Saved bet tracking is coming next.");
   };
 
@@ -1107,7 +1157,7 @@ ${analysis}`
     <div style={styles.page}>
       <div style={styles.glowTop}></div>
 
-        <Header />
+      <Header />
 
       <section style={styles.bankrollPanel}>
         <div style={styles.iconBox}>💰</div>
@@ -1167,22 +1217,48 @@ ${analysis}`
         </div>
       </section>
 
-     <AIPicks
-  topAiPicks={topAiPicks}
-  styles={styles}
-  formatOdds={formatOdds}
-  handleViewPick={handleViewPick}
-/>
-     <LiveMarketsSummary
-  styles={styles}
-  games={games}
-  lineHistory={lineHistory}
-/>
-     <SplitSummary
-  styles={styles}
-  arbOps={arbOps}
-  steamGames={steamGames}
-/>
+      <AIPicks
+        topAiPicks={topAiPicks}
+        styles={styles}
+        formatOdds={formatOdds}
+        handleViewPick={handleViewPick}
+      />
+
+      <LiveMarketsCard
+        styles={styles}
+        games={filteredGames}
+        lineHistory={lineHistory}
+      />
+
+      <section style={styles.splitSummary}>
+        <div style={styles.summaryCardGreen}>
+          <div style={styles.iconGreen}>$</div>
+
+          <div>
+            <h2 style={styles.featureTitle}>ARBITRAGE</h2>
+            <p style={styles.featureSubtitle}>Positive EV across books</p>
+          </div>
+
+          <div style={styles.rightBadgeGreen}>
+            {arbOps.length}
+            <span>OPPORTUNITIES</span>
+          </div>
+        </div>
+
+        <div style={styles.summaryCardPurpleOrange}>
+          <div style={styles.iconPurple}>🔥</div>
+
+          <div>
+            <h2 style={styles.featureTitle}>STEAM</h2>
+            <p style={styles.featureSubtitle}>Sharp money & line movement</p>
+          </div>
+
+          <div style={styles.rightBadgePurple}>
+            {steamGames.length}
+            <span>GAMES</span>
+          </div>
+        </div>
+      </section>
 
       <section style={styles.parlayWide}>
         <div style={styles.sectionIcon}>🧾</div>
@@ -1245,125 +1321,21 @@ ${analysis}`
         <div style={styles.rightBadgePurple}>{history.length} BETS</div>
       </section>
 
-      <section style={styles.marketPanel}>
-        <div style={styles.marketHeader}>
-          <div>
-            <h2 style={styles.marketTitle}>LIVE MARKETS</h2>
-            <p style={styles.featureSubtitle}>Real-time odds & AI edges</p>
-          </div>
-
-          <div style={styles.filterTabs}>
-            <span style={styles.activeTab}>ALL</span>
-            <span style={styles.tab}>NBA</span>
-            <span style={styles.tab}>MLB</span>
-            <span style={styles.tab}>NHL</span>
-            <span style={styles.tab}>NFL</span>
-            <span style={styles.tab}>NCAAB</span>
-          </div>
-
-          <div style={styles.liveOnly}>LIVE ONLY 🟢</div>
-        </div>
-
-        <div style={styles.tableHeader}>
-          <span>GAME</span>
-          <span>BOOKS</span>
-          <span>BEST LINE</span>
-          <span>AI EDGE</span>
-          <span>LINE MOVEMENT</span>
-          <span>ODDS HISTORY</span>
-          <span>ACTION</span>
-        </div>
-
-        {loading && <div style={styles.emptyState}>Loading KBETZ live markets...</div>}
-
-        {!loading && games.length === 0 && (
-          <div style={styles.emptyState}>No live markets available right now.</div>
-        )}
-
-        {games.map((g, i) => {
-          const moveText =
-            g.movement === "up"
-              ? "↑ line moving"
-              : g.movement === "down"
-              ? "↓ line moving"
-              : "stable";
-
-          return (
-            <div
-              key={g.key || i}
-              onMouseEnter={() => setHovered(g.key)}
-              onMouseLeave={() => setHovered(null)}
-              style={{
-                ...styles.marketRow,
-                boxShadow:
-                  hovered === g.key
-                    ? "0 0 28px rgba(0,255,225,0.45)"
-                    : flash[g.key] === "up"
-                    ? "0 0 18px rgba(0,255,225,0.65)"
-                    : flash[g.key] === "down"
-                    ? "0 0 18px rgba(255,40,40,0.55)"
-                    : flash[g.key] === "click"
-                    ? "0 0 18px rgba(0,194,255,0.65)"
-                    : "inset 0 0 0 1px rgba(255,255,255,0.04)",
-                transform:
-                  hovered === g.key
-                    ? "translateY(-2px) scale(1.01)"
-                    : flash[g.key]
-                    ? "scale(1.01)"
-                    : "scale(1)",
-              }}
-            >
-              <div style={styles.gameCell}>
-                <span style={styles.liveDot}>● LIVE</span>
-                <div>
-                  <strong>{g.away}</strong>
-                  <br />
-                  <span>@ {g.home}</span>
-                </div>
-              </div>
-
-              <div style={styles.booksCell}>
-                {(g.books || [{ name: "DK" }, { name: "FD" }, { name: "MGM" }])
-                  .slice(0, 3)
-                  .map((b, idx) => (
-                    <span key={idx} style={styles.bookBadge}>
-                      {b.name?.slice(0, 2) || "BK"}
-                    </span>
-                  ))}
-                <span style={styles.extraBooks}>+{Math.max((g.books?.length || 3) - 3, 0)}</span>
-              </div>
-
-              <div>
-                <strong style={styles.edge}>{g.home}</strong>
-                <br />
-                <span style={styles.bestLine}>{formatOdds(g.homeOdds)}</span>
-              </div>
-
-              <div style={styles.edgeLarge}>+{Number(g.edge || 0).toFixed(2)}%</div>
-
-              <div>
-                <span style={g.movement === "down" ? styles.moveDown : styles.moveUp}>
-                  {moveText}
-                </span>
-                <br />
-                <span style={styles.smallMuted}>live</span>
-              </div>
-
-              <div style={styles.chartCell}>
-                <ResponsiveContainer>
-                  <LineChart data={lineHistory[g.key] || []}>
-                    <Line dataKey="value" stroke="#00ffe1" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              <button style={styles.addBtn} onClick={() => addToParlay(g)}>
-                + Add to Parlay
-              </button>
-            </div>
-          );
-        })}
-      </section>
+      <MarketsTable
+        games={games}
+        loading={loading}
+        hovered={hovered}
+        setHovered={setHovered}
+        flash={flash}
+        styles={styles}
+        lineHistory={lineHistory}
+        formatOdds={formatOdds}
+        addToParlay={addToParlay}
+        activeGame={activeGame}
+        setActiveGame={setActiveGame}
+        selectedSport={selectedSport}
+        setSelectedSport={setSelectedSport}
+      />
 
       <section style={styles.lowerGrid}>
         <div style={styles.lowerCardGreen}>
@@ -1422,99 +1394,79 @@ ${analysis}`
         <a style={styles.legalLink} href="/support">Support</a>
       </div>
 
+      <AIGameDrawer
+        activeGame={activeGame}
+        onClose={() => setActiveGame(null)}
+      />
+
     </div>
   );
 }
 
 const styles = {
   page: {
-  minHeight: "100vh",
-
-  background: `
-    radial-gradient(circle at 15% 10%, rgba(0,255,225,.10), transparent 28%),
-    radial-gradient(circle at 85% 0%, rgba(124,92,255,.12), transparent 30%),
-    radial-gradient(circle at 50% 100%, rgba(255,61,242,.06), transparent 35%),
-    linear-gradient(180deg, #030708 0%, #020506 100%)
-  `,
-
-  padding: "30px",
-
-  color: "#ffffff",
-
-  position: "relative",
-
-  overflow: "hidden",
-},
-  glowTop: {
-    position: "absolute",
-    top: "-220px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    width: "900px",
-    height: "450px",
-    borderRadius: "50%",
+    position: "relative",
+    minHeight: "100vh",
+    padding: 28,
     background:
-      "radial-gradient(circle, rgba(0,255,225,0.22) 0%, rgba(124,92,255,0.12) 45%, transparent 75%)",
-    filter: "blur(80px)",
-    pointerEvents: "none",
-    zIndex: 0,
+      "radial-gradient(circle at top left, rgba(0,255,225,0.18), transparent 26%), radial-gradient(circle at top right, rgba(180,48,255,0.32), transparent 32%), linear-gradient(180deg,#020407 0%,#02070a 45%,#000 100%)",
+    color: "#ffffff",
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    overflowX: "hidden",
   },
 
- header: {
-  position: "relative",
-  zIndex: 1,
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
+  glowTop: {
+    position: "absolute",
+    top: 76,
+    left: 34,
+    right: 34,
+    height: 2,
+    background: "linear-gradient(90deg,#00ffe1,#7c3aed,#ff3df2)",
+    boxShadow: "0 0 22px rgba(0,255,225,0.85)",
+    opacity: 0.9,
+  },
 
-  padding: "24px 34px",
-  marginBottom: "28px",
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 18,
+  },
 
-  borderRadius: "20px",
-
-  background:
-    "linear-gradient(135deg, rgba(6,18,24,.88), rgba(18,8,34,.88))",
-
-  border: "1px solid rgba(0,255,225,.28)",
-
-  backdropFilter: "blur(18px)",
-
-  boxShadow:
-    "0 0 40px rgba(0,255,225,.12), 0 0 70px rgba(124,92,255,.10), inset 0 0 18px rgba(255,255,255,.03)",
-},
-logoLeft: {
-  fontSize: 52,
-  fontWeight: 1000,
-  letterSpacing: 2,
-  color: "#ffffff",
-  textTransform: "uppercase",
-  textShadow:
-    "0 0 8px rgba(255,255,255,.95), 0 0 22px rgba(0,255,225,.75), 0 0 48px rgba(124,92,255,.45)",
-},
-   logoTerminal: {
-    marginLeft: 10,
-    fontSize: 18,
-    fontWeight: 900,
-    letterSpacing: 4,
-    background: "linear-gradient(90deg,#00ffe1,#7c5cff,#ff3df2)",
+  logoLeft: {
+    fontSize: 44,
+    fontWeight: 950,
+    fontStyle: "italic",
+    letterSpacing: 1,
+    background: "linear-gradient(90deg,#8b5cf6 0%,#00ffe1 47%,#a855f7 100%)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     textShadow:
-      "0 0 18px rgba(0,255,225,0.55), 0 0 30px rgba(255,61,242,0.45)",
+      "0 0 20px rgba(0,255,225,0.65), 0 0 42px rgba(124,58,237,0.45)",
   },
-logoRight: {
-  fontSize: 52,
-  fontWeight: 1000,
-  fontStyle: "italic",
-  letterSpacing: 2,
-  background:
-    "linear-gradient(90deg,#00ffe1 0%,#7c5cff 50%,#ff3df2 100%)",
-  WebkitBackgroundClip: "text",
-  WebkitTextFillColor: "transparent",
-  textShadow:
-    "0 0 18px rgba(0,255,225,.8), 0 0 40px rgba(124,92,255,.6), 0 0 60px rgba(255,61,242,.4)",
-},
-   bankrollPanel: {
+
+  logoTerminal: {
+    marginLeft: 14,
+    fontSize: 34,
+    color: "#00eaff",
+    WebkitTextFillColor: "#00eaff",
+    textShadow: "0 0 18px rgba(0,255,225,0.65)",
+  },
+
+  logoRight: {
+    fontSize: 44,
+    fontWeight: 950,
+    fontStyle: "italic",
+    letterSpacing: 1,
+    background: "linear-gradient(90deg,#00ffe1 0%,#795cff 52%,#ff3df2 100%)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    textShadow:
+      "0 0 22px rgba(0,255,225,0.65), 0 0 44px rgba(255,61,242,0.5)",
+  },
+
+  bankrollPanel: {
     display: "grid",
     gridTemplateColumns: "70px 1fr 260px 170px",
     alignItems: "center",

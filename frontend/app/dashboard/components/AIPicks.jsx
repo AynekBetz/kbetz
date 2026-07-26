@@ -20,20 +20,56 @@ export default function AIPicks({
       <div style={styles.aiPickList}>
         {topAiPicks.length ? (
           topAiPicks.map((g, i) => (
-            <div key={i} style={styles.aiMiniRow}>
-              <span>
+            <div
+              key={i}
+              style={{
+                ...styles.aiMiniRow,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: "6px",
+                padding: "12px",
+              }}
+            >
+              <strong style={{ color: "#ffffff", fontSize: "16px" }}>
                 {g.home} {formatOdds(g.homeOdds)}
-              </span>
+              </strong>
 
-              <span style={styles.confidence}>
-                EDGE {g.edge.toFixed(1)}%
-              </span>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  flexWrap: "wrap",
+                  fontSize: "13px",
+                }}
+              >
+                <span style={{ color: "#00ffe1" }}>
+                  Confidence: {Math.round(g.confidence ?? 0)}%
+                </span>
+
+                <span style={{ color: "#7df9ff" }}>
+                  Edge: {g.edge.toFixed(1)}%
+                </span>
+
+                <span
+                  style={{
+                    color:
+                      g.riskLevel === "LOW"
+                        ? "#4cff7a"
+                        : g.riskLevel === "HIGH"
+                        ? "#ff6565"
+                        : "#ffd966",
+                  }}
+                >
+                  Risk: {g.riskLevel ?? "N/A"}
+                </span>
+              </div>
 
               <button
                 style={styles.smallViewBtn}
                 onClick={() => handleViewPick(g)}
               >
-                View Pick
+                View Analysis
               </button>
             </div>
           ))

@@ -7,10 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
-import Header from "./components/Header";
-import AIPicks from "./components/AIPicks";
-import LiveMarketsSummary from "./components/LiveMarketsSummary";
-import SplitSummary from "./components/SplitSummary";
+
 export const dynamic = "force-dynamic";
 
 export default function Dashboard() {
@@ -1091,7 +1088,12 @@ ${analysis}`
   return (
       <div style={styles.page}>
         <div style={styles.glowTop}></div>
-        <Header />
+        <header style={styles.header}>
+          <div style={styles.logoLeft}>
+            KBETZ <span style={styles.logoTerminal}>TERMINAL</span>
+          </div>
+          <div style={styles.logoRight}>KBETZ</div>
+        </header>
         <section style={styles.bankrollPanel}>
           <div style={styles.iconBox}>⚡</div>
           <div>
@@ -1107,7 +1109,12 @@ ${analysis}`
     <div style={styles.page}>
       <div style={styles.glowTop}></div>
 
-        <Header />
+      <header style={styles.header}>
+        <div style={styles.logoLeft}>
+          KBETZ <span style={styles.logoTerminal}>TERMINAL</span>
+        </div>
+        <div style={styles.logoRight}>KBETZ</div>
+      </header>
 
       <section style={styles.bankrollPanel}>
         <div style={styles.iconBox}>💰</div>
@@ -1167,22 +1174,102 @@ ${analysis}`
         </div>
       </section>
 
-     <AIPicks
-  topAiPicks={topAiPicks}
-  styles={styles}
-  formatOdds={formatOdds}
-  handleViewPick={handleViewPick}
-/>
-     <LiveMarketsSummary
-  styles={styles}
-  games={games}
-  lineHistory={lineHistory}
-/>
-     <SplitSummary
-  styles={styles}
-  arbOps={arbOps}
-  steamGames={steamGames}
-/>
+      <section style={styles.aiWideCard}>
+        <div style={styles.iconPink}>🧠</div>
+
+        <div>
+          <h2 style={styles.featureTitle}>AI PICKS</h2>
+          <p style={styles.featureSubtitle}>Top AI generated edges in real-time</p>
+        </div>
+
+        <div style={styles.aiPickList}>
+          {topAiPicks.length ? (
+            topAiPicks.map((g, i) => (
+              <div key={i} style={styles.aiMiniRow}>
+                <span>
+                  {g.home} {formatOdds(g.homeOdds)}
+                </span>
+                <span style={styles.confidence}>EDGE {g.edge.toFixed(1)}%</span>
+                <button style={styles.smallViewBtn} onClick={() => handleViewPick(g)}>
+                  View Pick
+                </button>
+              </div>
+            ))
+          ) : (
+            <div style={styles.mutedLine}>AI engine is scanning live edges...</div>
+          )}
+        </div>
+
+        <div style={styles.brainArt}></div>
+      </section>
+
+      <section style={styles.summaryCardTeal}>
+        <div style={styles.sectionIcon}>📊</div>
+
+        <div>
+          <h2 style={styles.featureTitle}>LIVE MARKETS</h2>
+          <p style={styles.featureSubtitle}>Real-time odds from multiple sportsbooks</p>
+        </div>
+
+        <div style={styles.marketMiniData}>
+          <div>NBA</div>
+          <strong>BOS 68</strong>
+          <strong>MIA 61</strong>
+          <span>Q3 6:42</span>
+        </div>
+
+        <div style={styles.marketMiniData}>
+          <div>SPREAD</div>
+          <strong>BOS -4.5</strong>
+          <span>-110</span>
+        </div>
+
+        <div style={styles.marketMiniData}>
+          <div>MONEYLINE</div>
+          <strong>BOS -210</strong>
+          <span>MIA +175</span>
+        </div>
+
+        <div style={styles.sparkLineLong}>
+          <ResponsiveContainer>
+            <LineChart data={(lineHistory[games[0]?.key] || []).slice(-24)}>
+              <Line dataKey="value" stroke="#00ffe1" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div style={styles.livePill}>● LIVE</div>
+      </section>
+
+      <section style={styles.splitSummary}>
+        <div style={styles.summaryCardGreen}>
+          <div style={styles.iconGreen}>$</div>
+
+          <div>
+            <h2 style={styles.featureTitle}>ARBITRAGE</h2>
+            <p style={styles.featureSubtitle}>Positive EV across books</p>
+          </div>
+
+          <div style={styles.rightBadgeGreen}>
+            {arbOps.length}
+            <span>OPPORTUNITIES</span>
+          </div>
+        </div>
+
+        <div style={styles.summaryCardPurpleOrange}>
+          <div style={styles.iconPurple}>🔥</div>
+
+          <div>
+            <h2 style={styles.featureTitle}>STEAM</h2>
+            <p style={styles.featureSubtitle}>Sharp money & line movement</p>
+          </div>
+
+          <div style={styles.rightBadgePurple}>
+            {steamGames.length}
+            <span>GAMES</span>
+          </div>
+        </div>
+      </section>
 
       <section style={styles.parlayWide}>
         <div style={styles.sectionIcon}>🧾</div>
@@ -1428,23 +1515,15 @@ ${analysis}`
 
 const styles = {
   page: {
-  minHeight: "100vh",
+    minHeight: "100vh",
+    background:
+      "radial-gradient(circle at top, rgba(0,255,225,0.08), transparent 35%), #020707",
+    padding: "28px",
+    color: "#ffffff",
+    position: "relative",
+    overflow: "hidden",
+  },
 
-  background: `
-    radial-gradient(circle at 15% 10%, rgba(0,255,225,.10), transparent 28%),
-    radial-gradient(circle at 85% 0%, rgba(124,92,255,.12), transparent 30%),
-    radial-gradient(circle at 50% 100%, rgba(255,61,242,.06), transparent 35%),
-    linear-gradient(180deg, #030708 0%, #020506 100%)
-  `,
-
-  padding: "30px",
-
-  color: "#ffffff",
-
-  position: "relative",
-
-  overflow: "hidden",
-},
   glowTop: {
     position: "absolute",
     top: "-220px",
@@ -1460,28 +1539,14 @@ const styles = {
     zIndex: 0,
   },
 
- header: {
-  position: "relative",
-  zIndex: 1,
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-
-  padding: "24px 34px",
-  marginBottom: "28px",
-
-  borderRadius: "20px",
-
-  background:
-    "linear-gradient(135deg, rgba(6,18,24,.88), rgba(18,8,34,.88))",
-
-  border: "1px solid rgba(0,255,225,.28)",
-
-  backdropFilter: "blur(18px)",
-
-  boxShadow:
-    "0 0 40px rgba(0,255,225,.12), 0 0 70px rgba(124,92,255,.10), inset 0 0 18px rgba(255,255,255,.03)",
-},
+  header: {
+    position: "relative",
+    zIndex: 1,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "26px",
+  },
 logoLeft: {
   fontSize: 52,
   fontWeight: 1000,
