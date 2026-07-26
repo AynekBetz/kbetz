@@ -11,6 +11,7 @@ import Header from "./components/Header";
 import AIPicks from "./components/AIPicks";
 import LiveMarketsSummary from "./components/LiveMarketsSummary";
 import SplitSummary from "./components/SplitSummary";
+import ParlayBuilder from "./components/ParlayBuilder";
 export const dynamic = "force-dynamic";
 
 export default function Dashboard() {
@@ -1184,35 +1185,13 @@ ${analysis}`
   steamGames={steamGames}
 />
 
-      <section style={styles.parlayWide}>
-        <div style={styles.sectionIcon}>🧾</div>
-
-        <div>
-          <h2 style={styles.featureTitle}>PARLAY BUILDER</h2>
-          <div style={styles.statLabel}>LEGS</div>
-          <div style={styles.statValue}>{parlay.length}</div>
-        </div>
-
-        <div style={styles.verticalLine}></div>
-
-        <div>
-          <div style={styles.statLabel}>POTENTIAL PAYOUT</div>
-          <div style={styles.bigNumber}>
-            {payout}x <span style={styles.payoutSub}>(${(Number(payout) * 500).toFixed(2)})</span>
-          </div>
-        </div>
-
-        <div style={styles.verticalLine}></div>
-
-        <div>
-          <div style={styles.statLabel}>PARLAY ODDS</div>
-          <div style={styles.purpleOdds}>{parlayOdds}</div>
-        </div>
-
-        <button style={styles.clearBtn} onClick={clearParlay}>
-          🗑 Clear Parlay
-        </button>
-      </section>
+    <ParlayBuilder
+  styles={styles}
+  parlay={parlay}
+  payout={payout}
+  parlayOdds={parlayOdds}
+  clearParlay={clearParlay}
+/>
 
       <section style={styles.historyWide}>
         <div style={styles.iconPurple}>↺</div>
