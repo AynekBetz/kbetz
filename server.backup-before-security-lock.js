@@ -6,32 +6,12 @@ import Stripe from "stripe";
 import fetch from "node-fetch";
 import http from "http";
 import { Server } from "socket.io";
-import crypto from "crypto";
 
 dotenv.config();
 
 const app = express();
-app.set("trust proxy", 1);
-
-const ALLOWED_ORIGINS = String(
-  process.env.ALLOWED_ORIGINS ||
-    process.env.CLIENT_URL ||
-    "https://kbetz.vercel.app,http://localhost:3000"
-)
-  .split(",")
-  .map((value) => value.trim())
-  .filter(Boolean);
-
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-      return callback(new Error("Origin not allowed by KBETZ CORS policy"));
-    },
-    credentials: true,
-  })
-);
-app.use(express.json({ limit: "100kb" }));
+app.use(cors());
+app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -44,9 +24,6 @@ const CLIENT_URL = process.env.CLIENT_URL || "https://kbetz.vercel.app";
 const ODDS_API_KEY = process.env.ODDS_API_KEY || "";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || "";
-const SESSION_SECRET = process.env.SESSION_SECRET || "";
-const OWNER_SECRET = process.env.OWNER_SECRET || "";
-const SESSION_TTL_SECONDS = Number(process.env.SESSION_TTL_SECONDS || 604800);
 
 const SPORTS_TO_FETCH = [
   { key: "americanfootball_nfl", label: "NFL" },
@@ -81,15 +58,13 @@ mongoose
   .catch((err) => console.log("❌ Mongo Error:", err?.message || err));
 
 /* ================= MODELS ================= */
-const User =
-  mongoose.models.User ||
-  mongoose.model("User", {
-    email: { type: String, required: true, unique: true, index: true },
-    password: { type: String, required: true },
-    isPro: { type: Boolean, default: false },
-    bankroll: { type: Number, default: 1000 },
-    createdAt: { type: Date, default: Date.now },
-  });
+const User = mongoose.model("User", {
+  email: String,
+  password: String,
+  isPro: { type: Boolean, default: false },
+  bankroll: { type: Number, default: 1000 },
+  createdAt: { type: Date, default: Date.now },
+});
 
 const Bet = mongoose.model("Bet", {
   email: String,
@@ -105,143 +80,10 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
-}
-
-function isStrongEnoughPassword(password) {
-  return typeof password === "string" && password.length >= 8 && password.length <= 128;
-}
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.pbkdf2Sync(password, salt, 210000, 32, "sha256").toString("hex");
-  return `pbkdf2$210000$${salt}$${hash}`;
-}
-
-function verifyPassword(password, storedPassword) {
-  const stored = String(storedPassword || "");
-
-  // One-time compatibility path for accounts created before password hashing.
-  if (!stored.startsWith("pbkdf2$")) {
-    return stored.length > 0 && stored === password;
-  }
-
-  const [scheme, iterationsText, salt, expectedHex] = stored.split("$");
-  if (scheme !== "pbkdf2" || !iterationsText || !salt || !expectedHex) return false;
-
-  const iterations = Number(iterationsText);
-  if (!Number.isInteger(iterations) || iterations < 100000) return false;
-
-  const actual = crypto.pbkdf2Sync(password, salt, iterations, 32, "sha256");
-  const expected = Buffer.from(expectedHex, "hex");
-  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
-}
-
-function getSessionSecret() {
-  if (SESSION_SECRET) return SESSION_SECRET;
-  if (process.env.NODE_ENV !== "production") return "kbetz-local-development-secret-change-me";
-  throw new Error("SESSION_SECRET is required in production");
-}
-
 function makeToken(email) {
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    sub: normalizeEmail(email),
-    iat: now,
-    exp: now + SESSION_TTL_SECONDS,
-    nonce: crypto.randomBytes(12).toString("hex"),
-  };
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = crypto
-    .createHmac("sha256", getSessionSecret())
-    .update(encoded)
-    .digest("base64url");
-  return `${encoded}.${signature}`;
+  const clean = normalizeEmail(email);
+  return `kbetz-session-${Buffer.from(clean).toString("base64")}-${Date.now()}`;
 }
-
-function verifyToken(token) {
-  try {
-    const [encoded, signature] = String(token || "").split(".");
-    if (!encoded || !signature) return null;
-
-    const expected = crypto
-      .createHmac("sha256", getSessionSecret())
-      .update(encoded)
-      .digest("base64url");
-
-    const actualBuffer = Buffer.from(signature);
-    const expectedBuffer = Buffer.from(expected);
-    if (
-      actualBuffer.length !== expectedBuffer.length ||
-      !crypto.timingSafeEqual(actualBuffer, expectedBuffer)
-    ) {
-      return null;
-    }
-
-    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-    if (!payload?.sub || !payload?.exp || payload.exp <= Math.floor(Date.now() / 1000)) {
-      return null;
-    }
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-function bearerToken(req) {
-  const header = String(req.headers.authorization || "");
-  return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-}
-
-function requireAuth(req, res, next) {
-  const payload = verifyToken(bearerToken(req));
-  if (!payload) {
-    return res.status(401).json({ success: false, error: "Authentication required" });
-  }
-  req.auth = payload;
-  next();
-}
-
-function requireOwnerSecret(req, res, next) {
-  if (!OWNER_SECRET) {
-    return res.status(503).json({ success: false, error: "OWNER_SECRET is not configured" });
-  }
-  const provided = String(
-    req.headers["x-kbetz-owner-secret"] ||
-      req.headers.authorization?.replace("Bearer ", "") ||
-      req.body?.secret ||
-      ""
-  );
-  const a = Buffer.from(provided);
-  const b = Buffer.from(OWNER_SECRET);
-  if (!provided || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return res.status(401).json({ success: false, error: "Owner authorization required" });
-  }
-  next();
-}
-
-const rateBuckets = new Map();
-function rateLimit({ windowMs, max, name }) {
-  return (req, res, next) => {
-    const key = `${name}:${req.ip}`;
-    const now = Date.now();
-    let bucket = rateBuckets.get(key);
-    if (!bucket || now >= bucket.resetAt) {
-      bucket = { count: 0, resetAt: now + windowMs };
-      rateBuckets.set(key, bucket);
-    }
-    bucket.count += 1;
-    res.setHeader("X-RateLimit-Limit", String(max));
-    res.setHeader("X-RateLimit-Remaining", String(Math.max(0, max - bucket.count)));
-    if (bucket.count > max) {
-      return res.status(429).json({ success: false, error: "Too many requests. Please try again shortly." });
-    }
-    next();
-  };
-}
-
-const authRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, name: "auth" });
 
 function computeEdge(homeOdds, awayOdds, index = 0) {
   const h = Math.abs(Number(homeOdds || -110));
@@ -283,22 +125,15 @@ app.get("/api/health", (req, res) => {
 
 app.get("/api/supported-sports", async (req, res) => {
   try {
-    if (!ODDS_API_KEY) {
-      return res.json({
-        success: true,
-        configured: false,
-        sports: SPORTS_TO_FETCH,
-      });
-    }
-
     const response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_API_KEY}`
+      
     );
+
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (err) {
     res.status(500).json({
-      success: false,
+      ok: false,
       error: err.message,
     });
   }
@@ -337,59 +172,59 @@ const PickLog =
   mongoose.models.PickLog || mongoose.model("PickLog", pickLogSchema);
 
 /* ================= AUTH ================= */
-app.post("/api/signup", authRateLimit, async (req, res) => {
+app.post("/api/signup", async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
     const password = String(req.body.password || "");
 
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ success: false, error: "A valid email is required" });
-    }
-    if (!isStrongEnoughPassword(password)) {
+    if (!email) {
       return res.status(400).json({
         success: false,
-        error: "Password must be between 8 and 128 characters",
+        error: "Email is required",
       });
     }
 
-    const existing = await User.findOne({ email }).lean();
-    if (existing) {
-      return res.status(409).json({ success: false, error: "An account with this email already exists" });
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({ email, password });
     }
 
-    const user = await User.create({ email, password: hashPassword(password) });
-    return res.status(201).json({
+    return res.json({
       success: true,
       token: makeToken(email),
-      user: { email: user.email, isPro: user.isPro, bankroll: user.bankroll },
+      user: {
+        email: user.email,
+        isPro: user.isPro,
+        bankroll: user.bankroll,
+      },
     });
   } catch (err) {
     console.log("Signup error:", err?.message || err);
-    if (err?.code === 11000) {
-      return res.status(409).json({ success: false, error: "An account with this email already exists" });
-    }
-    return res.status(500).json({ success: false, error: "Signup failed" });
+
+    return res.status(500).json({
+      success: false,
+      error: "Signup failed",
+    });
   }
 });
 
-app.post("/api/login", authRateLimit, async (req, res) => {
+app.post("/api/login", async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
     const password = String(req.body.password || "");
 
-    if (!isValidEmail(email) || !password) {
-      return res.status(400).json({ success: false, error: "Email and password are required" });
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: "Email is required",
+      });
     }
 
-    const user = await User.findOne({ email });
-    if (!user || !verifyPassword(password, user.password)) {
-      return res.status(401).json({ success: false, error: "Invalid email or password" });
-    }
+    let user = await User.findOne({ email });
 
-    // Transparently migrate old plaintext passwords after a valid login.
-    if (!String(user.password || "").startsWith("pbkdf2$")) {
-      user.password = hashPassword(password);
-      await user.save();
+    if (!user) {
+      user = await User.create({ email, password });
     }
 
     return res.json({
@@ -397,32 +232,41 @@ app.post("/api/login", authRateLimit, async (req, res) => {
       token: makeToken(email),
       isPro: user.isPro,
       bankroll: user.bankroll,
-      user: { email: user.email, isPro: user.isPro, bankroll: user.bankroll },
+      user: {
+        email: user.email,
+        isPro: user.isPro,
+        bankroll: user.bankroll,
+      },
     });
   } catch (err) {
     console.log("Login error:", err?.message || err);
-    return res.status(500).json({ success: false, error: "Login failed" });
+
+    return res.status(500).json({
+      success: false,
+      error: "Login failed",
+    });
   }
 });
 
-app.get("/api/me", requireAuth, async (req, res) => {
+app.get("/api/me", async (req, res) => {
   try {
-    const email = normalizeEmail(req.auth.sub);
-    const user = await User.findOne({ email }).lean();
-    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+    const email = normalizeEmail(req.query.email);
+    const user = email ? await User.findOne({ email }) : null;
 
     return res.json({
       success: true,
       email,
-      isPro: Boolean(user.isPro),
-      bankroll: Number(user.bankroll || 0),
-      plan: user.isPro ? "pro" : "free",
+      isPro: user?.isPro || false,
+      bankroll: user?.bankroll || 0,
+      plan: user?.isPro ? "pro" : "free",
     });
-  } catch {
-    return res.status(500).json({ success: false, error: "Could not load user" });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: "Could not load user",
+    });
   }
 });
-
 
 /* ================= FALLBACK ODDS ================= */
 let fakeTick = 0;
@@ -1658,12 +1502,8 @@ io.on("connection", (socket) => {
   console.log("⚡ Client connected");
 
   const send = async () => {
-    try {
-      const payload = await getCachedOdds();
-      socket.emit("oddsUpdate", payload.games || []);
-    } catch (err) {
-      socket.emit("oddsError", { message: "Live odds temporarily unavailable" });
-    }
+    const games = await fetchOdds();
+    socket.emit("oddsUpdate", games);
   };
 
   send();
@@ -1674,17 +1514,12 @@ io.on("connection", (socket) => {
 });
 
 /* ================= BETS ================= */
-app.post("/api/bet", requireAuth, async (req, res) => {
+app.post("/api/bet", async (req, res) => {
   try {
-    const { game, odds, stake } = req.body;
-    const email = normalizeEmail(req.auth.sub);
-
-    if (!game || !Number.isFinite(Number(odds)) || !Number.isFinite(Number(stake)) || Number(stake) <= 0) {
-      return res.status(400).json({ success: false, error: "Valid game, odds, and positive stake are required" });
-    }
+    const { email, game, odds, stake } = req.body;
 
     await Bet.create({
-      email,
+      email: normalizeEmail(email),
       game,
       odds: Number(odds || 0),
       stake: Number(stake || 0),
@@ -1699,9 +1534,9 @@ app.post("/api/bet", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/api/bets", requireAuth, async (req, res) => {
+app.get("/api/bets", async (req, res) => {
   try {
-    const email = normalizeEmail(req.auth.sub);
+    const email = normalizeEmail(req.query.email);
     const bets = await Bet.find({ email }).sort({ createdAt: -1 }).limit(100);
     res.json(bets);
   } catch (err) {
@@ -1710,9 +1545,9 @@ app.get("/api/bets", requireAuth, async (req, res) => {
 });
 
 /* ================= ROI ================= */
-app.get("/api/roi", requireAuth, async (req, res) => {
+app.get("/api/roi", async (req, res) => {
   try {
-    const email = normalizeEmail(req.auth.sub);
+    const email = normalizeEmail(req.query.email);
     const bets = await Bet.find({ email });
 
     let profit = 0;
@@ -1762,7 +1597,7 @@ app.get("/api/roi", requireAuth, async (req, res) => {
 });
 
 /* ================= STRIPE ================= */
-app.post("/api/checkout", requireAuth, async (req, res) => {
+app.post("/api/checkout", async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -1817,7 +1652,7 @@ app.post("/api/checkout", requireAuth, async (req, res) => {
 
 
 /* ================= STRIPE PRO CONFIRM ================= */
-app.post("/api/pro/confirm", requireAuth, async (req, res) => {
+app.post("/api/pro/confirm", async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -1859,13 +1694,6 @@ app.post("/api/pro/confirm", requireAuth, async (req, res) => {
       });
     }
 
-    if (email !== normalizeEmail(req.auth.sub)) {
-      return res.status(403).json({
-        success: false,
-        error: "Stripe session does not belong to this account",
-      });
-    }
-
     if (!paid) {
       return res.status(402).json({
         success: false,
@@ -1897,7 +1725,7 @@ app.post("/api/pro/confirm", requireAuth, async (req, res) => {
 });
 
 /* ================= WEBHOOK / PRO HELPERS ================= */
-app.post("/api/pro/activate", requireOwnerSecret, async (req, res) => {
+app.post("/api/pro/activate", async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);
 
@@ -1928,17 +1756,6 @@ app.post("/api/pro/activate", requireOwnerSecret, async (req, res) => {
 });
 
 /* ================= START ================= */
-if (process.env.NODE_ENV === "production") {
-  const missing = [];
-  if (!process.env.MONGO_URI) missing.push("MONGO_URI");
-  if (!SESSION_SECRET) missing.push("SESSION_SECRET");
-  if (!OWNER_SECRET) missing.push("OWNER_SECRET");
-  if (missing.length) {
-    console.error(`❌ Missing required production environment variables: ${missing.join(", ")}`);
-    process.exit(1);
-  }
-}
-
 server.listen(PORT, () => {
   console.log(`🔥 KBETZ LIVE on ${PORT}`);
 });
