@@ -477,7 +477,7 @@ async function fetchOdds() {
 /* ================= ODDS CACHE ================= */
 const ODDS_CACHE_MS = Number(process.env.ODDS_CACHE_MS || 90000);
 let oddsCache = null;
-let oddsRefreshPromise = null;
+
 async function getCachedOdds() {
   const now = Date.now();
 
@@ -495,39 +495,16 @@ async function getCachedOdds() {
     };
   }
 
-  // If another request is already refreshing the cache,
-  // wait for it instead of starting another refresh.
-  if (oddsRefreshPromise) {
-    await oddsRefreshPromise;
+  const games = await fetchOdds();
+  const source = games.some((g) => g.source === "live") ? "live" : "fallback";
 
-    return {
-      ...oddsCache,
-      cached: true,
-      cacheAgeSeconds: Math.round((Date.now() - oddsCache.updatedAt) / 1000),
-      cacheMs: ODDS_CACHE_MS,
-    };
-  }
-
-  oddsRefreshPromise = (async () => {
-    const games = await fetchOdds();
-    const source = games.some((g) => g.source === "live")
-      ? "live"
-      : "fallback";
-
-    oddsCache = {
-      success: true,
-      count: games.length,
-      source,
-      games,
-      updatedAt: Date.now(),
-    };
-  })();
-
-  try {
-    await oddsRefreshPromise;
-  } finally {
-    oddsRefreshPromise = null;
-  }
+  oddsCache = {
+    success: true,
+    count: games.length,
+    source,
+    games,
+    updatedAt: now,
+  };
 
   return {
     ...oddsCache,

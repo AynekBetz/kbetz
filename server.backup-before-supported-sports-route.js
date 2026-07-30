@@ -29,23 +29,13 @@ const SPORTS_TO_FETCH = [
   { key: "americanfootball_nfl", label: "NFL" },
   { key: "americanfootball_nfl_preseason", label: "NFL Preseason" },
   { key: "americanfootball_ncaaf", label: "NCAAF" },
-
-  { key: "basketball_nba", label: "NBA" },
-  { key: "basketball_nba_summer_league", label: "NBA Summer League" },
-  { key: "basketball_wnba", label: "WNBA" },
-  { key: "basketball_ncaab", label: "NCAAB" },
-
   { key: "baseball_mlb", label: "MLB" },
-  { key: "icehockey_nhl", label: "NHL" },
-
-  { key: "soccer_usa_mls", label: "MLS" },
-  { key: "soccer_epl", label: "EPL" },
-
+  { key: "basketball_wnba", label: "WNBA" },
+  { key: "basketball_nba_summer_league", label: "NBA Summer League" },
   { key: "mma_mixed_martial_arts", label: "MMA" },
   { key: "boxing_boxing", label: "Boxing" },
-
-  { key: "tennis_atp", label: "Tennis" },
-  { key: "golf_pga", label: "Golf" }
+  { key: "soccer_usa_mls", label: "MLS" },
+  { key: "soccer_epl", label: "EPL" },
 ];
 
 /* ================= STRIPE ================= */
@@ -121,22 +111,6 @@ app.get("/api/health", (req, res) => {
     server: "live",
     sports: SPORTS_TO_FETCH.map((s) => s.label),
   });
-});
-
-app.get("/api/supported-sports", async (req, res) => {
-  try {
-    const response = await fetch(
-      
-    );
-
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (err) {
-    res.status(500).json({
-      ok: false,
-      error: err.message,
-    });
-  }
 });
 
 
@@ -477,7 +451,7 @@ async function fetchOdds() {
 /* ================= ODDS CACHE ================= */
 const ODDS_CACHE_MS = Number(process.env.ODDS_CACHE_MS || 90000);
 let oddsCache = null;
-let oddsRefreshPromise = null;
+
 async function getCachedOdds() {
   const now = Date.now();
 
@@ -495,39 +469,16 @@ async function getCachedOdds() {
     };
   }
 
-  // If another request is already refreshing the cache,
-  // wait for it instead of starting another refresh.
-  if (oddsRefreshPromise) {
-    await oddsRefreshPromise;
+  const games = await fetchOdds();
+  const source = games.some((g) => g.source === "live") ? "live" : "fallback";
 
-    return {
-      ...oddsCache,
-      cached: true,
-      cacheAgeSeconds: Math.round((Date.now() - oddsCache.updatedAt) / 1000),
-      cacheMs: ODDS_CACHE_MS,
-    };
-  }
-
-  oddsRefreshPromise = (async () => {
-    const games = await fetchOdds();
-    const source = games.some((g) => g.source === "live")
-      ? "live"
-      : "fallback";
-
-    oddsCache = {
-      success: true,
-      count: games.length,
-      source,
-      games,
-      updatedAt: Date.now(),
-    };
-  })();
-
-  try {
-    await oddsRefreshPromise;
-  } finally {
-    oddsRefreshPromise = null;
-  }
+  oddsCache = {
+    success: true,
+    count: games.length,
+    source,
+    games,
+    updatedAt: now,
+  };
 
   return {
     ...oddsCache,
