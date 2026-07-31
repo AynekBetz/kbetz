@@ -202,7 +202,6 @@ export default function Dashboard() {
         const data = await res.json();
 
         if (data.success && data.isPro) {
-          localStorage.setItem("plan", "pro");
           alert("✅ KBETZ PRO is active. Thank you for upgrading!");
           window.history.replaceState({}, "", "/dashboard");
           window.location.reload();
@@ -760,8 +759,7 @@ export default function Dashboard() {
   ];
 
   useEffect(() => {
-    const email = getStoredEmail();
-    loadAll(email);
+    loadAll();
 
     const socket = io(API, {
       transports: ["websocket"],
@@ -831,33 +829,81 @@ export default function Dashboard() {
     }));
   };
 
-  const loadAll = async (email) => {
+  const loadAll = async () => {
     try {
       setLoading(true);
 
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("token")
+          : null;
+
+      const authHeaders = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
+
       const [user, roiData, odds] = await Promise.all([
-        fetch(`${API}/api/me?email=${email || ""}`, { cache: "no-store" })
-          .then((r) => r.json())
-          .catch(() => ({})),
+        token
+          ? fetch(`${API}/api/me`, {
+              method: "GET",
+              headers: authHeaders,
+              cache: "no-store",
+            })
+              .then(async (response) => {
+                if (!response.ok) return {};
+                return response.json();
+              })
+              .catch(() => ({}))
+          : Promise.resolve({}),
 
-        fetch(`${API}/api/roi?email=${email || ""}`, { cache: "no-store" })
-          .then((r) => r.json())
-          .catch(() => ({})),
+        token
+          ? fetch(`${API}/api/roi`, {
+              method: "GET",
+              headers: authHeaders,
+              cache: "no-store",
+            })
+              .then(async (response) => {
+                if (!response.ok) return {};
+                return response.json();
+              })
+              .catch(() => ({}))
+          : Promise.resolve({}),
 
-        fetch(`${API}/api/odds`, { cache: "no-store" })
-          .then((r) => r.json())
+        fetch(`${API}/api/odds`, {
+          cache: "no-store",
+        })
+          .then(async (response) => {
+            if (!response.ok) {
+              return { games: fallbackGames };
+            }
+
+            return response.json();
+          })
           .catch(() => ({ games: fallbackGames })),
       ]);
 
-      setBankroll(user?.bankroll ?? 0);
-      setIsPro(Boolean(user?.isPro || user?.plan === "pro"));
-      setROI(roiData || {});
+      const verifiedPro =
+        user?.success === true &&
+        (user?.isPro === true || user?.plan === "pro");
+
+      setBankroll(
+        user?.success === true
+          ? Number(user?.bankroll || 0)
+          : 0
+      );
+
+      setIsPro(verifiedPro);
+      setROI(token ? roiData || {} : {});
 
       const loadedGames = normalizeGames(odds?.games);
       processGames(loadedGames);
       trackLineHistory(loadedGames);
     } catch (err) {
       console.log("KBETZ load error:", err);
+
+      setBankroll(0);
+      setIsPro(false);
+      setROI({});
 
       const loadedGames = normalizeGames(fallbackGames);
       processGames(loadedGames);
