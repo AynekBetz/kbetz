@@ -1,6 +1,68 @@
 "use client";
 
-export default function SplitSummary({ styles, arbOps, steamGames }) {
+export default function SplitSummary({
+  styles,
+  arbOps,
+  steamGames,
+  isPro,
+  upgrade,
+}) {
+  if (!isPro) {
+    return (
+      <section style={styles.splitSummary}>
+        <div
+          style={{
+            ...styles.summaryCardGreen,
+            position: "relative",
+            overflow: "hidden",
+            opacity: 0.9,
+          }}
+        >
+          <div style={styles.iconGreen}>🔒</div>
+
+          <div>
+            <h2 style={styles.featureTitle}>ARBITRAGE PRO</h2>
+            <p style={styles.featureSubtitle}>
+              Compare sportsbooks and uncover positive EV opportunities.
+            </p>
+          </div>
+
+          <button
+            style={styles.upgradeBtn}
+            onClick={upgrade}
+          >
+            Upgrade to PRO
+          </button>
+        </div>
+
+        <div
+          style={{
+            ...styles.summaryCardPurpleOrange,
+            position: "relative",
+            overflow: "hidden",
+            opacity: 0.9,
+          }}
+        >
+          <div style={styles.iconPurple}>🔒</div>
+
+          <div>
+            <h2 style={styles.featureTitle}>STEAM PRO</h2>
+            <p style={styles.featureSubtitle}>
+              Unlock sharp money movement and steam alerts.
+            </p>
+          </div>
+
+          <button
+            style={styles.upgradeBtn}
+            onClick={upgrade}
+          >
+            Upgrade to PRO
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section style={styles.splitSummary}>
       <div style={styles.summaryCardGreen}>

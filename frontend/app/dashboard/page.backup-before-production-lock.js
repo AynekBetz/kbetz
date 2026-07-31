@@ -22,10 +22,14 @@ export default function Dashboard() {
   const [authEmail, setAuthEmail] = useState("");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setAuthEmail(localStorage.getItem("email") || "");
+    if (typeof window === "undefined") return;
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      router.replace("/login");
     }
-  }, []);
+  }, [router]);
 
   const handleKBETZLogout = () => {
     if (typeof window !== "undefined") {
@@ -202,7 +206,6 @@ export default function Dashboard() {
         const data = await res.json();
 
         if (data.success && data.isPro) {
-          localStorage.setItem("plan", "pro");
           alert("✅ KBETZ PRO is active. Thank you for upgrading!");
           window.history.replaceState({}, "", "/dashboard");
           window.location.reload();
@@ -831,25 +834,60 @@ export default function Dashboard() {
     }));
   };
 
-  const loadAll = async (email) => {
+  const loadAll = async () => {
     try {
       setLoading(true);
 
-      const [user, roiData, odds] = await Promise.all([
-        fetch(`${API}/api/me?email=${email || ""}`, { cache: "no-store" })
-          .then((r) => r.json())
-          .catch(() => ({})),
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("token")
+          : "";
 
-        fetch(`${API}/api/roi?email=${email || ""}`, { cache: "no-store" })
-          .then((r) => r.json())
-          .catch(() => ({})),
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
 
-        fetch(`${API}/api/odds`, { cache: "no-store" })
-          .then((r) => r.json())
-          .catch(() => ({ games: fallbackGames })),
+      const authHeaders = {
+        Authorization: `Bearer ${token}`,
+      };
+
+      const [userResponse, roiResponse, oddsResponse] = await Promise.all([
+        fetch(`${API}/api/me`, {
+          cache: "no-store",
+          headers: authHeaders,
+        }),
+
+        fetch(`${API}/api/roi`, {
+          cache: "no-store",
+          headers: authHeaders,
+        }),
+
+        fetch(`${API}/api/odds`, {
+          cache: "no-store",
+        }),
       ]);
 
-      setBankroll(user?.bankroll ?? 0);
+      if (userResponse.status === 401) {
+        throw new Error("AUTHENTICATION_REQUIRED");
+      }
+
+      const user = await userResponse.json().catch(() => ({}));
+
+      if (!userResponse.ok) {
+        throw new Error(user?.error || "Could not verify user");
+      }
+
+      const roiData = roiResponse.ok
+        ? await roiResponse.json().catch(() => ({}))
+        : {};
+
+      const odds = oddsResponse.ok
+        ? await oddsResponse.json().catch(() => ({ games: fallbackGames }))
+        : { games: fallbackGames };
+
+      setAuthEmail(user?.email || "");
+      setBankroll(Number(user?.bankroll || 0));
       setIsPro(Boolean(user?.isPro || user?.plan === "pro"));
       setROI(roiData || {});
 
@@ -858,6 +896,14 @@ export default function Dashboard() {
       trackLineHistory(loadedGames);
     } catch (err) {
       console.log("KBETZ load error:", err);
+
+      if (String(err?.message || "") === "AUTHENTICATION_REQUIRED") {
+        localStorage.removeItem("token");
+        localStorage.removeItem("email");
+        localStorage.removeItem("plan");
+        router.replace("/login");
+        return;
+      }
 
       const loadedGames = normalizeGames(fallbackGames);
       processGames(loadedGames);
@@ -1048,6 +1094,13 @@ export default function Dashboard() {
   };
 
  const handleViewPick = (pick) => {
+  if (!isPro) {
+    alert(
+      "🔒 Full AI analysis is a KBETZ PRO feature. Upgrade to reveal confidence, edge, risk, and recommendations."
+    );
+    return;
+  }
+
   if (typeof pick === "string") {
     alert(`KBETZ AI Pick\n\n${pick}`);
     return;
@@ -1171,88 +1224,94 @@ ${analysis}`
         </div>
       </section>
 
-   {isPro ? (
-  <AIPicks
-    topAiPicks={topAiPicks}
-    styles={styles}
-    formatOdds={formatOdds}
-    handleViewPick={handleViewPick}
-  />
-) : (
-  <div
-    style={{
-      marginBottom: 14,
-      padding: 24,
-      borderRadius: 10,
-      border: "1px solid rgba(0,255,225,.45)",
-      background:
-        "linear-gradient(135deg, rgba(0,255,225,.06), rgba(180,48,255,.06))",
-      textAlign: "center",
-      color: "#fff",
-    }}
-  >
-    <h2 style={{ marginBottom: 10 }}>🧠 KBETZ AI Picks</h2>
-
-    {topAiPicks.length > 0 ? (
-      <>
-        <h3>{topAiPicks[0].away} @ {topAiPicks[0].home}</h3>
-        <p>Confidence: {Math.round((topAiPicks[0].implied || 0) * 100)}%</p>
-      </>
-    ) : (
-      <p>Live AI picks loading…</p>
-    )}
-
-    <div
-      style={{
-        margin: "18px auto",
-        maxWidth: 420,
-        padding: 14,
-        borderRadius: 8,
-        backdropFilter: "blur(4px)",
-        background: "rgba(255,255,255,.08)",
-      }}
-    >
-      🔒 Unlock all AI picks, confidence scores, and full analysis with KBETZ PRO.
-    </div>
-
-    <button
-      onClick={upgrade}
-      style={styles.upgradeBtn}
-    >
-      Upgrade to PRO
-    </button>
-  </div>
-)}
+     <AIPicks
+  topAiPicks={topAiPicks}
+  styles={styles}
+  formatOdds={formatOdds}
+  handleViewPick={handleViewPick}
+/>
      <LiveMarketsSummary
   styles={styles}
   games={games}
   lineHistory={lineHistory}
 />
- <SplitSummary
-  styles={styles}
-  arbOps={arbOps}
-  steamGames={steamGames}
-  isPro={isPro}
-  upgrade={upgrade}
-/>
+     {isPro ? (
+       <SplitSummary
+         styles={styles}
+         arbOps={arbOps}
+         steamGames={steamGames}
+       />
+     ) : (
+       <section
+         style={{
+           marginBottom: 10,
+           padding: "24px",
+           borderRadius: 8,
+           border: "1px solid rgba(180,48,255,0.72)",
+           background:
+             "linear-gradient(90deg, rgba(0,255,225,0.055), rgba(180,48,255,0.11)), rgba(2,7,11,0.95)",
+           boxShadow:
+             "0 0 24px rgba(180,48,255,0.18), inset 0 0 25px rgba(0,255,225,0.025)",
+           textAlign: "center",
+         }}
+       >
+         <div style={{ fontSize: 30, marginBottom: 8 }}>🔒</div>
 
-<ParlayBuilder
+         <h2 style={{ margin: 0, color: "#ffffff" }}>
+           Arbitrage & Steam Detection
+         </h2>
+
+         <p style={{ color: "rgba(255,255,255,.76)" }}>
+           Unlock real-time market opportunities and sharp-money movement.
+         </p>
+
+         <button style={styles.upgradeBtn} onClick={upgrade}>
+           💎 Unlock with KBETZ PRO
+         </button>
+       </section>
+     )}
+
+    <ParlayBuilder
   styles={styles}
   parlay={parlay}
   payout={payout}
   parlayOdds={parlayOdds}
   clearParlay={clearParlay}
-  isPro={isPro}
-  upgrade={upgrade}
 />
 
-  <HistoryPanel
-  styles={styles}
-  history={history}
-  handleViewHistory={handleViewHistory}
-  isPro={isPro}
-  upgrade={upgrade}
-/>
+    {isPro ? (
+      <HistoryPanel
+        styles={styles}
+        history={history}
+        handleViewHistory={handleViewHistory}
+      />
+    ) : (
+      <section
+        style={{
+          marginBottom: 10,
+          padding: "22px",
+          borderRadius: 8,
+          border: "1px solid rgba(0,255,225,0.55)",
+          background: "rgba(2,7,11,0.95)",
+          boxShadow: "0 0 20px rgba(0,255,225,0.12)",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
+
+        <h2 style={{ margin: "0 0 8px", color: "#00ffe1" }}>
+          PRO Bet History
+        </h2>
+
+        <p style={{ color: "rgba(255,255,255,.76)" }}>
+          Save bets and track results, profit, ROI, and long-term performance.
+        </p>
+
+        <button style={styles.upgradeBtn} onClick={upgrade}>
+          Upgrade to PRO
+        </button>
+      </section>
+    )}
 
      <LiveMarkets
   styles={styles}
@@ -1266,7 +1325,13 @@ ${analysis}`
   addToParlay={addToParlay}
 />
 
-     
+     <LowerGrid
+  styles={styles}
+  arbOps={arbOps}
+  steamGames={steamGames}
+  history={history}
+  formatOdds={formatOdds}
+/>
 
       <footer style={styles.footer}>
         REAL-TIME DATA • AI POWERED • SHARP ADVANTAGE
