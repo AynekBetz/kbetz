@@ -25,8 +25,23 @@ const ALLOWED_ORIGINS = String(
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-      return callback(new Error("Origin not allowed by KBETZ CORS policy"));
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const isAllowedOrigin =
+        ALLOWED_ORIGINS.includes(origin) ||
+        origin === "https://kbetz.vercel.app" ||
+        origin.endsWith(".vercel.app") ||
+        origin === "http://localhost:3000";
+
+      if (isAllowedOrigin) {
+        return callback(null, true);
+      }
+
+      return callback(
+        new Error("Origin not allowed by KBETZ CORS policy")
+      );
     },
     credentials: true,
   })
