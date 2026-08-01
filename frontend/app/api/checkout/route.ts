@@ -29,19 +29,21 @@ export async function POST(req: Request) {
     return Response.json(data, {
       status: response.status,
     });
-  } catch (error) {
+
+  } catch (error: any) {
     console.error("KBETZ frontend checkout proxy error:", error);
 
     return Response.json(
       {
         error: "Checkout connection failed",
+        details: error?.message || "Unknown checkout proxy error",
       },
       {
         status: 500,
       }
     );
   }
-}
+} // ← THIS BRACE WAS MISSING
 
 export async function GET() {
   return Response.json(
