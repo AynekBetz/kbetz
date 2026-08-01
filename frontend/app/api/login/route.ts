@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 const BACKEND_URL =
   process.env.KBETZ_BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "https://kbetz-main.onrender.com";
+  "https://kbetz-live.onrender.com";
 
 export async function POST(req: Request) {
   try {
@@ -21,20 +21,29 @@ export async function POST(req: Request) {
     const text = await res.text();
 
     let data: any;
+
     try {
       data = JSON.parse(text);
     } catch {
-      data = { error: text || "Invalid backend response" };
+      data = {
+        success: false,
+        error: text || "Invalid backend response",
+      };
     }
 
-    return Response.json(data, { status: res.status });
+    return Response.json(data, {
+      status: res.status,
+    });
   } catch (err: any) {
     return Response.json(
       {
-        error: "Login proxy failed",
+        success: false,
+        error: "Login connection failed",
         details: err?.message || "Unknown error",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

@@ -22,74 +22,75 @@ export default function LoginPage() {
     );
 };
 
-  const handleLogin = async () => {
-    setMessage("");
+ const handleLogin = async () => {
+  setMessage("");
 
-    if (!email || !password) {
-      setMessage("Enter your email and password.");
+  if (!email || !password) {
+    setMessage("Enter your email and password.");
+    return;
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  try {
+    setLoading(true);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    let data: any = {};
+    let ok = false;
+
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      ok = res.ok;
+      data = await res.json().catch(() => ({}));
+    } catch {
+      clearTimeout(timeout);
+
+      setMessage(
+        "KBETZ could not connect to the login service. Please try again."
+      );
       return;
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const token = getToken(data);
 
-    try {
-      setLoading(true);
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-
-      let data: any = {};
-      let ok = false;
-
-      try {
-        const res = await fetch("/api/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: cleanEmail,
-            password,
-          }),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeout);
-
-        ok = res.ok;
-        data = await res.json();
-      } catch {
-        clearTimeout(timeout);
-        data = {};
-        ok = true;
-      }
-
-      let token = getToken(data);
-
-      if (!token) {
-        token = `kbetz-local-session-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
-      }
-
-      localStorage.setItem("token", token);
-      localStorage.setItem("email", cleanEmail);
-
-      router.push("/dashboard");
-    } catch {
-      const fallbackToken = `kbetz-local-session-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2)}`;
-
-      localStorage.setItem("token", fallbackToken);
-      localStorage.setItem("email", cleanEmail);
-
-      router.push("/dashboard");
-    } finally {
-      setLoading(false);
+    if (!ok || !token) {
+      setMessage(
+        data?.error ||
+          data?.message ||
+          "Invalid email or password."
+      );
+      return;
     }
-  };
 
+    localStorage.setItem("token", token);
+    localStorage.setItem("email", cleanEmail);
+    localStorage.removeItem("plan");
+
+    router.push("/dashboard");
+  } catch {
+    setMessage(
+      "KBETZ could not complete login. Please try again."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <main style={styles.page}>
       <div style={styles.glowOne}></div>
