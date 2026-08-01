@@ -1060,11 +1060,25 @@ export default function Dashboard() {
     const email = getStoredEmail();
 
     try {
-      const res = await fetch(`/api/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+     const token =
+  typeof window !== "undefined"
+    ? localStorage.getItem("token")
+    : null;
+
+if (!token) {
+  alert("Please log in before upgrading to KBETZ PRO.");
+  router.push("/login");
+  return;
+}
+
+const res = await fetch(`/api/checkout`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  },
+  body: JSON.stringify({ email }),
+});
 
       const data = await res.json();
 

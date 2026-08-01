@@ -1,21 +1,30 @@
 export const dynamic = "force-dynamic";
 
-const BACKEND_URL = "https://kbetz-main.onrender.com";
+const BACKEND_URL = "https://kbetz-live.onrender.com";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    const authorization = req.headers.get("authorization");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (authorization) {
+      headers.Authorization = authorization;
+    }
 
     const response = await fetch(`${BACKEND_URL}/api/checkout`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify(body),
       cache: "no-store",
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({
+      error: "Invalid checkout response",
+    }));
 
     return Response.json(data, {
       status: response.status,
