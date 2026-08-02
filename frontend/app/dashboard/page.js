@@ -785,7 +785,7 @@ export default function Dashboard() {
   };
 
   const normalizeGames = (rawGames) => {
-    const source = Array.isArray(rawGames) && rawGames.length ? rawGames : fallbackGames;
+    const source = Array.isArray(rawGames) ? rawGames : [];
 
     return source.map((g, index) => ({
       id: g.id || `game-${index}`,
@@ -846,12 +846,20 @@ export default function Dashboard() {
         })
           .then(async (response) => {
             if (!response.ok) {
-              return { games: fallbackGames };
+              return {
+                success: false,
+                source: "error",
+                games: [],
+              };
             }
 
             return response.json();
           })
-          .catch(() => ({ games: fallbackGames })),
+          .catch(() => ({
+            success: false,
+            source: "error",
+            games: [],
+          })),
       ]);
 
       const verifiedPro =
@@ -868,8 +876,17 @@ export default function Dashboard() {
       setROI(token ? roiData || {} : {});
 
       const loadedGames = normalizeGames(odds?.games);
-      processGames(loadedGames);
-      trackLineHistory(loadedGames);
+
+      if (loadedGames.length === 0) {
+        setGames([]);
+        setTicker([]);
+        setArbOps([]);
+        setSteamGames([]);
+        setLineHistory({});
+      } else {
+        processGames(loadedGames);
+        trackLineHistory(loadedGames);
+      }
     } catch (err) {
       console.log("KBETZ load error:", err);
 
@@ -877,9 +894,11 @@ export default function Dashboard() {
       setIsPro(false);
       setROI({});
 
-      const loadedGames = normalizeGames(fallbackGames);
-      processGames(loadedGames);
-      trackLineHistory(loadedGames);
+      setGames([]);
+      setTicker([]);
+      setArbOps([]);
+      setSteamGames([]);
+      setLineHistory({});
     } finally {
       setLoading(false);
     }
