@@ -738,15 +738,21 @@ export default function Dashboard() {
       reconnection: true,
     });
 
-    socket.on("oddsUpdate", (data) => {
-      const incomingGames = Array.isArray(data) ? data : data?.games;
+   socket.on("oddsUpdate", (data) => {
+  const incomingGames = Array.isArray(data) ? data : data?.games;
 
-      if (incomingGames?.length) {
-        processGames(incomingGames);
-        trackLineHistory(incomingGames);
-      }
-    });
+  if (!Array.isArray(incomingGames) || incomingGames.length === 0) {
+    setGames([]);
+    setTicker([]);
+    setArbOps([]);
+    setSteamGames([]);
+    setLineHistory({});
+    return;
+  }
 
+  processGames(incomingGames);
+  trackLineHistory(incomingGames);
+});
     return () => socket.disconnect();
   }, []);
 
