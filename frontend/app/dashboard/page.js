@@ -727,36 +727,8 @@ export default function Dashboard() {
     setMounted(true);
   }, []);
 
-  const fallbackGames = [
-    {
-      id: "fallback-1",
-      away: "Lakers",
-      home: "Warriors",
-      homeOdds: -110,
-      books: [{ name: "DK" }, { name: "FD" }, { name: "MGM" }],
-    },
-    {
-      id: "fallback-2",
-      away: "Celtics",
-      home: "Bucks",
-      homeOdds: -108,
-      books: [{ name: "DK" }, { name: "FD" }, { name: "MGM" }],
-    },
-    {
-      id: "fallback-3",
-      away: "Heat",
-      home: "Magic",
-      homeOdds: 124,
-      books: [{ name: "DK" }, { name: "FD" }, { name: "MGM" }],
-    },
-    {
-      id: "fallback-4",
-      away: "Chiefs",
-      home: "49ers",
-      homeOdds: -135,
-      books: [{ name: "DK" }, { name: "FD" }, { name: "MGM" }],
-    },
-  ];
+  // Production safety: never display invented games as live markets.
+  const fallbackGames = [];
 
   useEffect(() => {
     loadAll();
@@ -1080,11 +1052,31 @@ const res = await fetch(`/api/checkout`, {
   body: JSON.stringify({ email }),
 });
 
-      const data = await res.json();
+     const data = await res.json().catch(() => ({}));
 
-      if (data.url) {
-        window.location.href = data.url;
-      }
+if (!res.ok) {
+  alert(
+    data?.error ||
+      data?.message ||
+      `KBETZ checkout failed with status ${res.status}.`
+  );
+
+  if (res.status === 401) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("email");
+    localStorage.removeItem("plan");
+    router.push("/login");
+  }
+
+  return;
+}
+
+if (!data.url) {
+  alert("KBETZ checkout did not return a payment link.");
+  return;
+}
+
+window.location.href = data.url;
     } catch (err) {
       console.log("KBETZ checkout error:", err);
       alert("Checkout connection failed. Try again in a moment.");

@@ -635,11 +635,11 @@ async function fetchOdds() {
       return liveGames.slice(0, 80);
     }
 
-    console.log("⚠️ No live games found. Using fallback board.");
-    return buildFallbackGames();
+    console.log("ℹ️ No current sportsbook markets were returned.");
+    return [];
   } catch (err) {
-    console.log("⚠️ Odds fetch error. Using fallback:", err?.message || err);
-    return buildFallbackGames();
+    console.log("⚠️ Odds fetch error:", err?.message || err);
+    return [];
   }
 }
 
@@ -683,7 +683,7 @@ async function getCachedOdds() {
     const games = await fetchOdds();
     const source = games.some((g) => g.source === "live")
       ? "live"
-      : "fallback";
+      : "empty";
 
     oddsCache = {
       success: true,
