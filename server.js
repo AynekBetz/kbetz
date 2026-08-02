@@ -63,27 +63,44 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const OWNER_SECRET = process.env.OWNER_SECRET || "";
 const SESSION_TTL_SECONDS = Number(process.env.SESSION_TTL_SECONDS || 604800);
 
-const SPORTS_TO_FETCH = [
-  { key: "americanfootball_nfl", label: "NFL" },
-  { key: "americanfootball_nfl_preseason", label: "NFL Preseason" },
-  { key: "americanfootball_ncaaf", label: "NCAAF" },
+/*
+ * KBETZ discovers currently active sports from The Odds API.
+ * These values only control priority and the maximum number fetched.
+ */
+const ODDS_MAX_SPORTS = Math.max(
+  1,
+  Number(process.env.ODDS_MAX_SPORTS || 8)
+);
 
-  { key: "basketball_nba", label: "NBA" },
-  { key: "basketball_nba_summer_league", label: "NBA Summer League" },
-  { key: "basketball_wnba", label: "WNBA" },
-  { key: "basketball_ncaab", label: "NCAAB" },
+const SPORT_PRIORITY = [
+  "baseball_mlb",
+  "americanfootball_nfl",
+  "americanfootball_nfl_preseason",
+  "americanfootball_ncaaf",
+  "basketball_wnba",
+  "basketball_nba",
+  "basketball_ncaab",
+  "icehockey_nhl",
+  "soccer_usa_mls",
+  "soccer_epl",
+  "mma_mixed_martial_arts",
+  "boxing_boxing",
+];
 
-  { key: "baseball_mlb", label: "MLB" },
-  { key: "icehockey_nhl", label: "NHL" },
-
-  { key: "soccer_usa_mls", label: "MLS" },
-  { key: "soccer_epl", label: "EPL" },
-
-  { key: "mma_mixed_martial_arts", label: "MMA" },
-  { key: "boxing_boxing", label: "Boxing" },
-
-  { key: "tennis_atp", label: "Tennis" },
-  { key: "golf_pga", label: "Golf" }
+const ALLOWED_SPORT_GROUPS = [
+  "american football",
+  "baseball",
+  "basketball",
+  "ice hockey",
+  "soccer",
+  "tennis",
+  "golf",
+  "mixed martial arts",
+  "boxing",
+  "motorsports",
+  "rugby league",
+  "rugby union",
+  "cricket",
 ];
 
 /* ================= STRIPE ================= */
@@ -588,6 +605,63 @@ function normalizeOddsGame(rawGame, sportLabel, index = 0) {
   return game;
 }
 
+async function fetchActiveSports() {
+  if (!ODDS_API_KEY) {
+    throw new Error("Missing ODDS_API_KEY");
+  }
+
+  const url =
+    `https://api.the-odds-api.com/v4/sports/` +
+    `?apiKey=${ODDS_API_KEY}`;
+
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+        data?.error ||
+        `Active sports request failed with status ${response.status}`
+    );
+  }
+
+  if (!Array.isArray(data)) {
+    throw new Error("Invalid active sports response");
+  }
+
+  const activeSports = data
+    .filter((sport) => {
+      const group = String(sport?.group || "").toLowerCase();
+
+      return (
+        sport?.active === true &&
+        sport?.has_outrights !== true &&
+        ALLOWED_SPORT_GROUPS.some((allowed) => group.includes(allowed))
+      );
+    })
+    .map((sport) => ({
+      key: sport.key,
+      label: sport.title || sport.description || sport.key,
+      group: sport.group || "Other",
+    }));
+
+  activeSports.sort((a, b) => {
+    const aPriority = SPORT_PRIORITY.indexOf(a.key);
+    const bPriority = SPORT_PRIORITY.indexOf(b.key);
+
+    const aRank = aPriority === -1 ? 999 : aPriority;
+    const bRank = bPriority === -1 ? 999 : bPriority;
+
+    if (aRank !== bRank) return aRank - bRank;
+    return String(a.label).localeCompare(String(b.label));
+  });
+
+  return activeSports.slice(0, ODDS_MAX_SPORTS);
+}
+
 async function fetchSportOdds(sport) {
   if (!ODDS_API_KEY) {
     throw new Error("Missing ODDS_API_KEY");
@@ -615,8 +689,16 @@ async function fetchSportOdds(sport) {
 
 async function fetchOdds() {
   try {
+    const activeSports = await fetchActiveSports();
+
+    console.log(
+      `🌎 Active sports selected: ${
+        activeSports.map((sport) => sport.label).join(", ") || "none"
+      }`
+    );
+
     const results = await Promise.allSettled(
-      SPORTS_TO_FETCH.map((sport) => fetchSportOdds(sport))
+      activeSports.map((sport) => fetchSportOdds(sport))
     );
 
     const liveGames = results.flatMap((result) => {
@@ -631,8 +713,41 @@ async function fetchOdds() {
     });
 
     if (liveGames.length > 0) {
-      console.log(`✅ Live odds loaded: ${liveGames.length} games`);
-      return liveGames.slice(0, 80);
+      const uniqueGames = Array.from(
+        new Map(
+          liveGames.map((game) => [
+            game.id || `${game.sport}-${game.away}-${game.home}`,
+            game,
+          ])
+        ).values()
+      );
+
+      console.log(
+        `✅ Real sportsbook markets loaded: ${uniqueGames.length} games`
+      );
+
+      return uniqueGames.slice(0, 80);
+    }
+
+    /*
+     * The special "upcoming" key returns real live events and the next
+     * upcoming events across multiple sports. It does not create demo games.
+     */
+    console.log(
+      "ℹ️ No markets from selected sports. Checking real upcoming markets."
+    );
+
+    const upcomingGames = await fetchSportOdds({
+      key: "upcoming",
+      label: "Upcoming",
+    });
+
+    if (upcomingGames.length > 0) {
+      console.log(
+        `✅ Upcoming cross-sport markets loaded: ${upcomingGames.length}`
+      );
+
+      return upcomingGames.slice(0, 20);
     }
 
     console.log("ℹ️ No current sportsbook markets were returned.");
@@ -646,7 +761,7 @@ async function fetchOdds() {
 /* ================= ODDS ROUTES ================= */
 
 /* ================= ODDS CACHE ================= */
-const ODDS_CACHE_MS = Number(process.env.ODDS_CACHE_MS || 90000);
+const ODDS_CACHE_MS = Number(process.env.ODDS_CACHE_MS || 300000);
 let oddsCache = null;
 let oddsRefreshPromise = null;
 async function getCachedOdds() {
