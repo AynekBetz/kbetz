@@ -770,7 +770,6 @@ async function getCachedOdds() {
   if (
     oddsCache &&
     Array.isArray(oddsCache.games) &&
-    oddsCache.games.length &&
     now - oddsCache.updatedAt < ODDS_CACHE_MS
   ) {
     return {
@@ -1798,7 +1797,9 @@ io.on("connection", (socket) => {
 
   send();
 
-  const interval = setInterval(send, 10000);
+  // Send cached market updates once per minute.
+  // Provider refreshes remain controlled by ODDS_CACHE_MS.
+  const interval = setInterval(send, 60000);
 
   socket.on("disconnect", () => clearInterval(interval));
 });
