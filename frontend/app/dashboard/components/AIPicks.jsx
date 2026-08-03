@@ -9,6 +9,8 @@ function cleanSport(game) {
 export default function AIPicks({
   topAiPicks = [],
   games = [],
+  isPro = false,
+  upgrade,
   styles,
   formatOdds,
   handleViewPick,
@@ -68,7 +70,7 @@ export default function AIPicks({
       </div>
 
       <div style={styles.aiPickList}>
-        {realPicks.length ? (
+        {isPro && realPicks.length ? (
           realPicks.map((game, index) => (
             <div
               key={game.id || index}
@@ -330,6 +332,80 @@ export default function AIPicks({
             >
               Current schedule provider: {provider}
             </div>
+
+            {!isPro ? (
+              <div
+                style={{
+                  marginTop: 16,
+                  paddingTop: 15,
+                  borderTop: "1px solid rgba(255,255,255,.09)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 14,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <strong
+                    style={{
+                      display: "block",
+                      color: "#ffffff",
+                      fontSize: 14,
+                      marginBottom: 4,
+                    }}
+                  >
+                    Unlock KBETZ AI Market Analysis
+                  </strong>
+
+                  <span
+                    style={{
+                      color: "rgba(255,255,255,.58)",
+                      fontSize: 12,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    PRO includes verified picks, confidence scores, betting
+                    edges, steam alerts, and advanced analysis when real odds
+                    are available.
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={upgrade}
+                  style={{
+                    border: "1px solid rgba(0,255,214,.65)",
+                    borderRadius: 10,
+                    padding: "11px 16px",
+                    background:
+                      "linear-gradient(135deg, rgba(0,255,214,.13), rgba(209,45,255,.13))",
+                    color: "#00ffd6",
+                    cursor: "pointer",
+                    fontWeight: 1000,
+                    boxShadow:
+                      "0 0 18px rgba(0,255,214,.14), 0 0 18px rgba(209,45,255,.08)",
+                  }}
+                >
+                  Upgrade to KBETZ PRO
+                </button>
+              </div>
+            ) : (
+              <div
+                style={{
+                  marginTop: 14,
+                  border: "1px solid rgba(0,255,136,.25)",
+                  borderRadius: 10,
+                  padding: "9px 11px",
+                  color: "#00ff88",
+                  background: "rgba(0,255,136,.045)",
+                  fontSize: 11,
+                  fontWeight: 900,
+                }}
+              >
+                ✓ KBETZ PRO INTELLIGENCE ACTIVE
+              </div>
+            )}
           </div>
         )}
       </div>

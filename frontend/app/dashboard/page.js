@@ -1395,59 +1395,16 @@ ${analysis}`
         </div>
       </section>
 
-   {isPro ? (
-  <AIPicks
+   <AIPicks
     topAiPicks={topAiPicks}
     games={games}
+    isPro={isPro}
+    upgrade={upgrade}
     styles={styles}
     formatOdds={formatOdds}
     handleViewPick={handleViewPick}
   />
-) : (
-  <div
-    style={{
-      marginBottom: 14,
-      padding: 24,
-      borderRadius: 10,
-      border: "1px solid rgba(0,255,225,.45)",
-      background:
-        "linear-gradient(135deg, rgba(0,255,225,.06), rgba(180,48,255,.06))",
-      textAlign: "center",
-      color: "#fff",
-    }}
-  >
-    <h2 style={{ marginBottom: 10 }}>🧠 KBETZ AI Picks</h2>
 
-    {topAiPicks.length > 0 ? (
-      <>
-        <h3>{topAiPicks[0].away} @ {topAiPicks[0].home}</h3>
-        <p>Confidence: {Math.round((topAiPicks[0].implied || 0) * 100)}%</p>
-      </>
-    ) : (
-      <p>Live AI picks loading…</p>
-    )}
-
-    <div
-      style={{
-        margin: "18px auto",
-        maxWidth: 420,
-        padding: 14,
-        borderRadius: 8,
-        backdropFilter: "blur(4px)",
-        background: "rgba(255,255,255,.08)",
-      }}
-    >
-      🔒 Unlock all AI picks, confidence scores, and full analysis with KBETZ PRO.
-    </div>
-
-    <button
-      onClick={upgrade}
-      style={styles.upgradeBtn}
-    >
-      Upgrade to PRO
-    </button>
-  </div>
-)}
      <LiveMarketsSummary
   styles={styles}
   games={games}
