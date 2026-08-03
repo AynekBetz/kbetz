@@ -60,6 +60,13 @@ const ODDS_API_KEY = process.env.ODDS_API_KEY || "";
 const APISPORTS_KEY = process.env.APISPORTS_KEY || "";
 const APISPORTS_ENABLED =
   String(process.env.APISPORTS_ENABLED || "").toLowerCase() === "true";
+const API_SPORTS_CACHE_MS = Number(
+  process.env.API_SPORTS_CACHE_MS || 3600000
+);
+
+let apiSportsCache = null;
+let apiSportsRefreshPromise = null;
+
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
@@ -834,7 +841,7 @@ async function fetchApiSportsSoccer(date) {
   );
 }
 
-async function fetchApiSportsGames() {
+async function fetchApiSportsGamesFresh() {
   if (!APISPORTS_ENABLED) {
     console.log("ℹ️ API-Sports fallback is disabled.");
     return [];
@@ -892,6 +899,47 @@ async function fetchApiSportsGames() {
   );
 
   return uniqueGames.slice(0, 80);
+}
+
+
+async function fetchApiSportsGames() {
+  const now = Date.now();
+
+  if (
+    apiSportsCache &&
+    Array.isArray(apiSportsCache.games) &&
+    now - apiSportsCache.updatedAt < API_SPORTS_CACHE_MS
+  ) {
+    console.log(
+      `♻️ Using cached API-Sports schedule data (${Math.round(
+        (now - apiSportsCache.updatedAt) / 60000
+      )} minutes old)`
+    );
+
+    return apiSportsCache.games;
+  }
+
+  if (apiSportsRefreshPromise) {
+    console.log("⏳ Waiting for the current API-Sports refresh.");
+    return apiSportsRefreshPromise;
+  }
+
+  apiSportsRefreshPromise = (async () => {
+    const games = await fetchApiSportsGamesFresh();
+
+    apiSportsCache = {
+      games: Array.isArray(games) ? games : [],
+      updatedAt: Date.now(),
+    };
+
+    return apiSportsCache.games;
+  })();
+
+  try {
+    return await apiSportsRefreshPromise;
+  } finally {
+    apiSportsRefreshPromise = null;
+  }
 }
 
 async function fetchOdds() {
@@ -1049,7 +1097,9 @@ async function getCachedOdds() {
     const games = await fetchOdds();
     const source = games.some((g) => g.source === "live")
       ? "live"
-      : "empty";
+      : games.some((g) => g.source === "api-sports")
+        ? "api-sports"
+        : "empty";
 
     oddsCache = {
       success: true,
