@@ -57,6 +57,9 @@ console.log("🚀 KBETZ SERVER STARTING");
 const PORT = process.env.PORT || 10000;
 const CLIENT_URL = process.env.CLIENT_URL || "https://kbetz.vercel.app";
 const ODDS_API_KEY = process.env.ODDS_API_KEY || "";
+const APISPORTS_KEY = process.env.APISPORTS_KEY || "";
+const APISPORTS_ENABLED =
+  String(process.env.APISPORTS_ENABLED || "").toLowerCase() === "true";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
@@ -687,6 +690,210 @@ async function fetchSportOdds(sport) {
   return data.map((game, index) => normalizeOddsGame(game, sport.label, index));
 }
 
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function apiSportsHeaders() {
+  return {
+    Accept: "application/json",
+    "x-apisports-key": APISPORTS_KEY,
+  };
+}
+
+async function fetchApiSportsJson(url) {
+  const response = await fetch(url, {
+    headers: apiSportsHeaders(),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+        data?.errors?.token ||
+        data?.errors?.requests ||
+        `API-Sports request failed with status ${response.status}`
+    );
+  }
+
+  if (data?.errors && Object.keys(data.errors).length > 0) {
+    throw new Error(JSON.stringify(data.errors));
+  }
+
+  return Array.isArray(data?.response) ? data.response : [];
+}
+
+function normalizeApiSportsGame({
+  raw,
+  sport,
+  league,
+  home,
+  away,
+  startTime,
+  id,
+}) {
+  return {
+    id: String(id || `${sport}-${away}-${home}-${startTime || Date.now()}`),
+    sport,
+    league: league || sport,
+    home: home || "Home",
+    away: away || "Away",
+
+    /*
+     * API-Sports schedule feeds do not automatically guarantee sportsbook
+     * prices. Keep odds null so KBETZ never invents -110 lines.
+     */
+    homeOdds: null,
+    awayOdds: null,
+    edge: 0,
+    confidence: 0,
+    commenceTime: startTime || null,
+    source: "api-sports",
+    provider: "API-Sports",
+    hasOdds: false,
+    books: [],
+    markets: {
+      h2h: false,
+    },
+    bestLine: null,
+    recommended: null,
+  };
+}
+
+async function fetchApiSportsBaseball(date) {
+  const rows = await fetchApiSportsJson(
+    `https://v1.baseball.api-sports.io/games?date=${date}`
+  );
+
+  return rows.map((row) =>
+    normalizeApiSportsGame({
+      raw: row,
+      id: row?.id,
+      sport: "BASEBALL",
+      league: row?.league?.name || "Baseball",
+      home: row?.teams?.home?.name,
+      away: row?.teams?.away?.name,
+      startTime: row?.date,
+    })
+  );
+}
+
+async function fetchApiSportsBasketball(date) {
+  const rows = await fetchApiSportsJson(
+    `https://v1.basketball.api-sports.io/games?date=${date}`
+  );
+
+  return rows.map((row) =>
+    normalizeApiSportsGame({
+      raw: row,
+      id: row?.id,
+      sport: "BASKETBALL",
+      league: row?.league?.name || "Basketball",
+      home: row?.teams?.home?.name,
+      away: row?.teams?.away?.name,
+      startTime: row?.date,
+    })
+  );
+}
+
+async function fetchApiSportsHockey(date) {
+  const rows = await fetchApiSportsJson(
+    `https://v1.hockey.api-sports.io/games?date=${date}`
+  );
+
+  return rows.map((row) =>
+    normalizeApiSportsGame({
+      raw: row,
+      id: row?.id,
+      sport: "HOCKEY",
+      league: row?.league?.name || "Hockey",
+      home: row?.teams?.home?.name,
+      away: row?.teams?.away?.name,
+      startTime: row?.date,
+    })
+  );
+}
+
+async function fetchApiSportsSoccer(date) {
+  const rows = await fetchApiSportsJson(
+    `https://v3.football.api-sports.io/fixtures?date=${date}`
+  );
+
+  return rows.map((row) =>
+    normalizeApiSportsGame({
+      raw: row,
+      id: row?.fixture?.id,
+      sport: "SOCCER",
+      league: row?.league?.name || "Soccer",
+      home: row?.teams?.home?.name,
+      away: row?.teams?.away?.name,
+      startTime: row?.fixture?.date,
+    })
+  );
+}
+
+async function fetchApiSportsGames() {
+  if (!APISPORTS_ENABLED) {
+    console.log("ℹ️ API-Sports fallback is disabled.");
+    return [];
+  }
+
+  if (!APISPORTS_KEY) {
+    console.log("⚠️ APISPORTS_KEY is missing.");
+    return [];
+  }
+
+  const date = todayISO();
+
+  console.log(`🛟 Checking API-Sports fallback for ${date}`);
+
+  const results = await Promise.allSettled([
+    fetchApiSportsBaseball(date),
+    fetchApiSportsBasketball(date),
+    fetchApiSportsSoccer(date),
+    fetchApiSportsHockey(date),
+  ]);
+
+  const games = [];
+
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      games.push(...result.value);
+      return;
+    }
+
+    const labels = ["Baseball", "Basketball", "Soccer", "Hockey"];
+
+    console.log(
+      `⚠️ API-Sports ${labels[index]} error:`,
+      result.reason?.message || result.reason
+    );
+  });
+
+  const uniqueGames = Array.from(
+    new Map(
+      games.map((game) => [
+        game.id || `${game.sport}-${game.away}-${game.home}`,
+        game,
+      ])
+    ).values()
+  );
+
+  uniqueGames.sort((a, b) => {
+    const aTime = new Date(a.commenceTime || 0).getTime();
+    const bTime = new Date(b.commenceTime || 0).getTime();
+    return aTime - bTime;
+  });
+
+  console.log(
+    `✅ API-Sports returned ${uniqueGames.length} real scheduled games`
+  );
+
+  return uniqueGames.slice(0, 80);
+}
+
 async function fetchOdds() {
   try {
     const activeSports = await fetchActiveSports();
@@ -750,13 +957,58 @@ async function fetchOdds() {
       return upcomingGames.slice(0, 20);
     }
 
-    console.log("ℹ️ No current sportsbook markets were returned.");
-    return [];
+    console.log(
+      "ℹ️ The Odds API returned no usable markets. Trying API-Sports."
+    );
+
+    return await fetchApiSportsGames();
   } catch (err) {
-    console.log("⚠️ Odds fetch error:", err?.message || err);
-    return [];
+    console.log("⚠️ The Odds API error:", err?.message || err);
+    console.log("🛟 Switching to API-Sports fallback.");
+
+    try {
+      return await fetchApiSportsGames();
+    } catch (fallbackError) {
+      console.log(
+        "⚠️ API-Sports fallback error:",
+        fallbackError?.message || fallbackError
+      );
+      return [];
+    }
   }
 }
+
+
+app.get("/api/apisports/status", (req, res) => {
+  res.json({
+    success: true,
+    enabled: APISPORTS_ENABLED,
+    configured: Boolean(APISPORTS_KEY),
+    provider: "API-Sports",
+  });
+});
+
+app.get("/api/apisports/games", async (req, res) => {
+  try {
+    const games = await fetchApiSportsGames();
+
+    res.json({
+      success: true,
+      source: games.length ? "api-sports" : "empty",
+      count: games.length,
+      games,
+      updatedAt: Date.now(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      source: "error",
+      count: 0,
+      games: [],
+      error: error?.message || "API-Sports request failed",
+    });
+  }
+});
 
 /* ================= ODDS ROUTES ================= */
 
