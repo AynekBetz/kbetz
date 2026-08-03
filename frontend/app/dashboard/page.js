@@ -1199,10 +1199,33 @@ window.location.href = data.url;
 
   const topAiPicks = games.filter((g) => Number(g.edge) > 0).slice(0, 3);
 
-  const roiValue = roi?.roi ?? (isPro ? "18.47" : "--");
-  const profitValue = roi?.profit ?? (isPro ? "4529.10" : "--");
-  const winsValue = roi?.wins ?? (isPro ? "128" : "--");
-  const winRateValue = roi?.winRate ?? (isPro ? "68.8" : "--");
+  const hasPerformanceData =
+    roi &&
+    (
+      Number(roi?.total || 0) > 0 ||
+      Number(roi?.wins || 0) > 0 ||
+      Number(roi?.losses || 0) > 0
+    );
+
+  const roiValue = hasPerformanceData
+    ? Number(roi?.roi || 0).toFixed(2)
+    : "--";
+
+  const profitValue = hasPerformanceData
+    ? Number(roi?.profit || 0).toFixed(2)
+    : "--";
+
+  const winsValue = hasPerformanceData
+    ? Number(roi?.wins || 0)
+    : "--";
+
+  const winRateValue = hasPerformanceData
+    ? Number(roi?.winRate || 0).toFixed(1)
+    : "--";
+
+  const todayProfitValue = hasPerformanceData
+    ? Number(roi?.todayProfit ?? roi?.profit ?? 0)
+    : null;
 
   const handleDeposit = () => {
     if (isPro) {
@@ -1288,8 +1311,28 @@ ${analysis}`
         </div>
 
         <div style={styles.bankrollRight}>
-          <div style={styles.smallLabel}>TODAY'S P/L</div>
-          <div style={styles.greenMoney}>+$1,356.30</div>
+          <div style={styles.smallLabel}>TODAY&apos;S P/L</div>
+
+          <div
+            style={{
+              ...styles.greenMoney,
+              color:
+                todayProfitValue == null
+                  ? "rgba(255,255,255,.55)"
+                  : todayProfitValue >= 0
+                    ? "#20ff7a"
+                    : "#ff6565",
+            }}
+          >
+            {todayProfitValue == null
+              ? "--"
+              : `${todayProfitValue >= 0 ? "+" : "-"}$${Math.abs(
+                  todayProfitValue
+                ).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`}
+          </div>
         </div>
 
         <button style={styles.depositBtn} onClick={handleDeposit}>💎 Billing</button>
@@ -1300,7 +1343,9 @@ ${analysis}`
 
         <div style={styles.roiLeft}>
           <div style={styles.smallLabel}>ROI PERFORMANCE</div>
-          <h2 style={styles.sectionTitleTeal}>+{roiValue}%</h2>
+          <h2 style={styles.sectionTitleTeal}>
+            {roiValue === "--" ? "--" : `${Number(roiValue) >= 0 ? "+" : ""}${roiValue}%`}
+          </h2>
 
           {!isPro && (
             <button style={styles.upgradeBtn} onClick={upgrade}>
@@ -1312,12 +1357,23 @@ ${analysis}`
         <div style={styles.statRail}>
           <div style={styles.statBlock}>
             <div style={styles.statLabel}>ROI (30D)</div>
-            <div style={styles.statValue}>+{roiValue}%</div>
+            <div style={styles.statValue}>
+              {roiValue === "--" ? "--" : `${Number(roiValue) >= 0 ? "+" : ""}${roiValue}%`}
+            </div>
           </div>
 
           <div style={styles.statBlock}>
             <div style={styles.statLabel}>PROFIT (30D)</div>
-            <div style={styles.statValue}>${profitValue}</div>
+            <div style={styles.statValue}>
+              {profitValue === "--"
+                ? "--"
+                : `${Number(profitValue) >= 0 ? "+" : "-"}$${Math.abs(
+                    Number(profitValue)
+                  ).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`}
+            </div>
           </div>
 
           <div style={styles.statBlock}>
@@ -1332,7 +1388,9 @@ ${analysis}`
         </div>
 
         <div style={styles.roiCircle}>
-          <div style={styles.roiCircleNumber}>+{roiValue}%</div>
+          <div style={styles.roiCircleNumber}>
+            {roiValue === "--" ? "--" : `${Number(roiValue) >= 0 ? "+" : ""}${roiValue}%`}
+          </div>
           <div style={styles.roiCircleLabel}>ROI</div>
         </div>
       </section>
