@@ -1398,6 +1398,7 @@ ${analysis}`
    {isPro ? (
   <AIPicks
     topAiPicks={topAiPicks}
+    games={games}
     styles={styles}
     formatOdds={formatOdds}
     handleViewPick={handleViewPick}
