@@ -1,166 +1,448 @@
-import { ResponsiveContainer, LineChart, Line } from "recharts";
+"use client";
+
+import { useMemo, useState } from "react";
+
+const SPORT_ICONS = {
+  BASEBALL: "⚾",
+  BASKETBALL: "🏀",
+  SOCCER: "⚽",
+  HOCKEY: "🏒",
+  FOOTBALL: "🏈",
+  NFL: "🏈",
+  NBA: "🏀",
+  WNBA: "🏀",
+  MLB: "⚾",
+  NHL: "🏒",
+  MMA: "🥊",
+  TENNIS: "🎾",
+  GOLF: "⛳",
+};
+
+function cleanSport(game) {
+  return String(game?.sport || game?.league || "SPORT")
+    .trim()
+    .toUpperCase();
+}
+
+function gameTimestamp(game) {
+  const value = game?.commenceTime || game?.time;
+  const timestamp = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function formatStartTime(game) {
+  const value = game?.commenceTime || game?.time;
+
+  if (!value) return "Time unavailable";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  return date.toLocaleString([], {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export default function LiveMarkets({
-  styles,
   loading,
-  games,
+  games = [],
   hovered,
   setHovered,
-  flash,
-  lineHistory,
+  flash = {},
   formatOdds,
   addToParlay,
 }) {
+  const [activeSport, setActiveSport] = useState("ALL");
+
+  const sortedGames = useMemo(() => {
+    return [...games].sort((a, b) => {
+      const aOdds = a?.hasOdds ? 0 : 1;
+      const bOdds = b?.hasOdds ? 0 : 1;
+
+      if (aOdds !== bOdds) return aOdds - bOdds;
+
+      return gameTimestamp(a) - gameTimestamp(b);
+    });
+  }, [games]);
+
+  const sportCounts = useMemo(() => {
+    return sortedGames.reduce((counts, game) => {
+      const sport = cleanSport(game);
+      counts[sport] = (counts[sport] || 0) + 1;
+      return counts;
+    }, {});
+  }, [sortedGames]);
+
+  const sports = Object.keys(sportCounts).sort(
+    (a, b) => sportCounts[b] - sportCounts[a]
+  );
+
+  const filteredGames =
+    activeSport === "ALL"
+      ? sortedGames
+      : sortedGames.filter((game) => cleanSport(game) === activeSport);
+
+  const visibleGames = filteredGames.slice(0, 30);
+
   return (
-    <section style={styles.marketPanel}>
-      <div style={styles.marketHeader}>
+    <section
+      style={{
+        border: "1px solid rgba(0,255,214,.24)",
+        borderRadius: 22,
+        padding: 20,
+        background:
+          "linear-gradient(145deg, rgba(3,18,22,.92), rgba(10,4,22,.9))",
+        boxShadow:
+          "0 0 34px rgba(0,255,214,.08), inset 0 0 24px rgba(209,45,255,.05)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+          alignItems: "center",
+          marginBottom: 16,
+        }}
+      >
         <div>
-          <h2 style={styles.marketTitle}>LIVE MARKETS</h2>
-          <p style={styles.featureSubtitle}>Real-time odds & AI edges</p>
-        </div>
-
-        <div style={styles.filterTabs}>
-          <span style={styles.activeTab}>ALL</span>
-          <span style={styles.tab}>NBA</span>
-          <span style={styles.tab}>MLB</span>
-          <span style={styles.tab}>NHL</span>
-          <span style={styles.tab}>NFL</span>
-          <span style={styles.tab}>NCAAB</span>
-        </div>
-
-        <div style={styles.liveOnly}>LIVE ONLY 🟢</div>
-      </div>
-
-      <div style={styles.tableHeader}>
-        <span>GAME</span>
-        <span>BOOKS</span>
-        <span>BEST LINE</span>
-        <span>AI EDGE</span>
-        <span>LINE MOVEMENT</span>
-        <span>ODDS HISTORY</span>
-        <span>ACTION</span>
-      </div>
-
-      {loading && (
-        <div style={styles.emptyState}>
-          Loading KBETZ live markets...
-        </div>
-      )}
-
-      {!loading && games.length === 0 && (
-        <div style={styles.emptyState}>
-          No live markets available right now.
-        </div>
-      )}
-
-      {games.map((g, i) => {
-        const moveText =
-          g.movement === "up"
-            ? "↑ line moving"
-            : g.movement === "down"
-            ? "↓ line moving"
-            : "stable";
-
-        return (
-          <div
-            key={g.key || i}
-            onMouseEnter={() => setHovered(g.key)}
-            onMouseLeave={() => setHovered(null)}
+          <h2
             style={{
-              ...styles.marketRow,
-              boxShadow:
-                hovered === g.key
-                  ? "0 0 28px rgba(0,255,225,0.45)"
-                  : flash[g.key] === "up"
-                  ? "0 0 18px rgba(0,255,225,0.65)"
-                  : flash[g.key] === "down"
-                  ? "0 0 18px rgba(255,40,40,0.55)"
-                  : flash[g.key] === "click"
-                  ? "0 0 18px rgba(0,194,255,0.65)"
-                  : "inset 0 0 0 1px rgba(255,255,255,0.04)",
-              transform:
-                hovered === g.key
-                  ? "translateY(-2px) scale(1.01)"
-                  : flash[g.key]
-                  ? "scale(1.01)"
-                  : "scale(1)",
+              margin: 0,
+              fontSize: 24,
+              letterSpacing: 1,
+              color: "#ffffff",
             }}
           >
-            <div style={styles.gameCell}>
-              <span style={styles.liveDot}>● LIVE</span>
-              <div>
-                <strong>{g.away}</strong>
-                <br />
-                <span>@ {g.home}</span>
-              </div>
-            </div>
+            LIVE SPORTS BOARD
+          </h2>
 
-            <div style={styles.booksCell}>
-              {(g.books || [
-                { name: "DK" },
-                { name: "FD" },
-                { name: "MGM" },
-              ])
-                .slice(0, 3)
-                .map((b, idx) => (
-                  <span key={idx} style={styles.bookBadge}>
-                    {b.name?.slice(0, 2) || "BK"}
-                  </span>
-                ))}
+          <p
+            style={{
+              margin: "5px 0 0",
+              color: "rgba(255,255,255,.64)",
+              fontSize: 13,
+            }}
+          >
+            Real schedules and sportsbook markets from connected providers
+          </p>
+        </div>
 
-              <span style={styles.extraBooks}>
-                +{Math.max((g.books?.length || 3) - 3, 0)}
-              </span>
-            </div>
+        <div
+          style={{
+            border: "1px solid rgba(0,255,214,.35)",
+            borderRadius: 999,
+            padding: "8px 12px",
+            color: "#00ffd6",
+            fontWeight: 900,
+            fontSize: 12,
+          }}
+        >
+          {games.length} GAMES AVAILABLE
+        </div>
+      </div>
 
-            <div>
-              <strong style={styles.edge}>{g.home}</strong>
-              <br />
-              <span style={styles.bestLine}>
-                {formatOdds(g.homeOdds)}
-              </span>
-            </div>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          marginBottom: 18,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setActiveSport("ALL")}
+          style={{
+            border:
+              activeSport === "ALL"
+                ? "1px solid #00ffd6"
+                : "1px solid rgba(255,255,255,.13)",
+            borderRadius: 999,
+            padding: "9px 13px",
+            background:
+              activeSport === "ALL"
+                ? "rgba(0,255,214,.14)"
+                : "rgba(255,255,255,.035)",
+            color: activeSport === "ALL" ? "#00ffd6" : "#ffffff",
+            cursor: "pointer",
+            fontWeight: 900,
+          }}
+        >
+          ALL {games.length}
+        </button>
 
-            <div style={styles.edgeLarge}>
-              +{Number(g.edge || 0).toFixed(2)}%
-            </div>
+        {sports.map((sport) => (
+          <button
+            type="button"
+            key={sport}
+            onClick={() => setActiveSport(sport)}
+            style={{
+              border:
+                activeSport === sport
+                  ? "1px solid #d72dff"
+                  : "1px solid rgba(255,255,255,.13)",
+              borderRadius: 999,
+              padding: "9px 13px",
+              background:
+                activeSport === sport
+                  ? "rgba(215,45,255,.14)"
+                  : "rgba(255,255,255,.035)",
+              color: activeSport === sport ? "#f0b8ff" : "#ffffff",
+              cursor: "pointer",
+              fontWeight: 900,
+            }}
+          >
+            {SPORT_ICONS[sport] || "🏟️"} {sport} {sportCounts[sport]}
+          </button>
+        ))}
+      </div>
 
-            <div>
-              <span
-                style={
-                  g.movement === "down"
-                    ? styles.moveDown
-                    : styles.moveUp
-                }
+      {loading ? (
+        <div
+          style={{
+            padding: 28,
+            textAlign: "center",
+            color: "rgba(255,255,255,.65)",
+          }}
+        >
+          Loading current sports...
+        </div>
+      ) : visibleGames.length === 0 ? (
+        <div
+          style={{
+            padding: 28,
+            textAlign: "center",
+            color: "rgba(255,255,255,.65)",
+          }}
+        >
+          No current games are available for this sport.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 330px), 1fr))",
+            gap: 14,
+          }}
+        >
+          {visibleGames.map((game, index) => {
+            const sport = cleanSport(game);
+            const key = game.key || game.id || `${game.away}-${game.home}-${index}`;
+            const hasOdds =
+              game.hasOdds === true &&
+              Number.isFinite(Number(game.homeOdds));
+
+            return (
+              <article
+                key={key}
+                onMouseEnter={() => setHovered?.(key)}
+                onMouseLeave={() => setHovered?.(null)}
+                style={{
+                  border: hasOdds
+                    ? "1px solid rgba(0,255,214,.34)"
+                    : "1px solid rgba(209,45,255,.22)",
+                  borderRadius: 17,
+                  padding: 16,
+                  background:
+                    hovered === key
+                      ? "linear-gradient(145deg, rgba(0,255,214,.09), rgba(209,45,255,.09))"
+                      : "rgba(255,255,255,.028)",
+                  boxShadow:
+                    flash?.[key] || hovered === key
+                      ? "0 0 24px rgba(0,255,214,.16)"
+                      : "none",
+                  transition: "all .18s ease",
+                }}
               >
-                {moveText}
-              </span>
-              <br />
-              <span style={styles.smallMuted}>live</span>
-            </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    alignItems: "flex-start",
+                    marginBottom: 13,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        color: "#00ffd6",
+                        fontWeight: 1000,
+                        fontSize: 12,
+                        letterSpacing: 1,
+                      }}
+                    >
+                      {SPORT_ICONS[sport] || "🏟️"} {sport}
+                    </div>
 
-            <div style={styles.chartCell}>
-              <ResponsiveContainer>
-                <LineChart data={lineHistory[g.key] || []}>
-                  <Line
-                    dataKey="value"
-                    stroke="#00ffe1"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+                    <div
+                      style={{
+                        color: "rgba(255,255,255,.56)",
+                        fontSize: 12,
+                        marginTop: 4,
+                      }}
+                    >
+                      {game.league || "Sports"}
+                    </div>
+                  </div>
 
-            <button
-              style={styles.addBtn}
-              onClick={() => addToParlay(g)}
-            >
-              + Add to Parlay
-            </button>
-          </div>
-        );
-      })}
+                  <span
+                    style={{
+                      border: hasOdds
+                        ? "1px solid rgba(0,255,136,.45)"
+                        : "1px solid rgba(255,196,61,.38)",
+                      borderRadius: 999,
+                      padding: "5px 8px",
+                      color: hasOdds ? "#00ff88" : "#ffd66b",
+                      fontSize: 10,
+                      fontWeight: 1000,
+                    }}
+                  >
+                    {hasOdds ? "ODDS LIVE" : "SCHEDULE ONLY"}
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    color: "#ffffff",
+                    fontSize: 16,
+                    lineHeight: 1.55,
+                    fontWeight: 900,
+                  }}
+                >
+                  <div>{game.away}</div>
+                  <div style={{ color: "rgba(255,255,255,.5)", fontSize: 12 }}>
+                    at
+                  </div>
+                  <div>{game.home}</div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 13,
+                    paddingTop: 12,
+                    borderTop: "1px solid rgba(255,255,255,.08)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        color: "rgba(255,255,255,.53)",
+                        fontSize: 10,
+                        fontWeight: 900,
+                        letterSpacing: 1,
+                      }}
+                    >
+                      START
+                    </div>
+
+                    <div
+                      style={{
+                        color: "#ffffff",
+                        marginTop: 3,
+                        fontSize: 13,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {formatStartTime(game)}
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: "right" }}>
+                    <div
+                      style={{
+                        color: "rgba(255,255,255,.53)",
+                        fontSize: 10,
+                        fontWeight: 900,
+                        letterSpacing: 1,
+                      }}
+                    >
+                      PROVIDER
+                    </div>
+
+                    <div
+                      style={{
+                        color: "#f0b8ff",
+                        marginTop: 3,
+                        fontSize: 12,
+                        fontWeight: 900,
+                      }}
+                    >
+                      {game.provider || "API-Sports"}
+                    </div>
+                  </div>
+                </div>
+
+                {hasOdds ? (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 12,
+                    }}
+                  >
+                    <strong style={{ color: "#00ffd6", fontSize: 17 }}>
+                      {game.home} {formatOdds?.(game.homeOdds)}
+                    </strong>
+
+                    <button
+                      type="button"
+                      onClick={() => addToParlay?.(game)}
+                      style={{
+                        border: "1px solid rgba(0,255,214,.5)",
+                        borderRadius: 10,
+                        padding: "9px 11px",
+                        background: "rgba(0,255,214,.1)",
+                        color: "#00ffd6",
+                        cursor: "pointer",
+                        fontWeight: 1000,
+                      }}
+                    >
+                      + Parlay
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      color: "rgba(255,255,255,.55)",
+                      fontSize: 12,
+                    }}
+                  >
+                    Sportsbook prices will appear automatically when available.
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {filteredGames.length > visibleGames.length ? (
+        <div
+          style={{
+            marginTop: 16,
+            textAlign: "center",
+            color: "rgba(255,255,255,.52)",
+            fontSize: 12,
+          }}
+        >
+          Showing 30 of {filteredGames.length} games. Use the sport filters to
+          narrow the board.
+        </div>
+      ) : null}
     </section>
   );
 }

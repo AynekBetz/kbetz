@@ -793,18 +793,51 @@ export default function Dashboard() {
   const normalizeGames = (rawGames) => {
     const source = Array.isArray(rawGames) ? rawGames : [];
 
-    return source.map((g, index) => ({
-      id: g.id || `game-${index}`,
-      away: g.away || g.awayTeam || g.teams?.away || "Away",
-      home: g.home || g.homeTeam || g.teams?.home || "Home",
-      homeOdds: g.homeOdds ?? g.odds ?? g.price ?? -110,
-      books:
-        Array.isArray(g.books) && g.books.length
-          ? g.books
-          : [{ name: "DK" }, { name: "FD" }, { name: "MGM" }],
-      sport: g.sport || "LIVE",
-      time: g.time || "Live",
-    }));
+    return source.map((g, index) => {
+      const rawHomeOdds = g.homeOdds ?? g.odds ?? g.price;
+      const rawAwayOdds = g.awayOdds;
+
+      const homeOdds =
+        rawHomeOdds === null ||
+        rawHomeOdds === undefined ||
+        rawHomeOdds === ""
+          ? null
+          : Number(rawHomeOdds);
+
+      const awayOdds =
+        rawAwayOdds === null ||
+        rawAwayOdds === undefined ||
+        rawAwayOdds === ""
+          ? null
+          : Number(rawAwayOdds);
+
+      const hasOdds =
+        g.hasOdds === true ||
+        Number.isFinite(homeOdds) ||
+        Number.isFinite(awayOdds);
+
+      return {
+        ...g,
+        id: g.id || `game-${index}`,
+        away: g.away || g.awayTeam || g.teams?.away || "Away",
+        home: g.home || g.homeTeam || g.teams?.home || "Home",
+        homeOdds: Number.isFinite(homeOdds) ? homeOdds : null,
+        awayOdds: Number.isFinite(awayOdds) ? awayOdds : null,
+        books:
+          Array.isArray(g.books) && g.books.length
+            ? g.books
+            : [],
+        sport: g.sport || g.league || "SPORT",
+        league: g.league || g.sport || "Sports",
+        time: g.time || g.commenceTime || null,
+        commenceTime: g.commenceTime || g.time || null,
+        source: g.source || "unknown",
+        provider:
+          g.provider ||
+          (g.source === "api-sports" ? "API-Sports" : "The Odds API"),
+        hasOdds,
+      };
+    });
   };
 
   const loadAll = async () => {
@@ -919,11 +952,15 @@ export default function Dashboard() {
       });
 
       normalizeGames(incomingGames).forEach((g) => {
+        if (!g.hasOdds || !Number.isFinite(Number(g.homeOdds))) {
+          return;
+        }
+
         const key = g.id || `${g.home}-${g.away}`;
         const existing = Array.isArray(updated[key]) ? [...updated[key]] : [];
 
         const last = existing[existing.length - 1]?.value;
-        const base = Number(g.homeOdds || -110);
+        const base = Number(g.homeOdds);
         const drift = Math.floor(Math.random() * 9) - 4;
         const nextValue = Number.isFinite(last) ? last + drift : base;
 
@@ -970,10 +1007,24 @@ export default function Dashboard() {
 
       prevOdds.current[key] = g.homeOdds;
 
-      const implied = americanToProb(g.homeOdds);
-      const modelBoost = movement === "up" ? 0.035 : movement === "down" ? 0.012 : 0.018;
+      const hasOdds =
+        g.hasOdds === true &&
+        Number.isFinite(Number(g.homeOdds));
+
+      const implied = hasOdds
+        ? americanToProb(g.homeOdds)
+        : 0;
+
+      const modelBoost = hasOdds
+        ? movement === "up"
+          ? 0.035
+          : movement === "down"
+            ? 0.012
+            : 0.018
+        : 0;
+
       const model = implied + modelBoost;
-      const edge = (model - implied) * 100;
+      const edge = hasOdds ? (model - implied) * 100 : 0;
 
       return {
         ...g,
