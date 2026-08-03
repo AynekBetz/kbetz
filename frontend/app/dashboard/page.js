@@ -193,24 +193,62 @@ export default function Dashboard() {
 
     async function confirmProPayment() {
       try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          alert(
+            "Your payment was received. Please log in again to activate KBETZ PRO."
+          );
+          router.push("/login");
+          return;
+        }
+
         const res = await fetch(`${API}/api/pro/confirm`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
           body: JSON.stringify({ sessionId }),
+          cache: "no-store",
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
 
-        if (data.success && data.isPro) {
-          alert("✅ KBETZ PRO is active. Thank you for upgrading!");
+        if (!res.ok) {
+          if (res.status === 401) {
+            alert(
+              "Your payment was received. Please log in again to finish activating KBETZ PRO."
+            );
+            router.push("/login");
+            return;
+          }
+
+          alert(
+            data?.error ||
+              data?.message ||
+              "Payment received, but PRO activation is still processing."
+          );
+          return;
+        }
+
+        if (data.success === true && data.isPro === true) {
+          localStorage.setItem("plan", "pro");
+
+          alert("✅ KBETZ PRO is active. Welcome to the terminal!");
+
           window.history.replaceState({}, "", "/dashboard");
           window.location.reload();
           return;
         }
 
-        alert(data.error || "Payment received, but PRO did not unlock yet.");
+        alert("Payment received, but PRO activation is still processing.");
       } catch (err) {
-        alert("Payment received, but KBETZ could not confirm PRO yet.");
+        console.error("KBETZ PRO confirmation error:", err);
+
+        alert(
+          "Your payment was received, but KBETZ could not confirm PRO yet. Please refresh shortly."
+        );
       }
     }
 
