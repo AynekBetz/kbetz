@@ -71,6 +71,7 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const OWNER_SECRET = process.env.OWNER_SECRET || "";
+const OWNER_EMAIL = normalizeEmail(process.env.OWNER_EMAIL || "");
 const SESSION_TTL_SECONDS = Number(process.env.SESSION_TTL_SECONDS || 604800);
 
 /*
@@ -238,10 +239,35 @@ function bearerToken(req) {
 
 function requireAuth(req, res, next) {
   const payload = verifyToken(bearerToken(req));
+
   if (!payload) {
-    return res.status(401).json({ success: false, error: "Authentication required" });
+    return res.status(401).json({
+      success: false,
+      error: "Authentication required",
+    });
   }
+
   req.auth = payload;
+  next();
+}
+
+function requireOwnerAccount(req, res, next) {
+  if (!OWNER_EMAIL) {
+    return res.status(503).json({
+      success: false,
+      error: "OWNER_EMAIL is not configured",
+    });
+  }
+
+  const authenticatedEmail = normalizeEmail(req.auth?.sub);
+
+  if (!authenticatedEmail || authenticatedEmail !== OWNER_EMAIL) {
+    return res.status(403).json({
+      success: false,
+      error: "Owner access required",
+    });
+  }
+
   next();
 }
 
@@ -451,7 +477,13 @@ app.get("/api/me", requireAuth, async (req, res) => {
   try {
     const email = normalizeEmail(req.auth.sub);
     const user = await User.findOne({ email }).lean();
-    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
 
     return res.json({
       success: true,
@@ -461,9 +493,59 @@ app.get("/api/me", requireAuth, async (req, res) => {
       plan: user.isPro ? "pro" : "free",
     });
   } catch {
-    return res.status(500).json({ success: false, error: "Could not load user" });
+    return res.status(500).json({
+      success: false,
+      error: "Could not load user",
+    });
   }
 });
+
+/* ================= OWNER DASHBOARD ================= */
+app.get(
+  "/api/owner/dashboard",
+  requireAuth,
+  requireOwnerAccount,
+  async (req, res) => {
+    try {
+      const [totalUsers, proMembers] = await Promise.all([
+        User.countDocuments({}),
+        User.countDocuments({ isPro: true }),
+      ]);
+
+      const freeMembers = Math.max(0, totalUsers - proMembers);
+
+      const conversionRate =
+        totalUsers > 0
+          ? Number(((proMembers / totalUsers) * 100).toFixed(1))
+          : 0;
+
+      return res.json({
+        success: true,
+        owner: normalizeEmail(req.auth.sub),
+        metrics: {
+          totalUsers,
+          proMembers,
+          freeMembers,
+          conversionRate,
+          revenueToday: null,
+          monthlyRevenue: null,
+          lifetimeRevenue: null,
+        },
+        updatedAt: Date.now(),
+      });
+    } catch (err) {
+      console.error(
+        "❌ /api/owner/dashboard error:",
+        err?.message || err
+      );
+
+      return res.status(500).json({
+        success: false,
+        error: "Could not load owner dashboard metrics",
+      });
+    }
+  }
+);
 
 
 /* ================= FALLBACK ODDS ================= */
@@ -2366,6 +2448,7 @@ if (process.env.NODE_ENV === "production") {
   if (!process.env.MONGO_URI) missing.push("MONGO_URI");
   if (!SESSION_SECRET) missing.push("SESSION_SECRET");
   if (!OWNER_SECRET) missing.push("OWNER_SECRET");
+  if (!OWNER_EMAIL) missing.push("OWNER_EMAIL");
   if (missing.length) {
     console.error(`❌ Missing required production environment variables: ${missing.join(", ")}`);
     process.exit(1);
