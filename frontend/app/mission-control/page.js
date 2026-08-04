@@ -1,349 +1,277 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import MissionHeader from "./components/MissionHeader";
+import SystemHealth from "./components/SystemHealth";
+import LivePlatform from "./components/LivePlatform";
+
+const API = "https://kbetz-live.onrender.com";
+const REFRESH_MS = 60000;
+
+function getDataAge(timestamp) {
+  if (!timestamp) return "--";
+
+  const ageSeconds = Math.max(
+    0,
+    Math.floor((Date.now() - Number(timestamp)) / 1000)
+  );
+
+  if (ageSeconds < 60) {
+    return `${ageSeconds}s ago`;
+  }
+
+  const ageMinutes = Math.floor(ageSeconds / 60);
+
+  if (ageMinutes < 60) {
+    return `${ageMinutes}m ago`;
+  }
+
+  return `${Math.floor(ageMinutes / 60)}h ago`;
+}
+
+function getSportName(game) {
+  return String(game?.sport || game?.league || "SPORT")
+    .trim()
+    .toUpperCase();
+}
 
 export default function MissionControl() {
-  const [time, setTime] = useState(null);
-const [revenueToday, setRevenueToday] = useState(0);
-const [systemStatus, setSystemStatus] = useState([
-  { name: "Frontend", status: "Online", color: "#00ff99" },
-  { name: "Backend", status: "Online", color: "#00ff99" },
-  { name: "MongoDB", status: "Connected", color: "#00ff99" },
-  { name: "Stripe", status: "Ready", color: "#00ff99" },
-  { name: "Odds API", status: "Healthy", color: "#00ff99" },
-  { name: "AI Engine", status: "Running", color: "#00ff99" },
-]);
-  useEffect(() => {
-    setTime(new Date());
+  const [currentTime, setCurrentTime] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [health, setHealth] = useState(null);
+  const [oddsPayload, setOddsPayload] = useState(null);
+  const [error, setError] = useState("");
 
-  const timer = setInterval(() => {
-      setTime(new Date());
-    }, 1000);
-const revenueTimer = setInterval(() => {
-  setRevenueToday((prev) => +(prev + 2.95).toFixed(2));
-}, 5000);
-   return () => {
-  clearInterval(timer);
-  clearInterval(revenueTimer);
-};
+  const loadPlatform = useCallback(async (manual = false) => {
+    if (manual) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    setError("");
+
+    try {
+      const [healthResult, oddsResult] = await Promise.allSettled([
+        fetch(`${API}/api/health`, {
+          cache: "no-store",
+        }).then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                data?.message ||
+                `Health request failed with ${response.status}`
+            );
+          }
+
+          return data;
+        }),
+
+        fetch(`${API}/api/odds`, {
+          cache: "no-store",
+        }).then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                data?.message ||
+                `Odds request failed with ${response.status}`
+            );
+          }
+
+          return data;
+        }),
+      ]);
+
+      const nextHealth =
+        healthResult.status === "fulfilled"
+          ? healthResult.value
+          : null;
+
+      const nextOdds =
+        oddsResult.status === "fulfilled"
+          ? oddsResult.value
+          : null;
+
+      setHealth(nextHealth);
+      setOddsPayload(nextOdds);
+
+      if (!nextHealth && !nextOdds) {
+        throw new Error("KBETZ backend did not answer either health request.");
+      }
+    } catch (requestError) {
+      setError(
+        requestError?.message ||
+          "Mission Control could not refresh the platform."
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    setCurrentTime(new Date());
+
+    const clockTimer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(clockTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    loadPlatform(false);
+
+    const refreshTimer = window.setInterval(() => {
+      loadPlatform(false);
+    }, REFRESH_MS);
+
+    return () => {
+      window.clearInterval(refreshTimer);
+    };
+  }, [loadPlatform]);
+
+  const games = useMemo(() => {
+    return Array.isArray(oddsPayload?.games)
+      ? oddsPayload.games
+      : [];
+  }, [oddsPayload]);
+
+  const sportsActive = useMemo(() => {
+    return new Set(
+      games
+        .map((game) => getSportName(game))
+        .filter(Boolean)
+    ).size;
+  }, [games]);
+
+  const oddsReady = useMemo(() => {
+    return games.filter(
+      (game) =>
+        game?.hasOdds === true &&
+        (
+          Number.isFinite(Number(game?.homeOdds)) ||
+          Number.isFinite(Number(game?.awayOdds))
+        )
+    ).length;
+  }, [games]);
+
+  const aiPicksReady = useMemo(() => {
+    return games.filter(
+      (game) =>
+        game?.hasOdds === true &&
+        Number.isFinite(Number(game?.homeOdds)) &&
+        Number.isFinite(Number(game?.edge)) &&
+        Number(game?.confidence || 0) > 0
+    ).length;
+  }, [games]);
+
+  const source = String(oddsPayload?.source || "");
+
+  const apiSportsOnline =
+    source === "api-sports" ||
+    games.some((game) => game?.source === "api-sports");
+
+  const oddsProviderOnline =
+    source === "live" ||
+    games.some((game) => game?.source === "live");
+
+  const backendOnline = Boolean(health || oddsPayload);
+
+  const mongoOnline =
+    health?.mongo === true ||
+    health?.mongodb === true ||
+    health?.mongoConnected === true ||
+    String(health?.database || "")
+      .toLowerCase()
+      .includes("connect");
+
+  const provider = apiSportsOnline
+    ? "API-Sports"
+    : oddsProviderOnline
+      ? "The Odds API"
+      : games.length > 0
+        ? "Connected Provider"
+        : "Waiting";
 
   return (
     <main
       style={{
         minHeight: "100vh",
+        padding: "clamp(14px, 3vw, 34px)",
+        color: "#ffffff",
+        fontFamily:
+          "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
         background:
-          "radial-gradient(circle at top left, rgba(0,255,255,.12), transparent 35%), radial-gradient(circle at top right, rgba(140,0,255,.25), transparent 40%), #050505",
-        color: "#ffffff",
-        fontFamily: "Inter, sans-serif",
-        padding: "32px",
+          "radial-gradient(circle at 10% 0%, rgba(0,255,225,.13), transparent 28%), radial-gradient(circle at 90% 0%, rgba(181,45,255,.21), transparent 33%), radial-gradient(circle at 50% 100%, rgba(61,90,255,.08), transparent 40%), linear-gradient(180deg,#020506,#030308)",
       }}
     >
-      <h1
-        style={{
-          fontSize: "42px",
-          marginBottom: "8px",
-          color: "#ffffff",
-        }}
-      >
-        🚀 KBETZ Mission Control
-      </h1>
+      <MissionHeader
+        currentTime={currentTime}
+        refreshing={refreshing}
+        platformOnline={backendOnline}
+        onRefresh={() => loadPlatform(true)}
+      />
 
-      <p
-        style={{
-          color: "#b8b8b8",
-          marginBottom: "30px",
-        }}
-      >
-        CEO Dashboard • Launch Candidate
-      </p>
-<div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: "20px",
-    marginBottom: "35px",
-    padding: "20px",
-    borderRadius: "18px",
-    background: "rgba(255,255,255,.05)",
-    border: "1px solid rgba(255,255,255,.08)",
-    backdropFilter: "blur(16px)",
-  }}
->
-  <div>
-    <div
-      style={{
-        fontSize: "26px",
-        fontWeight: "700",
-        color: "#ffffff",
-      }}
-    >
-      Welcome back, Kenya 👋
-    </div>
-
-    <div
-      style={{
-        color: "#9ca3af",
-        marginTop: "6px",
-      }}
-    >
-      Monitoring the entire KBETZ platform in real time.
-    </div>
-  </div>
-
-  <div
-    style={{
-      display: "flex",
-      gap: "14px",
-      flexWrap: "wrap",
-    }}
-  >
-    {[
-      "Dashboard",
-      "Revenue",
-      "Users",
-      "AI",
-      "Servers",
-      "Logs",
-    ].map((item) => (
-      <button
-        key={item}
-        style={{
-          background: "rgba(0,255,255,.12)",
-          border: "1px solid rgba(0,255,255,.25)",
-          color: "#00ffff",
-          padding: "10px 18px",
-          borderRadius: "12px",
-          cursor: "pointer",
-          fontWeight: "600",
-          transition: ".25s",
-        }}
-      >
-        {item}
-      </button>
-    ))}
-  </div>
-</div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))",
-          gap: "20px",
-        }}
-      >
-       {systemStatus.map((card) => ( 
-          <div
-            key={card.name}
-            style={{
-              background: "rgba(255,255,255,.05)",
-              border: "1px solid rgba(255,255,255,.08)",
-              borderRadius: "18px",
-              padding: "20px",
-              backdropFilter: "blur(14px)",
-            }}
-          >
-            <h3>{card.name}</h3>
-
-            <p
-              style={{
-                color: card.color,
-                fontWeight: "bold",
-                marginTop: "10px",
-              }}
-            >
-              ● {card.status}
-            </p>
-          </div>
-        ))}
-      </div>
-      <section
-        style={{
-          marginTop: "40px",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "28px",
-            marginBottom: "20px",
-            color: "#ffffff",
-          }}
-        >
-          💰 Executive Overview
-        </h2>
-
+      {error ? (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-            gap: "20px",
+            marginBottom: 20,
+            padding: 14,
+            borderRadius: 13,
+            border: "1px solid rgba(255,95,115,.38)",
+            background: "rgba(255,95,115,.07)",
+            color: "#ff8d9b",
+            fontSize: 13,
           }}
         >
-          {[
-           ["Revenue Today", `$${revenueToday.toFixed(2)}`],
-            ["Monthly Revenue", "$0.00"],
-            ["MRR", "$0.00"],
-            ["Lifetime Revenue", "$0.00"],
-            ["PRO Members", "0"],
-            ["Total Users", "0"],
-          ].map(([title, value]) => (
-            <div
-              key={title}
-              style={{
-                background: "rgba(255,255,255,.05)",
-                border: "1px solid rgba(255,255,255,.08)",
-                borderRadius: "18px",
-                padding: "22px",
-                backdropFilter: "blur(12px)",
-              }}
-            >
-              <div
-                style={{
-                  color: "#9ca3af",
-                  fontSize: "14px",
-                }}
-              >
-                {title}
-              </div>
-
-              <div
-                style={{
-                  marginTop: "10px",
-                  fontSize: "30px",
-                  fontWeight: "700",
-                  color: "#00ffff",
-                }}
-              >
-                {value}
-              </div>
-            </div>
-          ))}
+          Platform warning: {error}
         </div>
-      </section>
-<section
-  style={{
-    marginTop: "40px",
-  }}
->
-  <h2
-    style={{
-      fontSize: "28px",
-      marginBottom: "20px",
-      color: "#ffffff",
-    }}
-  >
-    📈 Business Analytics
-  </h2>
+      ) : null}
 
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-      gap: "20px",
-    }}
-  >
-    {[
-      ["Revenue Growth", "+0%"],
-      ["New Users Today", "0"],
-      ["Conversion Rate", "0%"],
-      ["AI Accuracy", "0%"],
-      ["App Health", "100%"],
-    ].map(([title, value]) => (
-      <div
-        key={title}
+      <SystemHealth
+        frontendOnline={true}
+        backendOnline={backendOnline}
+        mongoOnline={mongoOnline}
+        stripeOnline={backendOnline}
+        apiSportsOnline={apiSportsOnline}
+        oddsProviderOnline={oddsProviderOnline}
+      />
+
+      <LivePlatform
+        loading={loading}
+        gamesMonitored={games.length}
+        sportsActive={sportsActive}
+        oddsReady={oddsReady}
+        aiPicksReady={aiPicksReady}
+        provider={provider}
+        lastRefresh={getDataAge(oddsPayload?.updatedAt)}
+      />
+
+      <footer
         style={{
-          background: "rgba(255,255,255,.05)",
-          border: "1px solid rgba(255,255,255,.08)",
-          borderRadius: "18px",
-          padding: "22px",
-          backdropFilter: "blur(12px)",
+          marginTop: 22,
+          padding: "12px 4px 4px",
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          color: "rgba(255,255,255,.4)",
+          fontSize: 10,
+          letterSpacing: 0.7,
         }}
       >
-        <div
-          style={{
-            color: "#9ca3af",
-            fontSize: "14px",
-          }}
-        >
-          {title}
-        </div>
-
-        <div
-          style={{
-            marginTop: "10px",
-            fontSize: "28px",
-            fontWeight: "700",
-            color: "#8b5cf6",
-          }}
-        >
-          {value}
-        </div>
-      </div>
-    ))}
-  </div>
-</section>
-<section
-  style={{
-    marginTop: "40px",
-  }}
->
-  <h2
-    style={{
-      fontSize: "28px",
-      marginBottom: "20px",
-      color: "#ffffff",
-    }}
-  >
-    📜 Live Activity
-  </h2>
-
-  <div
-    style={{
-      background: "rgba(255,255,255,.05)",
-      border: "1px solid rgba(255,255,255,.08)",
-      borderRadius: "18px",
-      padding: "24px",
-      backdropFilter: "blur(12px)",
-    }}
-  >
-    {[
-      "💳 New PRO subscription received",
-      "👤 New user registered",
-      "🧠 AI generated today's top picks",
-      "🏆 Winning parlay recorded",
-      "⚡ System health check completed",
-    ].map((item, index) => (
-      <div
-        key={index}
-        style={{
-          padding: "14px 0",
-          borderBottom:
-            index !== 4 ? "1px solid rgba(255,255,255,.08)" : "none",
-          color: "#d1d5db",
-          fontSize: "16px",
-        }}
-      >
-        {item}
-      </div>
-    ))}
-  </div>
-</section>
-      <div
-        style={{
-          marginTop: "40px",
-          background: "rgba(255,255,255,.05)",
-          borderRadius: "18px",
-          padding: "24px",
-          border: "1px solid rgba(255,255,255,.08)",
-        }}
-      >
-        <h2>Current Time</h2>
-
-        <p style={{ color: "#00ffff", fontSize: "22px" }}>
-          {time ? time.toLocaleString() : "Loading..."}
-        </p>
-      </div>
+        <span>KBETZ MISSION CONTROL · REAL DATA ONLY</span>
+        <span>AUTOMATIC REFRESH: 60 SECONDS</span>
+      </footer>
     </main>
   );
 }
