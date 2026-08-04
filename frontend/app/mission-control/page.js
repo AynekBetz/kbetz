@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import MissionHeader from "./components/MissionHeader";
 import SystemHealth from "./components/SystemHealth";
 import LivePlatform from "./components/LivePlatform";
+import IntelligenceCenter from "./components/IntelligenceCenter";
 
 const API = "https://kbetz-live.onrender.com";
 const REFRESH_MS = 60000;
@@ -254,6 +255,15 @@ export default function MissionControl() {
         aiPicksReady={aiPicksReady}
         provider={provider}
         lastRefresh={getDataAge(oddsPayload?.updatedAt)}
+      />
+
+      <IntelligenceCenter
+        loading={loading}
+        gamesMonitored={games.length}
+        oddsReady={oddsReady}
+        aiPicksReady={aiPicksReady}
+        steamAlerts={0}
+        arbitrageReady={0}
       />
 
       <footer
