@@ -341,11 +341,42 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
+  const mongoConnected = mongoose.connection.readyState === 1;
+
+  const cachedGames =
+    Array.isArray(oddsCache?.games)
+      ? oddsCache.games
+      : [];
+
+  const activeSports = [
+    ...new Set(
+      cachedGames
+        .map((game) => String(game?.sport || game?.league || "").trim())
+        .filter(Boolean)
+    ),
+  ];
+
   res.json({
     ok: true,
+    success: true,
     app: "KBETZ",
     server: "live",
-    sports: SPORTS_TO_FETCH.map((s) => s.label),
+
+    mongo: mongoConnected,
+    database: mongoConnected ? "connected" : "disconnected",
+
+    stripeConfigured: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ID),
+    apiSportsConfigured: Boolean(
+      APISPORTS_ENABLED && APISPORTS_KEY
+    ),
+    oddsApiConfigured: Boolean(ODDS_API_KEY),
+
+    provider: oddsCache?.source || "waiting",
+    gamesLoaded: cachedGames.length,
+    sports: activeSports,
+
+    updatedAt: oddsCache?.updatedAt || null,
+    timestamp: Date.now(),
   });
 });
 
