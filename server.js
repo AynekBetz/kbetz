@@ -64,6 +64,15 @@ const API_SPORTS_CACHE_MS = Number(
   process.env.API_SPORTS_CACHE_MS || 3600000
 );
 
+const API_SPORTS_EMPTY_CACHE_MS = Number(
+  process.env.API_SPORTS_EMPTY_CACHE_MS || 300000
+);
+
+const API_SPORTS_LOOKAHEAD_DAYS = Math.min(
+  7,
+  Math.max(1, Number(process.env.API_SPORTS_LOOKAHEAD_DAYS || 3))
+);
+
 let apiSportsCache = null;
 let apiSportsRefreshPromise = null;
 
@@ -965,37 +974,63 @@ async function fetchApiSportsGamesFresh() {
     return [];
   }
 
-  const date = todayISO();
+  const allGames = [];
+  const labels = ["Baseball", "Basketball", "Soccer", "Hockey"];
 
-  console.log(`🛟 Checking API-Sports fallback for ${date}`);
+  for (let dayOffset = 0; dayOffset < API_SPORTS_LOOKAHEAD_DAYS; dayOffset += 1) {
+    const dateObject = new Date();
 
-  const results = await Promise.allSettled([
-    fetchApiSportsBaseball(date),
-    fetchApiSportsBasketball(date),
-    fetchApiSportsSoccer(date),
-    fetchApiSportsHockey(date),
-  ]);
+    dateObject.setUTCDate(dateObject.getUTCDate() + dayOffset);
 
-  const games = [];
-
-  results.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      games.push(...result.value);
-      return;
-    }
-
-    const labels = ["Baseball", "Basketball", "Soccer", "Hockey"];
+    const date = dateObject.toISOString().slice(0, 10);
 
     console.log(
-      `⚠️ API-Sports ${labels[index]} error:`,
-      result.reason?.message || result.reason
+      `🛟 Checking API-Sports schedules for ${date} ` +
+        `(day ${dayOffset + 1}/${API_SPORTS_LOOKAHEAD_DAYS})`
     );
-  });
+
+    const results = await Promise.allSettled([
+      fetchApiSportsBaseball(date),
+      fetchApiSportsBasketball(date),
+      fetchApiSportsSoccer(date),
+      fetchApiSportsHockey(date),
+    ]);
+
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        allGames.push(...result.value);
+        return;
+      }
+
+      console.log(
+        `⚠️ API-Sports ${labels[index]} error for ${date}:`,
+        result.reason?.message || result.reason
+      );
+    });
+
+    const uniqueCount = new Set(
+      allGames.map(
+        (game) =>
+          game.id ||
+          `${game.sport}-${game.away}-${game.home}-${game.commenceTime}`
+      )
+    ).size;
+
+    console.log(
+      `📅 API-Sports schedule total after ${date}: ${uniqueCount}`
+    );
+
+    // Stop early once the dashboard limit has been satisfied.
+    if (uniqueCount >= 80) {
+      break;
+    }
+  }
 
   const uniqueGames = Array.from(
     new Map(
-      games.map((game) => [
-        game.id || `${game.sport}-${game.away}-${game.home}`,
+      allGames.map((game) => [
+        game.id ||
+          `${game.sport}-${game.away}-${game.home}-${game.commenceTime}`,
         game,
       ])
     ).values()
@@ -1004,11 +1039,12 @@ async function fetchApiSportsGamesFresh() {
   uniqueGames.sort((a, b) => {
     const aTime = new Date(a.commenceTime || 0).getTime();
     const bTime = new Date(b.commenceTime || 0).getTime();
+
     return aTime - bTime;
   });
 
   console.log(
-    `✅ API-Sports returned ${uniqueGames.length} real scheduled games`
+    `✅ API-Sports returned ${uniqueGames.length} real upcoming games`
   );
 
   return uniqueGames.slice(0, 80);
@@ -1018,10 +1054,16 @@ async function fetchApiSportsGamesFresh() {
 async function fetchApiSportsGames() {
   const now = Date.now();
 
+  const apiSportsCacheTtl =
+    Array.isArray(apiSportsCache?.games) &&
+    apiSportsCache.games.length > 0
+      ? API_SPORTS_CACHE_MS
+      : API_SPORTS_EMPTY_CACHE_MS;
+
   if (
     apiSportsCache &&
     Array.isArray(apiSportsCache.games) &&
-    now - apiSportsCache.updatedAt < API_SPORTS_CACHE_MS
+    now - apiSportsCache.updatedAt < apiSportsCacheTtl
   ) {
     console.log(
       `♻️ Using cached API-Sports schedule data (${Math.round(
