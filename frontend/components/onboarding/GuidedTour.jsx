@@ -20,12 +20,11 @@ export default function GuidedTour({
         position: "fixed",
         inset: 0,
         zIndex: 9998,
-        background: "rgba(0,0,0,.72)",
-        backdropFilter: "blur(8px)",
         display: "flex",
         justifyContent: "flex-end",
         alignItems: "center",
         padding: 24,
+        pointerEvents: "none",
       }}
     >
       <GlassCard
@@ -36,6 +35,9 @@ export default function GuidedTour({
           maxWidth: "100%",
           padding: 28,
           border: "1px solid rgba(0,255,225,.28)",
+          pointerEvents: "auto",
+          boxShadow:
+            "0 0 45px rgba(0,255,225,.12), 0 0 70px rgba(124,58,237,.12)",
         }}
       >
         <div
@@ -114,15 +116,23 @@ export default function GuidedTour({
           }}
         >
           <button
+            type="button"
             onClick={onPrevious}
+            disabled={stepIndex <= 0}
             style={{
               flex: 1,
               padding: 12,
               borderRadius: 12,
               border: "1px solid rgba(255,255,255,.15)",
-              background: "rgba(255,255,255,.05)",
-              color: "#fff",
-              cursor: "pointer",
+              background:
+                stepIndex <= 0
+                  ? "rgba(255,255,255,.025)"
+                  : "rgba(255,255,255,.05)",
+              color:
+                stepIndex <= 0
+                  ? "rgba(255,255,255,.28)"
+                  : "#ffffff",
+              cursor: stepIndex <= 0 ? "not-allowed" : "pointer",
             }}
           >
             ← Previous

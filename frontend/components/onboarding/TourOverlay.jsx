@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 export default function TourOverlay({
   open = false,
   targetSelector = "",
+  padding = 10,
 }) {
   const [rect, setRect] = useState(null);
 
@@ -14,68 +15,92 @@ export default function TourOverlay({
       return;
     }
 
-    const update = () => {
-      const el = document.querySelector(targetSelector);
+    let frameId = null;
 
-      if (!el) {
+    const update = () => {
+      const element = document.querySelector(targetSelector);
+
+      if (!element) {
         setRect(null);
         return;
       }
 
-      const r = el.getBoundingClientRect();
+      const nextRect = element.getBoundingClientRect();
 
       setRect({
-        top: r.top,
-        left: r.left,
-        width: r.width,
-        height: r.height,
+        top: nextRect.top,
+        left: nextRect.left,
+        width: nextRect.width,
+        height: nextRect.height,
       });
+    };
+
+    const scheduleUpdate = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = requestAnimationFrame(update);
     };
 
     update();
 
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("scroll", scheduleUpdate, true);
 
     return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+
+      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("scroll", scheduleUpdate, true);
     };
   }, [open, targetSelector]);
 
-  if (!open) return null;
+  if (!open) {
+    return null;
+  }
 
-  return (
-    <>
+  if (!rect) {
+    return (
       <div
+        aria-hidden="true"
         style={{
           position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,.72)",
-          backdropFilter: "blur(4px)",
           zIndex: 9996,
           pointerEvents: "none",
+          background: "rgba(0,0,0,.72)",
+          backdropFilter: "blur(3px)",
+          WebkitBackdropFilter: "blur(3px)",
         }}
       />
+    );
+  }
 
-      {rect && (
-        <div
-          style={{
-            position: "fixed",
-            top: rect.top - 8,
-            left: rect.left - 8,
-            width: rect.width + 16,
-            height: rect.height + 16,
-            borderRadius: 18,
-            border: "2px solid #00ffe1",
-            boxShadow:
-              "0 0 18px rgba(0,255,225,.9), 0 0 40px rgba(124,58,237,.55)",
-            zIndex: 9997,
-            pointerEvents: "none",
-            transition: "all .25s ease",
-          }}
-        />
-      )}
-    </>
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: "fixed",
+        top: Math.max(8, rect.top - padding),
+        left: Math.max(8, rect.left - padding),
+        width: Math.max(20, rect.width + padding * 2),
+        height: Math.max(20, rect.height + padding * 2),
+        zIndex: 9997,
+        pointerEvents: "none",
+        borderRadius: 20,
+        border: "2px solid #00ffe1",
+        background: "transparent",
+        boxShadow:
+          "0 0 0 9999px rgba(0,0,0,.72), " +
+          "0 0 20px rgba(0,255,225,.95), " +
+          "0 0 48px rgba(124,58,237,.68), " +
+          "inset 0 0 24px rgba(0,255,225,.08)",
+        transition:
+          "top .32s ease, left .32s ease, width .32s ease, height .32s ease",
+      }}
+    />
   );
 }

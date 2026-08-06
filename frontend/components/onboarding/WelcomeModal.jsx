@@ -16,9 +16,14 @@ const trialFeatures = [
 export default function WelcomeModal({
   open = true,
   imageSrc = "",
+  firstName = "",
   onStartTour,
   onSkip,
 }) {
+  const safeFirstName = String(firstName || "").trim();
+  const personalGreeting = safeFirstName
+    ? `Hello, ${safeFirstName}.`
+    : "Hello.";
   if (!open) {
     return null;
   }
@@ -144,7 +149,10 @@ export default function WelcomeModal({
                 lineHeight: 1.75,
               }}
             >
-              Meet Le&apos;kenya, your personal AI guide. She will show
+              <strong style={{ color: "#ffffff" }}>
+                {personalGreeting}
+              </strong>{" "}
+              Meet Le&apos;kenya, your KBETZ AI Guide. She will show
               you how to explore games, understand AI insights, track
               your bankroll, and get the most from your free trial.
             </p>
