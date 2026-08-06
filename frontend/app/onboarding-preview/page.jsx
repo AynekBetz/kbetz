@@ -6,6 +6,7 @@ import WelcomeModal from "../../components/onboarding/WelcomeModal";
 import GuidedTour from "../../components/onboarding/GuidedTour";
 import TourOverlay from "../../components/onboarding/TourOverlay";
 import useGuidedTour from "../../components/onboarding/useGuidedTour";
+import useLeKenyaNarration from "../../components/onboarding/useLeKenyaNarration";
 
 const TOUR_STEPS = [
   {
@@ -134,6 +135,21 @@ export default function OnboardingPreviewPage() {
   const [firstName, setFirstName] = useState("Kenya");
   const [tourFinished, setTourFinished] = useState(false);
 
+  const {
+    enabled: voiceEnabled,
+    speaking,
+    supported: voiceSupported,
+    voiceName,
+    speak,
+    stop,
+    toggle: toggleVoice,
+  } = useLeKenyaNarration({
+    enabledByDefault: true,
+    rate: 0.92,
+    pitch: 1.02,
+    volume: 1,
+  });
+
   useEffect(() => {
     const parameters = new URLSearchParams(window.location.search);
     const queryName = parameters.get("name");
@@ -172,6 +188,29 @@ export default function OnboardingPreviewPage() {
     return firstName ? `Hello, ${firstName}.` : "Hello.";
   }, [firstName]);
 
+  const narratedDescription = useMemo(() => {
+    const description = currentStep?.description || "";
+
+    return stepIndex === 0
+      ? `${greeting} ${description}`
+      : description;
+  }, [currentStep?.description, greeting, stepIndex]);
+
+  useEffect(() => {
+    if (!isOpen || !narratedDescription) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      speak(narratedDescription);
+    }, 320);
+
+    return () => {
+      window.clearTimeout(timer);
+      stop();
+    };
+  }, [isOpen, narratedDescription, speak, stop]);
+
   const startTour = () => {
     setShowWelcome(false);
     setTourFinished(false);
@@ -182,11 +221,13 @@ export default function OnboardingPreviewPage() {
   };
 
   const exploreAlone = () => {
+    stop();
     setShowWelcome(false);
     setTourFinished(false);
   };
 
   const replayTour = () => {
+    stop();
     resetTour();
     setTourFinished(false);
     setShowWelcome(true);
@@ -222,12 +263,7 @@ export default function OnboardingPreviewPage() {
         open={isOpen}
         currentStep={{
           ...currentStep,
-          description:
-            stepIndex === 0
-              ? `${greeting} ${
-                  currentStep?.description || ""
-                }`
-              : currentStep?.description,
+          description: narratedDescription,
         }}
         stepIndex={stepIndex}
         totalSteps={totalSteps}
@@ -282,11 +318,51 @@ export default function OnboardingPreviewPage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={replayTour}
+        <div
           style={{
-            padding: "12px 17px",
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
+          <button
+            type="button"
+            onClick={toggleVoice}
+            disabled={!voiceSupported}
+            title={
+              voiceSupported
+                ? `Narration voice: ${voiceName || "Loading"}`
+                : "Narration is unavailable in this browser"
+            }
+            style={{
+              padding: "12px 17px",
+              borderRadius: 13,
+              border: voiceEnabled
+                ? "1px solid rgba(0,255,225,.34)"
+                : "1px solid rgba(255,255,255,.14)",
+              background: voiceEnabled
+                ? "linear-gradient(135deg, rgba(0,255,225,.14), rgba(53,215,255,.08))"
+                : "rgba(255,255,255,.04)",
+              color: voiceEnabled
+                ? "#00ffe1"
+                : "rgba(255,255,255,.55)",
+              fontWeight: 1000,
+              cursor: voiceSupported ? "pointer" : "not-allowed",
+            }}
+          >
+            {speaking
+              ? "🔊 Le'kenya Speaking"
+              : voiceEnabled
+                ? "🔊 Voice On"
+                : "🔇 Voice Off"}
+          </button>
+
+          <button
+            type="button"
+            onClick={replayTour}
+            style={{
+              padding: "12px 17px",
             borderRadius: 13,
             border: "1px solid rgba(0,255,225,.28)",
             background:
@@ -296,8 +372,9 @@ export default function OnboardingPreviewPage() {
             cursor: "pointer",
           }}
         >
-          Replay Welcome
-        </button>
+            Replay Welcome
+          </button>
+        </div>
       </header>
 
       <div
