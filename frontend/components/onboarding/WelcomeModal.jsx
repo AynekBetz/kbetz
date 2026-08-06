@@ -15,7 +15,7 @@ const trialFeatures = [
 
 export default function WelcomeModal({
   open = true,
-  imageSrc = "",
+  imageSrc = "/lekenya-kbetz-portrait.png",
   firstName = "",
   onStartTour,
   onSkip,
@@ -53,9 +53,9 @@ export default function WelcomeModal({
         style={{
           width: "min(1080px, 100%)",
           padding: "clamp(18px, 3vw, 34px)",
-          border: "1px solid rgba(0,255,225,.32)",
+          border: "1px solid rgba(0,255,225,.48)",
           boxShadow:
-            "0 0 60px rgba(0,255,225,.1), 0 0 85px rgba(196,45,255,.1)",
+            "0 0 52px rgba(0,255,225,.17), 0 0 88px rgba(53,215,255,.08), 0 0 105px rgba(139,92,246,.12)",
         }}
       >
         <div
@@ -237,7 +237,7 @@ export default function WelcomeModal({
                 border: "1px solid rgba(196,45,255,.25)",
                 borderRadius: 22,
                 background:
-                  "radial-gradient(circle at 50% 18%, rgba(0,255,225,.22), transparent 27%), radial-gradient(circle at 70% 30%, rgba(196,45,255,.28), transparent 36%), linear-gradient(180deg, #07161b 0%, #10051d 56%, #030308 100%)",
+                  "radial-gradient(circle at 28% 20%, rgba(0,255,225,.38), transparent 34%), radial-gradient(circle at 72% 28%, rgba(53,215,255,.22), transparent 32%), radial-gradient(circle at 82% 52%, rgba(139,92,246,.28), transparent 38%), linear-gradient(180deg, #03161a 0%, #07101b 42%, #10051d 72%, #020307 100%)",
                 boxShadow:
                   "0 0 34px rgba(0,255,225,.09), inset 0 0 38px rgba(196,45,255,.06)",
               }}
@@ -267,6 +267,8 @@ export default function WelcomeModal({
                     height: 440,
                     objectFit: "cover",
                     objectPosition: "center top",
+                    filter:
+                      "saturate(1.06) contrast(1.03) drop-shadow(0 0 22px rgba(0,255,225,.18))",
                   }}
                 />
               ) : (
