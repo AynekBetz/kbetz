@@ -24,6 +24,7 @@ const TOUR_STEPS = [
   },
   {
     title: "AI Market Intelligence",
+    audioSrc: "/audio/lekenya/ai-market-intelligence.mp3",
     description:
       "When real sportsbook prices are available, KBETZ can organize confidence, edge, and risk information to help you evaluate a market. No prediction is guaranteed.",
     targetSelector: "[data-tour='ai-picks']",
