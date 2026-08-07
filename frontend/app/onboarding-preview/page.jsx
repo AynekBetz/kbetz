@@ -17,6 +17,7 @@ const TOUR_STEPS = [
   },
   {
     title: "Live Markets",
+    audioSrc: "/audio/lekenya/live-markets.mp3",
     description:
       "This is where available games and market information appear. Schedule-only games remain clearly labeled until genuine sportsbook odds are available.",
     targetSelector: "[data-tour='live-markets']",
