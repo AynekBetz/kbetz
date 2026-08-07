@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import WelcomeModal from "../../components/onboarding/WelcomeModal";
 import GuidedTour from "../../components/onboarding/GuidedTour";
@@ -135,6 +135,8 @@ export default function OnboardingPreviewPage() {
   const [firstName, setFirstName] = useState("Kenya");
   const [tourFinished, setTourFinished] = useState(false);
 
+  const welcomeAudioRef = useRef(null);
+
   const {
     enabled: voiceEnabled,
     speaking,
@@ -212,6 +214,13 @@ export default function OnboardingPreviewPage() {
   }, [isOpen, narratedDescription, speak, stop]);
 
   const startTour = () => {
+    stop();
+
+    if (welcomeAudioRef.current) {
+      welcomeAudioRef.current.pause();
+      welcomeAudioRef.current.currentTime = 0;
+    }
+
     setShowWelcome(false);
     setTourFinished(false);
 
@@ -228,6 +237,12 @@ export default function OnboardingPreviewPage() {
 
   const replayTour = () => {
     stop();
+
+    if (welcomeAudioRef.current) {
+      welcomeAudioRef.current.pause();
+      welcomeAudioRef.current.currentTime = 0;
+    }
+
     resetTour();
     setTourFinished(false);
     setShowWelcome(true);
@@ -247,6 +262,12 @@ export default function OnboardingPreviewPage() {
           "linear-gradient(180deg, #02070a 0%, #06020b 48%, #000000 100%)",
       }}
     >
+      <audio
+        ref={welcomeAudioRef}
+        src="/audio/lekenya/welcome.mp3"
+        preload="auto"
+      />
+
       <WelcomeModal
         open={showWelcome}
         firstName={firstName}
@@ -326,6 +347,30 @@ export default function OnboardingPreviewPage() {
             justifyContent: "flex-end",
           }}
         >
+          <button
+            type="button"
+            onClick={() => {
+              if (!welcomeAudioRef.current) return;
+
+              stop();
+              welcomeAudioRef.current.currentTime = 0;
+
+              welcomeAudioRef.current.play().catch(() => {});
+            }}
+            style={{
+              padding: "12px 17px",
+              borderRadius: 13,
+              border: "1px solid rgba(0,255,225,.34)",
+              background:
+                "linear-gradient(135deg, rgba(0,255,225,.14), rgba(53,215,255,.08))",
+              color: "#00ffe1",
+              fontWeight: 1000,
+              cursor: "pointer",
+            }}
+          >
+            ▶ Hear Le&apos;kenya
+          </button>
+
           <button
             type="button"
             onClick={toggleVoice}
