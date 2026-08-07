@@ -42,27 +42,44 @@ export default function GuidedTour({
       >
         <div
           style={{
-            width: 90,
-            height: 90,
-            borderRadius: "50%",
-            margin: "0 auto 20px",
-            display: "grid",
-            placeItems: "center",
-            fontSize: 34,
-            fontWeight: 900,
-            color: "#fff",
+            position: "relative",
+            width: 170,
+            height: 190,
+            margin: "0 auto 18px",
+            overflow: "hidden",
+            borderRadius: 22,
+            border: "1px solid rgba(0,255,225,.34)",
             background:
-              "linear-gradient(135deg,#00ffe1,#7c3aed,#ff49d8)",
+              "radial-gradient(circle at 30% 20%, rgba(0,255,225,.24), transparent 38%), radial-gradient(circle at 75% 35%, rgba(124,58,237,.22), transparent 42%), #03070c",
+            boxShadow:
+              "0 0 26px rgba(0,255,225,.18), 0 0 45px rgba(124,58,237,.16)",
           }}
         >
-          LK
+          <img
+            src="/lekenya-kbetz-portrait.png"
+            alt="Le'kenya, your KBETZ AI Guide"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center top",
+              filter:
+                "saturate(1.08) contrast(1.03) drop-shadow(0 0 18px rgba(0,255,225,.18))",
+            }}
+          />
         </div>
 
         <h2
           style={{
-            color: "#fff",
             textAlign: "center",
             marginBottom: 14,
+            fontWeight: 1000,
+            background:
+              "linear-gradient(90deg, #00ffe1 0%, #35d7ff 30%, #7c6cff 64%, #d946ef 100%)",
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+            textShadow: "0 0 22px rgba(0,255,225,.12)",
           }}
         >
           {currentStep.title || "Welcome"}

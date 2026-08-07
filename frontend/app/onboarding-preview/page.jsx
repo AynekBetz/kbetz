@@ -14,6 +14,7 @@ const TOUR_STEPS = [
     description:
       "Hello! I'm Le'kenya, your KBETZ AI Guide. I'll show you the most important parts of the platform one step at a time.",
     targetSelector: "[data-tour='welcome']",
+    audioSrc: "/audio/lekenya/welcome.mp3",
   },
   {
     title: "Live Markets",
@@ -31,6 +32,7 @@ const TOUR_STEPS = [
   },
   {
     title: "Your Bankroll",
+    audioSrc: "/audio/lekenya/bankroll.mp3",
     description:
       "Your bankroll is the amount you've personally set aside for betting. KBETZ does not hold your money—it helps you track your results and performance.",
     targetSelector: "[data-tour='bankroll']",
@@ -44,12 +46,14 @@ const TOUR_STEPS = [
   },
   {
     title: "Your 7-Day FREE Trial",
+    audioSrc: "/audio/lekenya/free-trial.mp3",
     description:
       "During your trial, eligible PRO tools are unlocked so you can explore the premium experience before deciding whether to subscribe.",
     targetSelector: "[data-tour='trial']",
   },
   {
     title: "You're Ready",
+    audioSrc: "/audio/lekenya/finish.mp3",
     description:
       "Thank you for choosing KBETZ. I'm excited to be part of your journey. Good luck—and welcome to the KBETZ family.",
     targetSelector: "[data-tour='finish']",
