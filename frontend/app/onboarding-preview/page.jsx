@@ -209,6 +209,8 @@ export default function OnboardingPreviewPage() {
 
     stop();
 
+    let advanceTimer = null;
+
     if (tourAudioRef.current) {
       tourAudioRef.current.pause();
       tourAudioRef.current.currentTime = 0;
@@ -222,6 +224,12 @@ export default function OnboardingPreviewPage() {
         audio.preload = "auto";
         tourAudioRef.current = audio;
 
+        audio.onended = () => {
+          advanceTimer = window.setTimeout(() => {
+            nextStep();
+          }, 750);
+        };
+
         audio.play().catch((error) => {
           console.warn(
             "Le'kenya professional narration could not start:",
@@ -232,14 +240,22 @@ export default function OnboardingPreviewPage() {
         return;
       }
 
+      // Temporary fallback while we finish recording
+      // Le'kenya's remaining professional MP3 files.
       speak(narratedDescription);
     }, 320);
 
     return () => {
       window.clearTimeout(timer);
+
+      if (advanceTimer) {
+        window.clearTimeout(advanceTimer);
+      }
+
       stop();
 
       if (tourAudioRef.current) {
+        tourAudioRef.current.onended = null;
         tourAudioRef.current.pause();
         tourAudioRef.current.currentTime = 0;
         tourAudioRef.current = null;
@@ -249,6 +265,7 @@ export default function OnboardingPreviewPage() {
     isOpen,
     currentStep?.audioSrc,
     narratedDescription,
+    nextStep,
     speak,
     stop,
   ]);
