@@ -38,6 +38,7 @@ const TOUR_STEPS = [
     description:
       "Mission Control shows platform health, database status, data-provider readiness, and other operational information behind KBETZ.",
     targetSelector: "[data-tour='mission-control']",
+    audioSrc: "/audio/lekenya/mission-control.mp3",
   },
   {
     title: "Your 7-Day FREE Trial",
@@ -136,6 +137,7 @@ export default function OnboardingPreviewPage() {
   const [tourFinished, setTourFinished] = useState(false);
 
   const welcomeAudioRef = useRef(null);
+  const tourAudioRef = useRef(null);
 
   const {
     enabled: voiceEnabled,
@@ -203,15 +205,51 @@ export default function OnboardingPreviewPage() {
       return;
     }
 
+    stop();
+
+    if (tourAudioRef.current) {
+      tourAudioRef.current.pause();
+      tourAudioRef.current.currentTime = 0;
+      tourAudioRef.current = null;
+    }
+
     const timer = window.setTimeout(() => {
+      if (currentStep?.audioSrc) {
+        const audio = new Audio(currentStep.audioSrc);
+
+        audio.preload = "auto";
+        tourAudioRef.current = audio;
+
+        audio.play().catch((error) => {
+          console.warn(
+            "Le'kenya professional narration could not start:",
+            error
+          );
+        });
+
+        return;
+      }
+
       speak(narratedDescription);
     }, 320);
 
     return () => {
       window.clearTimeout(timer);
       stop();
+
+      if (tourAudioRef.current) {
+        tourAudioRef.current.pause();
+        tourAudioRef.current.currentTime = 0;
+        tourAudioRef.current = null;
+      }
     };
-  }, [isOpen, narratedDescription, speak, stop]);
+  }, [
+    isOpen,
+    currentStep?.audioSrc,
+    narratedDescription,
+    speak,
+    stop,
+  ]);
 
   const startTour = () => {
     stop();
