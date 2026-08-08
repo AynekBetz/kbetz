@@ -532,10 +532,27 @@ export default function Dashboard() {
     recordLink.style.boxShadow = "0 0 22px rgba(210,45,255,.18)";
     recordLink.style.backdropFilter = "blur(12px)";
 
+    const missionLink = document.createElement("a");
+    missionLink.href = "/mission-control";
+    missionLink.textContent = "🛰️ Mission Control";
+    missionLink.style.color = "#ffffff";
+    missionLink.style.textDecoration = "none";
+    missionLink.style.fontWeight = "1000";
+    missionLink.style.fontSize = "12px";
+    missionLink.style.padding = "10px 13px";
+    missionLink.style.borderRadius = "999px";
+    missionLink.style.border = "1px solid rgba(0,255,225,.68)";
+    missionLink.style.background =
+      "linear-gradient(90deg, rgba(0,255,225,.20), rgba(53,215,255,.12), rgba(124,58,237,.22))";
+    missionLink.style.boxShadow =
+      "0 0 22px rgba(0,255,225,.18), 0 0 20px rgba(124,58,237,.14)";
+    missionLink.style.backdropFilter = "blur(12px)";
+
     wrap.appendChild(playerLink);
     wrap.appendChild(parlayLink);
     wrap.appendChild(howToLink);
     wrap.appendChild(recordLink);
+    wrap.appendChild(missionLink);
     document.body.appendChild(wrap);
 
     const mobileStyle = document.createElement("style");
