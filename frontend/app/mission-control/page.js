@@ -215,6 +215,36 @@ export default function MissionControl() {
           "radial-gradient(circle at 10% 0%, rgba(0,255,225,.13), transparent 28%), radial-gradient(circle at 90% 0%, rgba(181,45,255,.21), transparent 33%), radial-gradient(circle at 50% 100%, rgba(61,90,255,.08), transparent 40%), linear-gradient(180deg,#020506,#030308)",
       }}
     >
+      <div
+        style={{
+          marginBottom: 18,
+          display: "flex",
+          justifyContent: "flex-start",
+        }}
+      >
+        <a
+          href="/dashboard"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 15px",
+            borderRadius: 999,
+            border: "1px solid rgba(0,255,225,.45)",
+            background:
+              "linear-gradient(90deg, rgba(0,255,225,.12), rgba(53,215,255,.10), rgba(124,58,237,.14))",
+            color: "#ffffff",
+            textDecoration: "none",
+            fontSize: 12,
+            fontWeight: 900,
+            boxShadow:
+              "0 0 18px rgba(0,255,225,.12), 0 0 18px rgba(124,58,237,.10)",
+          }}
+        >
+          ← Back to Dashboard
+        </a>
+      </div>
+
       <MissionHeader
         currentTime={currentTime}
         refreshing={refreshing}
