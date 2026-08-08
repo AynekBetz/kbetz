@@ -55,18 +55,37 @@ export default function GuidedTour({
               "0 0 26px rgba(0,255,225,.18), 0 0 45px rgba(124,58,237,.16)",
           }}
         >
-          <img
-            src="/lekenya-kbetz-portrait.png"
-            alt="Le'kenya, your KBETZ AI Guide"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: "center top",
-              filter:
-                "saturate(1.08) contrast(1.03) drop-shadow(0 0 18px rgba(0,255,225,.18))",
-            }}
-          />
+          {currentStep?.videoSrc ? (
+            <video
+              key={currentStep.videoSrc}
+              src={currentStep.videoSrc}
+              autoPlay
+              muted
+              playsInline
+              loop
+              preload="metadata"
+              aria-label="Le'kenya, your KBETZ AI Guide"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                objectPosition: "center top",
+              }}
+            />
+          ) : (
+            <img
+              src="/lekenya-kbetz-portrait.png"
+              alt="Le'kenya, your KBETZ AI Guide"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                objectPosition: "center top",
+                filter:
+                  "saturate(1.08) contrast(1.03) drop-shadow(0 0 18px rgba(0,255,225,.18))",
+              }}
+            />
+          )}
         </div>
 
         <h2
