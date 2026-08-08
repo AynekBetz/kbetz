@@ -44,6 +44,8 @@ export default function MissionControl() {
   const [health, setHealth] = useState(null);
   const [oddsPayload, setOddsPayload] = useState(null);
   const [error, setError] = useState("");
+  const [ownerChecking, setOwnerChecking] = useState(true);
+  const [ownerAllowed, setOwnerAllowed] = useState(false);
 
   const loadPlatform = useCallback(async (manual = false) => {
     if (manual) {
@@ -117,6 +119,66 @@ export default function MissionControl() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const token = window.localStorage.getItem("token") || "";
+
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+
+    let cancelled = false;
+
+    async function verifyOwner() {
+      try {
+        const response = await fetch(`${API}/api/owner/dashboard`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: "no-store",
+        });
+
+        if (cancelled) return;
+
+        if (response.status === 401) {
+          window.localStorage.removeItem("token");
+          window.location.href = "/login";
+          return;
+        }
+
+        if (response.status === 403) {
+          window.location.href = "/dashboard";
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Owner check failed with ${response.status}`);
+        }
+
+        setOwnerAllowed(true);
+      } catch (ownerError) {
+        console.error("Mission Control owner verification failed:", ownerError);
+
+        if (!cancelled) {
+          setError("Mission Control could not verify owner access.");
+        }
+      } finally {
+        if (!cancelled) {
+          setOwnerChecking(false);
+        }
+      }
+    }
+
+    verifyOwner();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     setCurrentTime(new Date());
 
     const clockTimer = window.setInterval(() => {
@@ -129,6 +191,8 @@ export default function MissionControl() {
   }, []);
 
   useEffect(() => {
+    if (!ownerAllowed) return;
+
     loadPlatform(false);
 
     const refreshTimer = window.setInterval(() => {
@@ -138,7 +202,7 @@ export default function MissionControl() {
     return () => {
       window.clearInterval(refreshTimer);
     };
-  }, [loadPlatform]);
+  }, [loadPlatform, ownerAllowed]);
 
   const games = useMemo(() => {
     return Array.isArray(oddsPayload?.games)
@@ -202,6 +266,41 @@ export default function MissionControl() {
       : games.length > 0
         ? "Connected Provider"
         : "Waiting";
+
+  if (ownerChecking) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          color: "#ffffff",
+          fontFamily:
+            "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+          background:
+            "radial-gradient(circle at 10% 0%, rgba(0,255,225,.13), transparent 28%), radial-gradient(circle at 90% 0%, rgba(181,45,255,.21), transparent 33%), linear-gradient(180deg,#020506,#030308)",
+        }}
+      >
+        <div
+          style={{
+            padding: 22,
+            borderRadius: 18,
+            border: "1px solid rgba(0,255,225,.28)",
+            background: "rgba(3,8,14,.82)",
+            boxShadow:
+              "0 0 30px rgba(0,255,225,.12), 0 0 40px rgba(124,58,237,.10)",
+            fontWeight: 900,
+          }}
+        >
+          Verifying owner access...
+        </div>
+      </main>
+    );
+  }
+
+  if (!ownerAllowed) {
+    return null;
+  }
 
   return (
     <main
