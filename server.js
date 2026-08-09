@@ -68,6 +68,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const PASSWORD_RESET_FROM_EMAIL =
   process.env.PASSWORD_RESET_FROM_EMAIL || "";
 const ODDS_API_KEY = process.env.ODDS_API_KEY || "";
+const THERUNDOWN_API_KEY = process.env.THERUNDOWN_API_KEY || "";
 const APISPORTS_KEY = process.env.APISPORTS_KEY || "";
 const APISPORTS_ENABLED =
   String(process.env.APISPORTS_ENABLED || "").toLowerCase() === "true";
@@ -1480,6 +1481,55 @@ async function getCachedOdds() {
     cacheMs: ODDS_CACHE_MS,
   };
 }
+
+/* ================= THERUNDOWN TEST ================= */
+app.get("/api/therundown/status", async (req, res) => {
+  try {
+    if (!THERUNDOWN_API_KEY) {
+      return res.status(503).json({
+        success: false,
+        configured: false,
+        error: "THERUNDOWN_API_KEY is not configured",
+      });
+    }
+
+    const response = await fetch(
+      "https://therundown.io/api/v2/sports",
+      {
+        headers: {
+          "X-TheRundown-Key": THERUNDOWN_API_KEY,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const raw = await response.text();
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = { raw: raw.slice(0, 1000) };
+    }
+
+    return res.status(response.status).json({
+      success: response.ok,
+      configured: true,
+      provider: "TheRundown",
+      providerStatus: response.status,
+      data,
+    });
+  } catch (err) {
+    console.error("TheRundown status error:", err?.message || err);
+
+    return res.status(500).json({
+      success: false,
+      configured: true,
+      provider: "TheRundown",
+      error: err?.message || "TheRundown request failed",
+    });
+  }
+});
 
 app.get("/api/odds", async (req, res) => {
   try {
