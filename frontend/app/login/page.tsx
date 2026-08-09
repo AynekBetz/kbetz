@@ -132,7 +132,25 @@ export default function LoginPage() {
           }}
         />
 
-        {message ? <p style={styles.message}>{message}</p> : null}
+        <button
+      type="button"
+      onClick={() => router.push("/forgot-password")}
+      style={{
+        marginTop: 10,
+        padding: 0,
+        border: "none",
+        background: "transparent",
+        color: "#67e8f9",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: 800,
+        textAlign: "left",
+      }}
+    >
+      Forgot password?
+    </button>
+
+    {message ? <p style={styles.message}>{message}</p> : null}
 
         <button
           style={{

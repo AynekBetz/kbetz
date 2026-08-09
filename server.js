@@ -56,6 +56,9 @@ console.log("🚀 KBETZ SERVER STARTING");
 /* ================= CONFIG ================= */
 const PORT = process.env.PORT || 10000;
 const CLIENT_URL = process.env.CLIENT_URL || "https://kbetz.vercel.app";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const PASSWORD_RESET_FROM_EMAIL =
+  process.env.PASSWORD_RESET_FROM_EMAIL || "";
 const ODDS_API_KEY = process.env.ODDS_API_KEY || "";
 const APISPORTS_KEY = process.env.APISPORTS_KEY || "";
 const APISPORTS_ENABLED =
@@ -140,6 +143,17 @@ const User =
     password: { type: String, required: true },
     isPro: { type: Boolean, default: false },
     bankroll: { type: Number, default: 1000 },
+
+passwordResetTokenHash: {
+  type: String,
+  default: "",
+  select: false,
+},
+passwordResetExpiresAt: {
+  type: Date,
+  default: null,
+  select: false,
+},
     createdAt: { type: Date, default: Date.now },
   });
 
@@ -169,6 +183,54 @@ function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.pbkdf2Sync(password, salt, 210000, 32, "sha256").toString("hex");
   return `pbkdf2$210000$${salt}$${hash}`;
+}
+
+function hashResetToken(token) {
+  return crypto
+    .createHash("sha256")
+    .update(String(token || ""))
+    .digest("hex");
+}
+
+async function sendPasswordResetEmail(email, resetUrl) {
+  if (!RESEND_API_KEY || !PASSWORD_RESET_FROM_EMAIL) {
+    throw new Error("Password reset email service is not configured");
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: PASSWORD_RESET_FROM_EMAIL,
+      to: [email],
+      subject: "Reset your KBETZ password",
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111">
+          <h2>Reset your KBETZ password</h2>
+          <p>We received a request to reset your KBETZ password.</p>
+          <p>
+            <a href="${resetUrl}">
+              Reset Password
+            </a>
+          </p>
+          <p>This link expires in 30 minutes and can only be used once.</p>
+          <p>If you did not request this reset, you can ignore this email.</p>
+        </div>
+      `,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(
+      data?.message ||
+        data?.error ||
+        `Password reset email failed with ${response.status}`
+    );
+  }
 }
 
 function verifyPassword(password, storedPassword) {
@@ -510,6 +572,135 @@ app.post("/api/login", authRateLimit, async (req, res) => {
   } catch (err) {
     console.log("Login error:", err?.message || err);
     return res.status(500).json({ success: false, error: "Login failed" });
+  }
+});
+
+app.post("/api/forgot-password", authRateLimit, async (req, res) => {
+  const genericMessage =
+    "If an account exists for that email, a password reset link has been sent.";
+
+  try {
+    const email = normalizeEmail(req.body.email);
+
+    if (!isValidEmail(email)) {
+      return res.json({
+        success: true,
+        message: genericMessage,
+      });
+    }
+
+    const user = await User.findOne({ email }).select(
+      "+passwordResetTokenHash +passwordResetExpiresAt"
+    );
+
+    if (!user) {
+      return res.json({
+        success: true,
+        message: genericMessage,
+      });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+
+    user.passwordResetTokenHash = hashResetToken(rawToken);
+    user.passwordResetExpiresAt =
+      new Date(Date.now() + 30 * 60 * 1000);
+
+    await user.save();
+
+    const resetUrl =
+      `${CLIENT_URL}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+    try {
+      await sendPasswordResetEmail(email, resetUrl);
+    } catch (mailError) {
+      user.passwordResetTokenHash = "";
+      user.passwordResetExpiresAt = null;
+      await user.save();
+
+      console.error(
+        "Password reset email error:",
+        mailError?.message || mailError
+      );
+
+      return res.status(503).json({
+        success: false,
+        error: "Password reset email service is temporarily unavailable.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: genericMessage,
+    });
+  } catch (err) {
+    console.error(
+      "Forgot password error:",
+      err?.message || err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: "Could not process password reset request.",
+    });
+  }
+});
+
+app.post("/api/reset-password", authRateLimit, async (req, res) => {
+  try {
+    const token = String(req.body.token || "").trim();
+    const password = String(req.body.password || "");
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: "Reset token is required.",
+      });
+    }
+
+    if (!isStrongEnoughPassword(password)) {
+      return res.status(400).json({
+        success: false,
+        error: "Password must be between 8 and 128 characters.",
+      });
+    }
+
+    const tokenHash = hashResetToken(token);
+
+    const user = await User.findOne({
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: { $gt: new Date() },
+    }).select(
+      "+passwordResetTokenHash +passwordResetExpiresAt"
+    );
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: "This password reset link is invalid or has expired.",
+      });
+    }
+
+    user.password = hashPassword(password);
+    user.passwordResetTokenHash = "";
+    user.passwordResetExpiresAt = null;
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Your KBETZ password has been reset successfully.",
+    });
+  } catch (err) {
+    console.error(
+      "Reset password error:",
+      err?.message || err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: "Could not reset password.",
+    });
   }
 });
 
