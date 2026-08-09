@@ -1275,11 +1275,6 @@ window.location.href = data.url;
     : null;
 
   const handleDeposit = async () => {
-    if (!isPro) {
-      upgrade();
-      return;
-    }
-
     try {
       const token =
         typeof window !== "undefined"
@@ -1305,16 +1300,21 @@ window.location.href = data.url;
 
       const data = await response.json().catch(() => ({}));
 
-      if (!response.ok || !data?.url) {
-        alert(
-          data?.error ||
-            data?.message ||
-            "KBETZ could not open the billing portal."
-        );
+      if (response.ok && data?.url) {
+        window.location.href = data.url;
         return;
       }
 
-      window.location.href = data.url;
+      if (response.status === 404 && !isPro) {
+        upgrade();
+        return;
+      }
+
+      alert(
+        data?.error ||
+          data?.message ||
+          "KBETZ could not open the billing portal."
+      );
     } catch (err) {
       console.error("KBETZ billing portal error:", err);
       alert("KBETZ could not connect to billing. Please try again.");
