@@ -1274,13 +1274,51 @@ window.location.href = data.url;
     ? Number(roi?.todayProfit ?? roi?.profit ?? 0)
     : null;
 
-  const handleDeposit = () => {
-    if (isPro) {
-      alert("KBETZ PRO is active. Billing portal management is coming next.");
+  const handleDeposit = async () => {
+    if (!isPro) {
+      upgrade();
       return;
     }
 
-    upgrade();
+    try {
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("token")
+          : null;
+
+      if (!token) {
+        alert("Please log in to manage KBETZ billing.");
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(
+        `${API}/api/billing-portal`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data?.url) {
+        alert(
+          data?.error ||
+            data?.message ||
+            "KBETZ could not open the billing portal."
+        );
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch (err) {
+      console.error("KBETZ billing portal error:", err);
+      alert("KBETZ could not connect to billing. Please try again.");
+    }
   };
 
  const handleViewPick = (pick) => {

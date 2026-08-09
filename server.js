@@ -2722,6 +2722,64 @@ app.post("/api/checkout", requireAuth, async (req, res) => {
 });
 
 
+/* ================= STRIPE BILLING PORTAL ================= */
+app.post("/api/billing-portal", requireAuth, async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({
+        success: false,
+        error: "Stripe is not configured",
+      });
+    }
+
+    const email = normalizeEmail(req.auth?.sub);
+
+    if (!email) {
+      return res.status(401).json({
+        success: false,
+        error: "Authentication required",
+      });
+    }
+
+    const customers = await stripe.customers.list({
+      email,
+      limit: 10,
+    });
+
+    if (!customers.data.length) {
+      return res.status(404).json({
+        success: false,
+        error: "No Stripe billing account was found for this KBETZ account.",
+      });
+    }
+
+    const customer =
+      customers.data.find((item) => item.email === email) ||
+      customers.data[0];
+
+    const portalSession =
+      await stripe.billingPortal.sessions.create({
+        customer: customer.id,
+        return_url: `${CLIENT_URL}/dashboard`,
+      });
+
+    return res.json({
+      success: true,
+      url: portalSession.url,
+    });
+  } catch (err) {
+    console.error(
+      "Stripe billing portal error:",
+      err?.message || err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: err?.message || "Could not open billing portal",
+    });
+  }
+});
+
 /* ================= STRIPE PRO CONFIRM ================= */
 app.post("/api/pro/confirm", requireAuth, async (req, res) => {
   try {
