@@ -46,7 +46,15 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "100kb" }));
+const jsonParser = express.json({ limit: "100kb" });
+
+app.use((req, res, next) => {
+  if (req.originalUrl === "/api/stripe/webhook") {
+    return next();
+  }
+
+  return jsonParser(req, res, next);
+});
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -81,6 +89,8 @@ let apiSportsRefreshPromise = null;
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || "";
+const STRIPE_WEBHOOK_SECRET =
+  process.env.STRIPE_WEBHOOK_SECRET || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const OWNER_SECRET = process.env.OWNER_SECRET || "";
 const OWNER_EMAIL = normalizeEmail(process.env.OWNER_EMAIL || "");
@@ -2540,6 +2550,105 @@ app.get("/api/roi", requireAuth, async (req, res) => {
   }
 });
 
+/* ================= STRIPE WEBHOOK ================= */
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    if (!stripe || !STRIPE_WEBHOOK_SECRET) {
+      return res.status(503).send("Stripe webhook is not configured");
+    }
+
+    const signature = req.headers["stripe-signature"];
+
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        signature,
+        STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error(
+        "Stripe webhook signature error:",
+        err?.message || err
+      );
+
+      return res.status(400).send("Invalid Stripe webhook signature");
+    }
+
+    try {
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+
+        const email = normalizeEmail(
+          session.customer_email ||
+            session.customer_details?.email ||
+            session.metadata?.email ||
+            session.client_reference_id
+        );
+
+        if (email && session.mode === "subscription") {
+          await User.findOneAndUpdate(
+            { email },
+            { isPro: true }
+          );
+
+          console.log(
+            "✅ Stripe webhook activated PRO:",
+            email
+          );
+        }
+      }
+
+      if (
+        event.type === "customer.subscription.updated" ||
+        event.type === "customer.subscription.deleted"
+      ) {
+        const subscription = event.data.object;
+
+        const email = normalizeEmail(
+          subscription.metadata?.email
+        );
+
+        if (email) {
+          const active =
+            event.type !== "customer.subscription.deleted" &&
+            (
+              subscription.status === "active" ||
+              subscription.status === "trialing"
+            );
+
+          await User.findOneAndUpdate(
+            { email },
+            { isPro: active }
+          );
+
+          console.log(
+            `✅ Stripe subscription ${subscription.status}:`,
+            email,
+            "PRO:",
+            active
+          );
+        }
+      }
+
+      return res.json({ received: true });
+    } catch (err) {
+      console.error(
+        "Stripe webhook processing error:",
+        err?.message || err
+      );
+
+      return res.status(500).json({
+        received: false,
+        error: "Stripe webhook processing failed",
+      });
+    }
+  }
+);
+
 /* ================= STRIPE ================= */
 app.post("/api/checkout", requireAuth, async (req, res) => {
   try {
@@ -2557,14 +2666,23 @@ app.post("/api/checkout", requireAuth, async (req, res) => {
       });
     }
 
-    const email = normalizeEmail(req.body.email);
+      const email = normalizeEmail(req.auth?.sub);
 
     if (!email) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        error: "Email is required for checkout",
+          error: "Authentication required for checkout",
       });
     }
+
+      const checkoutUser = await User.findOne({ email }).lean();
+
+      if (!checkoutUser) {
+        return res.status(404).json({
+          success: false,
+          error: "KBETZ account not found",
+        });
+      }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -2657,8 +2775,15 @@ app.post("/api/pro/confirm", requireAuth, async (req, res) => {
     const user = await User.findOneAndUpdate(
       { email },
       { isPro: true },
-      { new: true, upsert: true }
+      { new: true }
     );
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: "KBETZ account not found",
+        });
+      }
 
     res.json({
       success: true,
@@ -2713,6 +2838,7 @@ if (process.env.NODE_ENV === "production") {
   if (!SESSION_SECRET) missing.push("SESSION_SECRET");
   if (!OWNER_SECRET) missing.push("OWNER_SECRET");
   if (!OWNER_EMAIL) missing.push("OWNER_EMAIL");
+  if (!STRIPE_WEBHOOK_SECRET) missing.push("STRIPE_WEBHOOK_SECRET");
   if (missing.length) {
     console.error(`❌ Missing required production environment variables: ${missing.join(", ")}`);
     process.exit(1);
