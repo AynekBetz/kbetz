@@ -67,7 +67,10 @@ export default function SignupPage() {
       }
 
       if (!token) {
-        token = `kbetz-local-session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        setMessage(
+          "Your account was created, but KBETZ could not establish a secure session. Please log in."
+        );
+        return;
       }
 
       localStorage.setItem("token", token);
