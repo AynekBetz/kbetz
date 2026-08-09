@@ -153,6 +153,7 @@ const User =
     password: { type: String, required: true },
     isPro: { type: Boolean, default: false },
     bankroll: { type: Number, default: 1000 },
+    trialUsed: { type: Boolean, default: false },
 
 passwordResetTokenHash: {
   type: String,
@@ -2592,7 +2593,7 @@ app.post(
         if (email && session.mode === "subscription") {
           await User.findOneAndUpdate(
             { email },
-            { isPro: true }
+            { isPro: true, trialUsed: true }
           );
 
           console.log(
@@ -2684,6 +2685,13 @@ app.post("/api/checkout", requireAuth, async (req, res) => {
         });
       }
 
+      if (checkoutUser.trialUsed === true) {
+        return res.status(409).json({
+          success: false,
+          error: "This KBETZ account has already used its 7-day free trial.",
+        });
+      }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
@@ -2692,6 +2700,7 @@ app.post("/api/checkout", requireAuth, async (req, res) => {
       metadata: { email },
       subscription_data: {
         metadata: { email },
+        trial_period_days: 7,
       },
       line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
       success_url: `${CLIENT_URL}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
@@ -2774,7 +2783,7 @@ app.post("/api/pro/confirm", requireAuth, async (req, res) => {
 
     const user = await User.findOneAndUpdate(
       { email },
-      { isPro: true },
+      { isPro: true, trialUsed: true },
       { new: true }
     );
 
