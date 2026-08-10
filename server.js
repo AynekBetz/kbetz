@@ -1300,6 +1300,198 @@ async function fetchApiSportsGames() {
   }
 }
 
+const THERUNDOWN_BOOKS = {
+  "19": "DraftKings",
+  "22": "BetMGM",
+  "23": "FanDuel",
+};
+
+function normalizeTheRundownEvent(event, sportLabel = "MLB", index = 0) {
+  const teams = Array.isArray(event?.teams) ? event.teams : [];
+
+  const awayTeam = teams.find((team) => team?.is_away);
+  const homeTeam = teams.find((team) => team?.is_home);
+
+  if (!awayTeam || !homeTeam) {
+    return null;
+  }
+
+  const moneylineMarket = Array.isArray(event?.markets)
+    ? event.markets.find(
+        (market) =>
+          Number(market?.market_id) === 1 ||
+          String(market?.name || "").toLowerCase() === "moneyline"
+      )
+    : null;
+
+  const participants = Array.isArray(moneylineMarket?.participants)
+    ? moneylineMarket.participants
+    : [];
+
+  const awayParticipant = participants.find(
+    (participant) =>
+      Number(participant?.id) === Number(awayTeam.team_id)
+  );
+
+  const homeParticipant = participants.find(
+    (participant) =>
+      Number(participant?.id) === Number(homeTeam.team_id)
+  );
+
+  const awayPrices =
+    awayParticipant?.lines?.[0]?.prices &&
+    typeof awayParticipant.lines[0].prices === "object"
+      ? awayParticipant.lines[0].prices
+      : {};
+
+  const homePrices =
+    homeParticipant?.lines?.[0]?.prices &&
+    typeof homeParticipant.lines[0].prices === "object"
+      ? homeParticipant.lines[0].prices
+      : {};
+
+  const books = [];
+
+  for (const [affiliateId, bookName] of Object.entries(THERUNDOWN_BOOKS)) {
+    const awayOdds = Number(awayPrices?.[affiliateId]?.price);
+    const homeOdds = Number(homePrices?.[affiliateId]?.price);
+
+    if (!Number.isFinite(awayOdds) || !Number.isFinite(homeOdds)) {
+      continue;
+    }
+
+    books.push({
+      name: bookName,
+      awayOdds,
+      homeOdds,
+      odds: homeOdds,
+
+      awayDelta: Number.isFinite(
+        Number(awayPrices?.[affiliateId]?.price_delta)
+      )
+        ? Number(awayPrices[affiliateId].price_delta)
+        : 0,
+
+      homeDelta: Number.isFinite(
+        Number(homePrices?.[affiliateId]?.price_delta)
+      )
+        ? Number(homePrices[affiliateId].price_delta)
+        : 0,
+
+      updatedAt:
+        homePrices?.[affiliateId]?.updated_at ||
+        awayPrices?.[affiliateId]?.updated_at ||
+        null,
+    });
+  }
+
+  if (!books.length) {
+    return null;
+  }
+
+  const baseBook = books[0];
+
+  const homeOdds = Number(baseBook.homeOdds);
+  const awayOdds = Number(baseBook.awayOdds);
+
+  const edge = computeEdge(homeOdds, awayOdds, index);
+  const confidence = computeConfidence(edge, index);
+
+  const homeName =
+    `${homeTeam.name || ""} ${homeTeam.mascot || ""}`.trim();
+
+  const awayName =
+    `${awayTeam.name || ""} ${awayTeam.mascot || ""}`.trim();
+
+  const game = {
+    id:
+      event.event_id ||
+      event.event_uuid ||
+      `therundown-${sportLabel}-${index}`,
+
+    sport: sportLabel,
+    league: event?.schedule?.league_name || sportLabel,
+
+    home: homeName || homeTeam.abbreviation || "Home",
+    away: awayName || awayTeam.abbreviation || "Away",
+
+    homeOdds,
+    awayOdds,
+
+    edge,
+    confidence,
+
+    commenceTime: event.event_date || null,
+
+    source: "therundown",
+    provider: "TheRundown",
+    hasOdds: true,
+
+    books,
+
+    markets: {
+      h2h: true,
+    },
+
+    status: event?.score?.event_status || null,
+    venue: event?.score?.venue_name || null,
+
+    pitcherHome: event?.pitcher_home?.name || null,
+    pitcherAway: event?.pitcher_away?.name || null,
+  };
+
+  game.bestLine = pickBestLine(game);
+  game.recommended = game.bestLine;
+
+  return game;
+}
+
+async function fetchTheRundownMLB() {
+  if (!THERUNDOWN_API_KEY) {
+    console.log("ℹ️ TheRundown is not configured.");
+    return [];
+  }
+
+  const date = new Date().toISOString().slice(0, 10);
+
+  const url =
+    `https://therundown.io/api/v2/sports/3/events/${date}` +
+    `?market_ids=1&affiliate_ids=19,22,23&main_line=true&offset=300`;
+
+  const response = await fetch(url, {
+    headers: {
+      "X-TheRundown-Key": THERUNDOWN_API_KEY,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+
+    throw new Error(
+      `TheRundown MLB request failed with ${response.status}: ${body.slice(0, 300)}`
+    );
+  }
+
+  const data = await response.json();
+
+  const events = Array.isArray(data?.events)
+    ? data.events
+    : [];
+
+  const games = events
+    .map((event, index) =>
+      normalizeTheRundownEvent(event, "MLB", index)
+    )
+    .filter(Boolean);
+
+  console.log(
+    `✅ TheRundown MLB loaded: ${games.length} real sportsbook games`
+  );
+
+  return games;
+}
+
 async function fetchOdds() {
   try {
     const activeSports = await fetchActiveSports();
@@ -1363,15 +1555,46 @@ async function fetchOdds() {
       return upcomingGames.slice(0, 20);
     }
 
-    console.log(
-      "ℹ️ The Odds API returned no usable markets. Trying API-Sports."
-    );
+      console.log(
+        "ℹ️ The Odds API returned no usable markets. Trying TheRundown."
+      );
 
-    return await fetchApiSportsGames();
+      try {
+        const rundownGames = await fetchTheRundownMLB();
+
+        if (rundownGames.length > 0) {
+          return rundownGames;
+        }
+      } catch (rundownError) {
+        console.log(
+          "⚠️ TheRundown fallback error:",
+          rundownError?.message || rundownError
+        );
+      }
+
+      console.log(
+        "ℹ️ TheRundown returned no usable markets. Trying API-Sports."
+      );
+
+      return await fetchApiSportsGames();
   } catch (err) {
-    console.log("⚠️ The Odds API error:", err?.message || err);
-    console.log("🛟 Switching to API-Sports fallback.");
+      console.log("⚠️ The Odds API error:", err?.message || err);
+      console.log("🛟 Switching to TheRundown fallback.");
 
+      try {
+        const rundownGames = await fetchTheRundownMLB();
+
+        if (rundownGames.length > 0) {
+          return rundownGames;
+        }
+      } catch (rundownError) {
+        console.log(
+          "⚠️ TheRundown fallback error:",
+          rundownError?.message || rundownError
+        );
+      }
+
+      console.log("🛟 Switching to API-Sports fallback.");
     try {
       return await fetchApiSportsGames();
     } catch (fallbackError) {
@@ -1453,11 +1676,13 @@ async function getCachedOdds() {
 
   oddsRefreshPromise = (async () => {
     const games = await fetchOdds();
-    const source = games.some((g) => g.source === "live")
-      ? "live"
-      : games.some((g) => g.source === "api-sports")
-        ? "api-sports"
-        : "empty";
+      const source = games.some((g) => g.source === "live")
+        ? "live"
+        : games.some((g) => g.source === "therundown")
+          ? "therundown"
+          : games.some((g) => g.source === "api-sports")
+            ? "api-sports"
+            : "empty";
 
     oddsCache = {
       success: true,
