@@ -47,6 +47,7 @@ export default function MissionControl() {
   const [ownerChecking, setOwnerChecking] = useState(true);
   const [ownerAllowed, setOwnerAllowed] = useState(false);
   const [ownerMetrics, setOwnerMetrics] = useState(null);
+  const [ownerUsers, setOwnerUsers] = useState([]);
 
   const loadPlatform = useCallback(async (manual = false) => {
     if (manual) {
@@ -167,6 +168,34 @@ export default function MissionControl() {
         );
 
         setOwnerAllowed(true);
+
+        try {
+          const auditResponse = await fetch(
+            `${API}/api/owner/users-audit`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              cache: "no-store",
+            }
+          );
+
+          const auditData =
+            await auditResponse.json().catch(() => ({}));
+
+          if (
+            auditResponse.ok &&
+            Array.isArray(auditData?.users)
+          ) {
+            setOwnerUsers(auditData.users);
+          }
+        } catch (auditError) {
+          console.error(
+            "Mission Control account audit failed:",
+            auditError
+          );
+        }
       } catch (ownerError) {
         console.error("Mission Control owner verification failed:", ownerError);
 
@@ -587,6 +616,216 @@ export default function MissionControl() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+
+      <section
+        style={{
+          marginTop: 22,
+          border: "1px solid rgba(181,45,255,.28)",
+          borderRadius: 18,
+          padding: 18,
+          background:
+            "linear-gradient(135deg, rgba(181,45,255,.055), rgba(0,255,225,.035))",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                color: "#d96cff",
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: 1.4,
+              }}
+            >
+              OWNER ACCOUNT AUDIT
+            </div>
+
+            <h2
+              style={{
+                margin: "5px 0 0",
+                fontSize: 22,
+              }}
+            >
+              Registered Accounts
+            </h2>
+          </div>
+
+          <div
+            style={{
+              padding: "8px 11px",
+              borderRadius: 999,
+              border: "1px solid rgba(0,255,225,.3)",
+              color: "#00ffe1",
+              fontSize: 11,
+              fontWeight: 900,
+            }}
+          >
+            {ownerUsers.length} RECORDS
+          </div>
+        </div>
+
+        <div
+          style={{
+            overflowX: "auto",
+            borderRadius: 14,
+            border: "1px solid rgba(255,255,255,.07)",
+          }}
+        >
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              minWidth: 760,
+              fontSize: 12,
+            }}
+          >
+            <thead>
+              <tr
+                style={{
+                  background: "rgba(255,255,255,.035)",
+                  color: "rgba(255,255,255,.58)",
+                  textAlign: "left",
+                }}
+              >
+                {[
+                  "#",
+                  "Email",
+                  "Created",
+                  "Plan",
+                  "Trial Used",
+                  "Bankroll",
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    style={{
+                      padding: "12px 13px",
+                      fontSize: 10,
+                      letterSpacing: 1,
+                    }}
+                  >
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {ownerUsers.map((user, index) => (
+                <tr
+                  key={`${user.email}-${index}`}
+                  style={{
+                    borderTop:
+                      "1px solid rgba(255,255,255,.055)",
+                  }}
+                >
+                  <td
+                    style={{
+                      padding: "11px 13px",
+                      color: "rgba(255,255,255,.42)",
+                    }}
+                  >
+                    {index + 1}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "11px 13px",
+                      color: "#ffffff",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {user.email}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "11px 13px",
+                      color: "rgba(255,255,255,.68)",
+                    }}
+                  >
+                    {user.createdAt
+                      ? new Date(
+                          user.createdAt
+                        ).toLocaleString()
+                      : "--"}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "11px 13px",
+                      color: user.isPro
+                        ? "#d96cff"
+                        : "#00ffe1",
+                      fontWeight: 900,
+                    }}
+                  >
+                    {user.isPro ? "PRO" : "FREE"}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "11px 13px",
+                      color: user.trialUsed
+                        ? "#ffcf4a"
+                        : "rgba(255,255,255,.55)",
+                    }}
+                  >
+                    {user.trialUsed ? "YES" : "NO"}
+                  </td>
+
+                  <td
+                    style={{
+                      padding: "11px 13px",
+                      color: "#ffffff",
+                    }}
+                  >
+                    ${Number(
+                      user.bankroll || 0
+                    ).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+
+              {!ownerUsers.length ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    style={{
+                      padding: 20,
+                      textAlign: "center",
+                      color: "rgba(255,255,255,.48)",
+                    }}
+                  >
+                    No account records loaded.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+            color: "rgba(255,255,255,.4)",
+            fontSize: 10,
+            lineHeight: 1.5,
+          }}
+        >
+          Read-only owner audit. Passwords and password-reset
+          information are never returned.
         </div>
       </section>
 

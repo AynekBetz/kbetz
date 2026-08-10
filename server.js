@@ -952,6 +952,46 @@ app.get(
 );
 
 
+
+/* ================= OWNER USER AUDIT ================= */
+app.get(
+  "/api/owner/users-audit",
+  requireAuth,
+  requireOwnerAccount,
+  async (req, res) => {
+    try {
+      const users = await User.find({})
+        .select("email isPro bankroll trialUsed createdAt")
+        .sort({ createdAt: 1 })
+        .lean();
+
+      return res.json({
+        success: true,
+        count: users.length,
+        users: users.map((user) => ({
+          email: normalizeEmail(user.email),
+          isPro: Boolean(user.isPro),
+          plan: user.isPro ? "pro" : "free",
+          trialUsed: Boolean(user.trialUsed),
+          bankroll: Number(user.bankroll || 0),
+          createdAt: user.createdAt || null,
+        })),
+        updatedAt: Date.now(),
+      });
+    } catch (err) {
+      console.error(
+        "❌ /api/owner/users-audit error:",
+        err?.message || err
+      );
+
+      return res.status(500).json({
+        success: false,
+        error: "Could not load owner user audit",
+      });
+    }
+  }
+);
+
 /* ================= FALLBACK ODDS ================= */
 let fakeTick = 0;
 
