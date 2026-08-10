@@ -36,7 +36,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 75000);
 
     let data: any = {};
     let ok = false;
