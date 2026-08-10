@@ -1531,6 +1531,56 @@ app.get("/api/therundown/status", async (req, res) => {
   }
 });
 
+/* ================= THERUNDOWN MLB ODDS TEST ================= */
+app.get("/api/therundown/mlb-test", async (req, res) => {
+  try {
+    if (!THERUNDOWN_API_KEY) {
+      return res.status(503).json({
+        success: false,
+        error: "THERUNDOWN_API_KEY is not configured",
+      });
+    }
+
+    const date = new Date().toISOString().slice(0, 10);
+
+    const url =
+      `https://therundown.io/api/v2/sports/3/events/${date}` +
+      `?market_ids=1&affiliate_ids=19,22,23&main_line=true&offset=300`;
+
+    const response = await fetch(url, {
+      headers: {
+        "X-TheRundown-Key": THERUNDOWN_API_KEY,
+        Accept: "application/json",
+      },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    return res.status(response.status).json({
+      success: response.ok,
+      provider: "TheRundown",
+      sport: "MLB",
+      date,
+      providerStatus: response.status,
+      eventCount: Array.isArray(data?.events)
+        ? data.events.length
+        : 0,
+      data,
+    });
+  } catch (err) {
+    console.error(
+      "TheRundown MLB test error:",
+      err?.message || err
+    );
+
+    return res.status(500).json({
+      success: false,
+      provider: "TheRundown",
+      error: err?.message || "TheRundown MLB request failed",
+    });
+  }
+});
+
 app.get("/api/odds", async (req, res) => {
   try {
     const oddsPayload = await getCachedOdds();
