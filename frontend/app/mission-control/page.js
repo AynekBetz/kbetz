@@ -46,6 +46,7 @@ export default function MissionControl() {
   const [error, setError] = useState("");
   const [ownerChecking, setOwnerChecking] = useState(true);
   const [ownerAllowed, setOwnerAllowed] = useState(false);
+  const [ownerMetrics, setOwnerMetrics] = useState(null);
 
   const loadPlatform = useCallback(async (manual = false) => {
     if (manual) {
@@ -156,6 +157,14 @@ export default function MissionControl() {
         if (!response.ok) {
           throw new Error(`Owner check failed with ${response.status}`);
         }
+
+        const data = await response.json().catch(() => ({}));
+
+        setOwnerMetrics(
+          data?.metrics && typeof data.metrics === "object"
+            ? data.metrics
+            : null
+        );
 
         setOwnerAllowed(true);
       } catch (ownerError) {
@@ -394,6 +403,192 @@ export default function MissionControl() {
         steamAlerts={0}
         arbitrageReady={0}
       />
+
+
+      <section
+        style={{
+          marginTop: 22,
+          border: "1px solid rgba(0,255,225,.22)",
+          borderRadius: 18,
+          padding: 18,
+          background:
+            "linear-gradient(135deg, rgba(0,255,225,.04), rgba(124,58,237,.07))",
+          boxShadow:
+            "0 0 28px rgba(0,255,225,.08), 0 0 34px rgba(124,58,237,.08)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 900,
+                letterSpacing: 1.5,
+                color: "#00ffe1",
+              }}
+            >
+              OWNER BUSINESS COMMAND CENTER
+            </div>
+
+            <h2
+              style={{
+                margin: "6px 0 0",
+                fontSize: 24,
+                color: "#ffffff",
+              }}
+            >
+              Business Metrics
+            </h2>
+          </div>
+
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(0,255,153,.35)",
+              background: "rgba(0,255,153,.07)",
+              color: "#00ff99",
+              fontSize: 11,
+              fontWeight: 900,
+            }}
+          >
+            REAL OWNER DATA
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit,minmax(min(100%,180px),1fr))",
+            gap: 12,
+          }}
+        >
+          {[
+            [
+              "Total Users",
+              ownerMetrics?.totalUsers ?? "--",
+              "All registered KBETZ accounts",
+            ],
+            [
+              "PRO Members",
+              ownerMetrics?.proMembers ?? "--",
+              "Accounts currently marked PRO",
+            ],
+            [
+              "Free Members",
+              ownerMetrics?.freeMembers ?? "--",
+              "Registered non-PRO accounts",
+            ],
+            [
+              "Conversion Rate",
+              Number.isFinite(Number(ownerMetrics?.conversionRate))
+                ? `${ownerMetrics.conversionRate}%`
+                : "--",
+              "PRO members ÷ total users",
+            ],
+            [
+              "Revenue Today",
+              ownerMetrics?.revenueToday == null
+                ? "Not connected"
+                : `$${Number(ownerMetrics.revenueToday).toFixed(2)}`,
+              "Net successful Stripe revenue",
+            ],
+            [
+              "Monthly Revenue",
+              ownerMetrics?.monthlyRevenue == null
+                ? "Not connected"
+                : `$${Number(ownerMetrics.monthlyRevenue).toFixed(2)}`,
+              "Net successful Stripe revenue",
+            ],
+            [
+              "Lifetime Revenue",
+              ownerMetrics?.lifetimeRevenue == null
+                ? "--"
+                : `$${Number(ownerMetrics.lifetimeRevenue).toFixed(2)}`,
+              "Net successful Stripe revenue",
+            ],
+            [
+              "MRR",
+              ownerMetrics?.mrr == null
+                ? "--"
+                : `$${Number(ownerMetrics.mrr).toFixed(2)}`,
+              "Active monthly-equivalent subscription revenue",
+            ],
+            [
+              "Active Subscriptions",
+              ownerMetrics?.activeSubscriptions ?? "--",
+              "Stripe subscriptions currently active",
+            ],
+            [
+              "Trials",
+              ownerMetrics?.trialSubscriptions ?? "--",
+              "Stripe subscriptions currently trialing",
+            ],
+            [
+              "Live Now",
+              ownerMetrics?.liveNow ?? "--",
+              "Currently connected KBETZ dashboard sessions",
+            ],
+          ].map(([label, value, note]) => (
+            <div
+              key={label}
+              style={{
+                minHeight: 116,
+                borderRadius: 15,
+                border: "1px solid rgba(255,255,255,.08)",
+                padding: 14,
+                background: "rgba(255,255,255,.025)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 900,
+                  letterSpacing: 1,
+                  color: "rgba(255,255,255,.52)",
+                }}
+              >
+                {label}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 9,
+                  fontSize: 24,
+                  fontWeight: 1000,
+                  color:
+                    value === "Not connected" || value === "Pending"
+                      ? "#ffb347"
+                      : "#ffffff",
+                }}
+              >
+                {value}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 10,
+                  lineHeight: 1.45,
+                  color: "rgba(255,255,255,.42)",
+                }}
+              >
+                {note}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <footer
         style={{

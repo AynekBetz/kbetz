@@ -21,10 +21,10 @@ export default function SignupPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setMessage("Password must be at least 6 characters.");
-      return;
-    }
+      if (password.length < 8 || password.length > 128) {
+        setMessage("Password must be between 8 and 128 characters.");
+        return;
+      }
 
     try {
       setLoading(true);

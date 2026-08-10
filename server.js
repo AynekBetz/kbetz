@@ -762,6 +762,156 @@ app.get(
           ? Number(((proMembers / totalUsers) * 100).toFixed(1))
           : 0;
 
+      let revenueToday = 0;
+      let monthlyRevenue = 0;
+      let lifetimeRevenue = 0;
+      let mrr = 0;
+      let activeSubscriptions = 0;
+      let trialSubscriptions = 0;
+
+      if (stripe) {
+        const now = new Date();
+
+        const startOfToday = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+
+        const startOfMonth = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          1
+        );
+
+        /*
+         * Successful Stripe charges.
+         * Refunds are subtracted so Mission Control shows
+         * actual net collected revenue.
+         */
+        for await (const charge of stripe.charges.list({
+          limit: 100,
+        })) {
+          if (
+            charge?.paid !== true ||
+            charge?.status !== "succeeded"
+          ) {
+            continue;
+          }
+
+          const createdMs = Number(charge.created || 0) * 1000;
+
+          const amountCaptured = Number(
+            charge.amount_captured ?? charge.amount ?? 0
+          );
+
+          const amountRefunded = Number(
+            charge.amount_refunded || 0
+          );
+
+          const netAmount = Math.max(
+            0,
+            amountCaptured - amountRefunded
+          );
+
+          lifetimeRevenue += netAmount;
+
+          if (createdMs >= startOfMonth.getTime()) {
+            monthlyRevenue += netAmount;
+          }
+
+          if (createdMs >= startOfToday.getTime()) {
+            revenueToday += netAmount;
+          }
+        }
+
+        /*
+         * Active + trialing subscriptions.
+         * Convert recurring prices into monthly-equivalent revenue.
+         */
+        for await (const subscription of stripe.subscriptions.list({
+          status: "all",
+          limit: 100,
+        })) {
+          if (
+            subscription.status !== "active" &&
+            subscription.status !== "trialing"
+          ) {
+            continue;
+          }
+
+          if (subscription.status === "active") {
+            activeSubscriptions += 1;
+          }
+
+          if (subscription.status === "trialing") {
+            trialSubscriptions += 1;
+          }
+
+          const items = Array.isArray(subscription?.items?.data)
+            ? subscription.items.data
+            : [];
+
+          for (const item of items) {
+            const price = item?.price;
+
+            const unitAmount = Number(
+              price?.unit_amount || 0
+            );
+
+            const quantity = Math.max(
+              1,
+              Number(item?.quantity || 1)
+            );
+
+            const recurring = price?.recurring;
+
+            if (!unitAmount || !recurring) {
+              continue;
+            }
+
+            const interval = String(
+              recurring.interval || ""
+            ).toLowerCase();
+
+            const intervalCount = Math.max(
+              1,
+              Number(recurring.interval_count || 1)
+            );
+
+            let monthlyAmount = 0;
+
+            if (interval === "month") {
+              monthlyAmount =
+                (unitAmount * quantity) / intervalCount;
+            } else if (interval === "year") {
+              monthlyAmount =
+                (unitAmount * quantity) /
+                (12 * intervalCount);
+            } else if (interval === "week") {
+              monthlyAmount =
+                (unitAmount * quantity * 52) /
+                (12 * intervalCount);
+            } else if (interval === "day") {
+              monthlyAmount =
+                (unitAmount * quantity * 365) /
+                (12 * intervalCount);
+            }
+
+            /*
+             * Trialing subscriptions are counted as trials,
+             * but are not counted toward collected MRR yet.
+             */
+            if (subscription.status === "active") {
+              mrr += monthlyAmount;
+            }
+          }
+        }
+      }
+
+      const centsToDollars = (value) =>
+        Number((Number(value || 0) / 100).toFixed(2));
+
       return res.json({
         success: true,
         owner: normalizeEmail(req.auth.sub),
@@ -770,9 +920,20 @@ app.get(
           proMembers,
           freeMembers,
           conversionRate,
-          revenueToday: null,
-          monthlyRevenue: null,
-          lifetimeRevenue: null,
+
+          revenueToday: centsToDollars(revenueToday),
+          monthlyRevenue: centsToDollars(monthlyRevenue),
+          lifetimeRevenue: centsToDollars(lifetimeRevenue),
+
+          mrr: centsToDollars(mrr),
+
+          activeSubscriptions,
+          trialSubscriptions,
+
+          // Real-time connected KBETZ dashboard clients.
+          // Socket.IO keeps this collection synchronized as
+          // clients connect and disconnect.
+          liveNow: io?.sockets?.sockets?.size ?? 0,
         },
         updatedAt: Date.now(),
       });

@@ -15,6 +15,10 @@ import SplitSummary from "./components/SplitSummary";
 import ParlayBuilder from "./components/ParlayBuilder";
 import HistoryPanel from "../../components/dashboard/HistoryPanel";
 import LiveMarkets from "../../components/dashboard/LiveMarkets";
+import WelcomeModal from "../../components/onboarding/WelcomeModal";
+import GuidedTour from "../../components/onboarding/GuidedTour";
+import TourOverlay from "../../components/onboarding/TourOverlay";
+import useGuidedTour from "../../components/onboarding/useGuidedTour";
 export const dynamic = "force-dynamic";
 
 export default function Dashboard() {
@@ -1365,6 +1369,109 @@ ${analysis}`
     setParlay([]);
   };
 
+  const leKenyaSteps = [
+    {
+      title: "Your Bankroll",
+      description:
+        "This is your bankroll command center. Track the money you've personally set aside and your daily profit or loss.",
+      targetSelector: '[data-tour="bankroll"]',
+    },
+    {
+      title: "ROI Performance",
+      description:
+        "Here you can monitor your tracked performance, including wins, win rate, profit, and return on investment.",
+      targetSelector: '[data-tour="roi"]',
+    },
+    {
+      title: "AI Market Intelligence",
+      description:
+        "KBETZ organizes connected sportsbook market information, confidence, edge, and risk information to help you evaluate available opportunities. No prediction is guaranteed.",
+      targetSelector: '[data-tour="ai-picks"]',
+    },
+    {
+      title: "Parlay Builder",
+      description:
+        "Build your parlay here. Add selections from the live board and review the combined odds and projected payout.",
+      targetSelector: '[data-tour="parlay-builder"]',
+    },
+    {
+      title: "Live Sports Board",
+      description:
+        "This is your live sports board. Explore available games, compare connected sportsbook prices, and add selections to your parlay.",
+      targetSelector: '[data-tour="live-markets"]',
+    },
+  ];
+
+  const [showLeKenyaWelcome, setShowLeKenyaWelcome] = useState(false);
+
+  const {
+    isOpen: leKenyaTourOpen,
+    stepIndex: leKenyaStepIndex,
+    currentStep: leKenyaCurrentStep,
+    totalSteps: leKenyaTotalSteps,
+    openTour: openLeKenyaTour,
+    nextStep: nextLeKenyaStep,
+    previousStep: previousLeKenyaStep,
+    skipTour: skipLeKenyaTour,
+  } = useGuidedTour({
+    steps: leKenyaSteps,
+
+    onComplete: () => {
+      try {
+        localStorage.setItem(
+          "kbetz-lekenya-tour-complete",
+          "true"
+        );
+      } catch {}
+    },
+
+    onSkip: () => {
+      try {
+        localStorage.setItem(
+          "kbetz-lekenya-tour-complete",
+          "true"
+        );
+      } catch {}
+    },
+  });
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    try {
+      const completed =
+        localStorage.getItem(
+          "kbetz-lekenya-tour-complete"
+        ) === "true";
+
+      if (!completed) {
+        setShowLeKenyaWelcome(true);
+      }
+    } catch {
+      setShowLeKenyaWelcome(true);
+    }
+  }, [mounted]);
+
+  useEffect(() => {
+    if (
+      !leKenyaTourOpen ||
+      !leKenyaCurrentStep?.targetSelector
+    ) {
+      return;
+    }
+
+    const target = document.querySelector(
+      leKenyaCurrentStep.targetSelector
+    );
+
+    if (target) {
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [leKenyaTourOpen, leKenyaCurrentStep]);
+
   if (!mounted) {
   return (
       <div style={styles.page}>
@@ -1387,7 +1494,7 @@ ${analysis}`
 
         <Header />
 
-      <section style={styles.bankrollPanel}>
+      <section data-tour="bankroll" style={styles.bankrollPanel}>
         <div style={styles.iconBox}>💰</div>
 
         <div>
@@ -1423,7 +1530,7 @@ ${analysis}`
         <button style={styles.depositBtn} onClick={handleDeposit}>💎 Billing</button>
       </section>
 
-      <section style={styles.roiPanel}>
+      <section data-tour="roi" style={styles.roiPanel}>
         <div style={styles.sectionIcon}>📈</div>
 
         <div style={styles.roiLeft}>
@@ -1480,6 +1587,7 @@ ${analysis}`
         </div>
       </section>
 
+   <div data-tour="ai-picks">
    <AIPicks
     topAiPicks={topAiPicks}
     games={games}
@@ -1489,6 +1597,7 @@ ${analysis}`
     formatOdds={formatOdds}
     handleViewPick={handleViewPick}
   />
+   </div>
 
      <LiveMarketsSummary
   styles={styles}
@@ -1503,6 +1612,7 @@ ${analysis}`
   upgrade={upgrade}
 />
 
+<div data-tour="parlay-builder">
 <ParlayBuilder
   styles={styles}
   parlay={parlay}
@@ -1512,6 +1622,7 @@ ${analysis}`
   isPro={isPro}
   upgrade={upgrade}
 />
+</div>
 
   <HistoryPanel
   styles={styles}
@@ -1521,6 +1632,7 @@ ${analysis}`
   upgrade={upgrade}
 />
 
+     <div data-tour="live-markets">
      <LiveMarkets
   styles={styles}
   loading={loading}
@@ -1532,8 +1644,45 @@ ${analysis}`
   formatOdds={formatOdds}
   addToParlay={addToParlay}
 />
+     </div>
 
      
+
+        <WelcomeModal
+          open={showLeKenyaWelcome}
+          firstName=""
+          onStartTour={() => {
+            setShowLeKenyaWelcome(false);
+            openLeKenyaTour(0);
+          }}
+          onSkip={() => {
+            setShowLeKenyaWelcome(false);
+
+            try {
+              localStorage.setItem(
+                "kbetz-lekenya-tour-complete",
+                "true"
+              );
+            } catch {}
+          }}
+        />
+
+        <TourOverlay
+          open={leKenyaTourOpen}
+          targetSelector={
+            leKenyaCurrentStep?.targetSelector || ""
+          }
+        />
+
+        <GuidedTour
+          open={leKenyaTourOpen}
+          currentStep={leKenyaCurrentStep || {}}
+          stepIndex={leKenyaStepIndex}
+          totalSteps={leKenyaTotalSteps}
+          onNext={nextLeKenyaStep}
+          onPrevious={previousLeKenyaStep}
+          onSkip={skipLeKenyaTour}
+        />
 
       <footer style={styles.footer}>
         REAL-TIME DATA • AI POWERED • SHARP ADVANTAGE
