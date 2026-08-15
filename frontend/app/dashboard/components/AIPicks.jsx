@@ -6,6 +6,64 @@ function cleanSport(game) {
     .toUpperCase();
 }
 
+function formatGameDateTime(commenceTime) {
+  if (!commenceTime) {
+    return {
+      dayDate: "DATE TBD",
+      time: "TIME TBD",
+    };
+  }
+
+  const date = new Date(commenceTime);
+
+  if (Number.isNaN(date.getTime())) {
+    return {
+      dayDate: "DATE TBD",
+      time: "TIME TBD",
+    };
+  }
+
+  return {
+    dayDate: new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(date),
+
+    time: new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date),
+  };
+}
+
+function recommendedTeam(game) {
+  const recommendation = String(
+    game?.recommended || game?.bestLine || ""
+  );
+
+  if (recommendation.includes(String(game?.away || ""))) {
+    return game.away;
+  }
+
+  if (recommendation.includes(String(game?.home || ""))) {
+    return game.home;
+  }
+
+  return game.home || game.away || "Market";
+}
+
+function recommendedOdds(game) {
+  const team = recommendedTeam(game);
+
+  if (team === game?.away) {
+    return game?.awayOdds;
+  }
+
+  return game?.homeOdds;
+}
+
 export default function AIPicks({
   topAiPicks = [],
   games = [],
@@ -119,7 +177,8 @@ export default function AIPicks({
               </div>
 
               <strong style={{ color: "#ffffff", fontSize: 16 }}>
-                {game.home} {formatOdds?.(game.homeOdds)}
+                {recommendedTeam(game)}{" "}
+                {formatOdds?.(recommendedOdds(game))}
               </strong>
 
               <span
@@ -134,17 +193,53 @@ export default function AIPicks({
               <div
                 style={{
                   display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginTop: 1,
+                }}
+              >
+                <span
+                  style={{
+                    border: "1px solid rgba(0,255,225,.22)",
+                    borderRadius: 999,
+                    padding: "5px 9px",
+                    color: "#00ffe1",
+                    background: "rgba(0,255,225,.045)",
+                    fontSize: 10,
+                    fontWeight: 900,
+                    letterSpacing: 0.35,
+                  }}
+                >
+                  📅 {formatGameDateTime(game.commenceTime).dayDate}
+                </span>
+
+                <span
+                  style={{
+                    border: "1px solid rgba(240,184,255,.22)",
+                    borderRadius: 999,
+                    padding: "5px 9px",
+                    color: "#f0b8ff",
+                    background: "rgba(209,45,255,.045)",
+                    fontSize: 10,
+                    fontWeight: 900,
+                    letterSpacing: 0.35,
+                  }}
+                >
+                  🕒 {formatGameDateTime(game.commenceTime).time}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
                   gap: 12,
                   flexWrap: "wrap",
                   fontSize: 13,
                 }}
               >
                 <span style={{ color: "#00ffe1" }}>
-                  Confidence: {Math.round(Number(game.confidence || 0))}%
-                </span>
-
-                <span style={{ color: "#7df9ff" }}>
-                  Edge: {Number(game.edge || 0).toFixed(1)}%
+                  Market Confidence: {Math.round(Number(game.confidence || 0))}%
                 </span>
 
                 <span style={{ color: "#ffd966" }}>

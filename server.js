@@ -394,20 +394,67 @@ function rateLimit({ windowMs, max, name }) {
 
 const authRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, name: "auth" });
 
-function computeEdge(homeOdds, awayOdds, index = 0) {
-  const h = Math.abs(Number(homeOdds || -110));
-  const a = Math.abs(Number(awayOdds || -110));
-  const base = 4 + ((h + a + index * 7) % 15);
-  return Number(base.toFixed(1));
+function americanOddsToProbability(odds) {
+  const value = Number(odds);
+
+  if (!Number.isFinite(value) || value === 0) return 0;
+
+  if (value > 0) {
+    return 100 / (value + 100);
+  }
+
+  return Math.abs(value) / (Math.abs(value) + 100);
 }
 
-function computeConfidence(edge, index = 0) {
-  const val = 57 + Number(edge || 0) + (index % 8);
-  return Math.min(92, Math.max(52, Math.round(val)));
+function getFairMarketProbabilities(homeOdds, awayOdds) {
+  const homeImplied = americanOddsToProbability(homeOdds);
+  const awayImplied = americanOddsToProbability(awayOdds);
+  const total = homeImplied + awayImplied;
+
+  if (total <= 0) {
+    return {
+      homeImplied: 0,
+      awayImplied: 0,
+      homeFair: 0,
+      awayFair: 0,
+      vig: 0,
+    };
+  }
+
+  return {
+    homeImplied,
+    awayImplied,
+    homeFair: homeImplied / total,
+    awayFair: awayImplied / total,
+    vig: Math.max(0, total - 1),
+  };
+}
+
+function computeEdge(homeOdds, awayOdds, index = 0) {
+  const market = getFairMarketProbabilities(homeOdds, awayOdds);
+
+  // A two-sided sportsbook market alone does not prove an independent
+  // predictive betting edge. Keep this neutral until KBETZ has a
+  // separately validated probability model.
+  return 0;
+}
+
+function computeConfidence(edge, index = 0, homeOdds = null, awayOdds = null) {
+  if (Number.isFinite(Number(homeOdds)) && Number.isFinite(Number(awayOdds))) {
+    const market = getFairMarketProbabilities(homeOdds, awayOdds);
+    return Math.round(Math.max(market.homeFair, market.awayFair) * 100);
+  }
+
+  return 0;
 }
 
 function pickBestLine(game) {
-  if (Number(game.homeOdds || 0) > Number(game.awayOdds || 0)) {
+  const market = getFairMarketProbabilities(
+    game?.homeOdds,
+    game?.awayOdds
+  );
+
+  if (market.homeFair >= market.awayFair) {
     return `${game.home} ML`;
   }
 
@@ -1036,7 +1083,7 @@ function buildFallbackGames() {
     const homeOdds = -110 + drift + (idx % 5);
     const awayOdds = -108 - drift - (idx % 4);
     const edge = computeEdge(homeOdds, awayOdds, idx);
-    const confidence = computeConfidence(edge, idx);
+    const confidence = computeConfidence(edge, idx, homeOdds, awayOdds);
 
     const game = {
       id: `fallback-${m.sport}-${idx + 1}`,
@@ -1115,7 +1162,7 @@ function normalizeOddsGame(rawGame, sportLabel, index = 0) {
   if (!Number.isFinite(awayOdds)) awayOdds = -110 - (index % 5);
 
   const edge = computeEdge(homeOdds, awayOdds, index);
-  const confidence = computeConfidence(edge, index);
+  const confidence = computeConfidence(edge, index, homeOdds, awayOdds);
 
   const game = {
     id: rawGame.id || `${sportLabel}-${homeTeam}-${awayTeam}`,
@@ -1596,7 +1643,7 @@ function normalizeTheRundownEvent(event, sportLabel = "MLB", index = 0) {
   const awayOdds = Number(baseBook.awayOdds);
 
   const edge = computeEdge(homeOdds, awayOdds, index);
-  const confidence = computeConfidence(edge, index);
+  const confidence = computeConfidence(edge, index, homeOdds, awayOdds);
 
   const homeName =
     `${homeTeam.name || ""} ${homeTeam.mascot || ""}`.trim();
@@ -2354,7 +2401,7 @@ function buildPickFromGame(game, oddsPayload) {
     edge: Number(game.edge || 0),
     confidence: Number(game.confidence || 0),
     commenceTime: game.commenceTime || "",
-    oddsSource: oddsPayload?.source || game.source || "live",
+    oddsSource: game.source || oddsPayload?.source || "unknown",
     modelVersion: "kbetz-live-odds-v1",
     result: "pending",
     status: "pending",
@@ -2368,7 +2415,17 @@ app.post("/api/picks/snapshot", async (req, res) => {
     const oddsPayload = await getCachedOdds();
 
     const games = (oddsPayload.games || [])
-      .filter((game) => game && game.source === "live")
+      .filter(
+        (game) =>
+          game &&
+          ["live", "therundown"].includes(
+            String(game.source || "").toLowerCase()
+          ) &&
+          Number.isFinite(Number(game.homeOdds)) &&
+          Number.isFinite(Number(game.awayOdds)) &&
+          Array.isArray(game.books) &&
+          game.books.length > 0
+      )
       .sort((a, b) => {
         const scoreA = Number(a.confidence || 0) + Number(a.edge || 0);
         const scoreB = Number(b.confidence || 0) + Number(b.edge || 0);

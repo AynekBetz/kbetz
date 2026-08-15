@@ -11,6 +11,7 @@ export default function SplitSummary({
     return (
       <section style={styles.splitSummary}>
         <div
+          data-tour="arbitrage"
           style={{
             ...styles.summaryCardGreen,
             position: "relative",
@@ -36,6 +37,7 @@ export default function SplitSummary({
         </div>
 
         <div
+          data-tour="steam"
           style={{
             ...styles.summaryCardPurpleOrange,
             position: "relative",
@@ -65,7 +67,10 @@ export default function SplitSummary({
 
   return (
     <section style={styles.splitSummary}>
-      <div style={styles.summaryCardGreen}>
+      <div
+        data-tour="arbitrage"
+        style={styles.summaryCardGreen}
+      >
         <div style={styles.iconGreen}>$</div>
 
         <div>
@@ -79,7 +84,10 @@ export default function SplitSummary({
         </div>
       </div>
 
-      <div style={styles.summaryCardPurpleOrange}>
+      <div
+        data-tour="steam"
+        style={styles.summaryCardPurpleOrange}
+      >
         <div style={styles.iconPurple}>🔥</div>
 
         <div>

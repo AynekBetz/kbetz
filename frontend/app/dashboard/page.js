@@ -15,10 +15,7 @@ import SplitSummary from "./components/SplitSummary";
 import ParlayBuilder from "./components/ParlayBuilder";
 import HistoryPanel from "../../components/dashboard/HistoryPanel";
 import LiveMarkets from "../../components/dashboard/LiveMarkets";
-import WelcomeModal from "../../components/onboarding/WelcomeModal";
-import GuidedTour from "../../components/onboarding/GuidedTour";
-import TourOverlay from "../../components/onboarding/TourOverlay";
-import useGuidedTour from "../../components/onboarding/useGuidedTour";
+import LeKenyaHost from "../../components/onboarding/LeKenyaHost";
 export const dynamic = "force-dynamic";
 
 export default function Dashboard() {
@@ -873,6 +870,20 @@ export default function Dashboard() {
       : 1 + 100 / Math.abs(value);
   };
 
+  const americanToDecimal = (odds) => {
+    const value = Number(odds);
+
+    if (!Number.isFinite(value) || value === 0) {
+      return null;
+    }
+
+    if (value > 0) {
+      return 1 + value / 100;
+    }
+
+    return 1 + 100 / Math.abs(value);
+  };
+
   const formatOdds = (odds) => {
     const value = Number(odds);
     if (!Number.isFinite(value)) return odds;
@@ -942,7 +953,7 @@ export default function Dashboard() {
         ? { Authorization: `Bearer ${token}` }
         : {};
 
-      const [user, roiData, odds] = await Promise.all([
+      const [user, roiData, odds, pickHistoryData] = await Promise.all([
         token
           ? fetch(`${API}/api/me`, {
               method: "GET",
@@ -988,6 +999,24 @@ export default function Dashboard() {
             source: "error",
             games: [],
           })),
+
+        fetch(`${API}/api/picks/public?limit=100`, {
+          cache: "no-store",
+        })
+          .then(async (response) => {
+            if (!response.ok) {
+              return {
+                success: false,
+                picks: [],
+              };
+            }
+
+            return response.json();
+          })
+          .catch(() => ({
+            success: false,
+            picks: [],
+          })),
       ]);
 
       const verifiedPro =
@@ -1002,6 +1031,12 @@ export default function Dashboard() {
 
       setIsPro(verifiedPro);
       setROI(token ? roiData || {} : {});
+
+      setHistory(
+        Array.isArray(pickHistoryData?.picks)
+          ? pickHistoryData.picks
+          : []
+      );
 
       const loadedGames = normalizeGames(odds?.games);
 
@@ -1021,6 +1056,7 @@ export default function Dashboard() {
       setBankroll(0);
       setIsPro(false);
       setROI({});
+      setHistory([]);
 
       setGames([]);
       setTicker([]);
@@ -1104,16 +1140,11 @@ export default function Dashboard() {
         ? americanToProb(g.homeOdds)
         : 0;
 
-      const modelBoost = hasOdds
-        ? movement === "up"
-          ? 0.035
-          : movement === "down"
-            ? 0.012
-            : 0.018
+      // Preserve the backend's market-derived analytics.
+      // Do not manufacture predictive edge from line movement.
+      const edge = Number.isFinite(Number(g.edge))
+        ? Number(g.edge)
         : 0;
-
-      const model = implied + modelBoost;
-      const edge = hasOdds ? (model - implied) * 100 : 0;
 
       return {
         ...g,
@@ -1131,23 +1162,114 @@ export default function Dashboard() {
 
     const arb = sorted
       .map((g) => {
-        const simulatedEdge = Math.max(0, Number(g.edge) - 0.65);
+        const books = Array.isArray(g.books) ? g.books : [];
+
+        const validBooks = books.filter(
+          (book) =>
+            Number.isFinite(Number(book?.homeOdds)) &&
+            Number.isFinite(Number(book?.awayOdds)) &&
+            Number(book?.homeOdds) !== 0 &&
+            Number(book?.awayOdds) !== 0
+        );
+
+        if (!validBooks.length) return null;
+
+        const bestHomeBook = validBooks.reduce((best, book) =>
+          Number(book.homeOdds) > Number(best.homeOdds) ? book : best
+        );
+
+        const bestAwayBook = validBooks.reduce((best, book) =>
+          Number(book.awayOdds) > Number(best.awayOdds) ? book : best
+        );
+
+        const homeDecimal = americanToDecimal(bestHomeBook.homeOdds);
+        const awayDecimal = americanToDecimal(bestAwayBook.awayOdds);
+
+        if (
+          !Number.isFinite(homeDecimal) ||
+          !Number.isFinite(awayDecimal) ||
+          homeDecimal <= 1 ||
+          awayDecimal <= 1
+        ) {
+          return null;
+        }
+
+        const impliedTotal =
+          1 / homeDecimal +
+          1 / awayDecimal;
+
+        if (impliedTotal >= 1) return null;
+
+        const arbReturn = ((1 / impliedTotal) - 1) * 100;
+
         return {
           ...g,
-          arbEdge: simulatedEdge.toFixed(2),
+          arbEdge: arbReturn.toFixed(2),
+          arbImpliedTotal: impliedTotal,
+          bestHomeBook: bestHomeBook.name || "Book",
+          bestAwayBook: bestAwayBook.name || "Book",
+          bestHomeOdds: Number(bestHomeBook.homeOdds),
+          bestAwayOdds: Number(bestAwayBook.awayOdds),
         };
       })
-      .filter((g) => Number(g.arbEdge) > 1.15)
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          Number(b.arbEdge || 0) - Number(a.arbEdge || 0)
+      )
       .slice(0, 4);
 
     setArbOps(arb);
 
     const steam = sorted
-      .filter((g) => g.movement === "up" || Number(g.edge) >= 2)
-      .map((g) => ({
-        ...g,
-        strength: Math.abs(g.edge + 3.1).toFixed(2),
-      }))
+      .map((g) => {
+        const books = Array.isArray(g.books) ? g.books : [];
+
+        const movements = books.flatMap((book) => {
+          const values = [];
+
+          const homeDelta = Number(book?.homeDelta);
+          const awayDelta = Number(book?.awayDelta);
+
+          if (Number.isFinite(homeDelta) && homeDelta !== 0) {
+            values.push({
+              side: "home",
+              delta: homeDelta,
+              book: book?.name || "Book",
+            });
+          }
+
+          if (Number.isFinite(awayDelta) && awayDelta !== 0) {
+            values.push({
+              side: "away",
+              delta: awayDelta,
+              book: book?.name || "Book",
+            });
+          }
+
+          return values;
+        });
+
+        if (!movements.length) return null;
+
+        const strongest = movements.reduce((best, item) =>
+          Math.abs(item.delta) > Math.abs(best.delta) ? item : best
+        );
+
+        return {
+          ...g,
+          steamSide: strongest.side,
+          steamBook: strongest.book,
+          steamDelta: strongest.delta,
+          strength: Math.abs(strongest.delta).toFixed(2),
+        };
+      })
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          Math.abs(Number(b.steamDelta || 0)) -
+          Math.abs(Number(a.steamDelta || 0))
+      )
       .slice(0, 4);
 
     setSteamGames(steam);
@@ -1155,7 +1277,6 @@ export default function Dashboard() {
 
   const addToParlay = (game) => {
     setParlay((prev) => [...prev, game]);
-    setHistory((prev) => [game, ...prev].slice(0, 10));
 
     if (FLAGS.FLASH) {
       setFlash((prev) => ({
@@ -1248,7 +1369,22 @@ window.location.href = data.url;
     }
   };
 
-  const topAiPicks = games.filter((g) => Number(g.edge) > 0).slice(0, 3);
+  const topAiPicks = [...games]
+    .filter(
+      (g) =>
+        g?.hasOdds === true &&
+        Number.isFinite(Number(g?.homeOdds)) &&
+        Number.isFinite(Number(g?.awayOdds)) &&
+        Number.isFinite(Number(g?.confidence)) &&
+        Number(g?.confidence) > 0 &&
+        Array.isArray(g?.books) &&
+        g.books.length > 0
+    )
+    .sort(
+      (a, b) =>
+        Number(b.confidence || 0) - Number(a.confidence || 0)
+    )
+    .slice(0, 3);
 
   const hasPerformanceData =
     roi &&
@@ -1362,115 +1498,19 @@ Analysis:
 ${analysis}`
   );
 };  const handleViewHistory = () => {
-    alert("Bet history is active. Saved bet tracking is coming next.");
+    const target = document.querySelector(
+      '[data-tour="history-tracker"]'
+    );
+
+    target?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
   };
 
   const handleClearParlayClick = () => {
     setParlay([]);
   };
-
-  const leKenyaSteps = [
-    {
-      title: "Your Bankroll",
-      description:
-        "This is your bankroll command center. Track the money you've personally set aside and your daily profit or loss.",
-      targetSelector: '[data-tour="bankroll"]',
-    },
-    {
-      title: "ROI Performance",
-      description:
-        "Here you can monitor your tracked performance, including wins, win rate, profit, and return on investment.",
-      targetSelector: '[data-tour="roi"]',
-    },
-    {
-      title: "AI Market Intelligence",
-      description:
-        "KBETZ organizes connected sportsbook market information, confidence, edge, and risk information to help you evaluate available opportunities. No prediction is guaranteed.",
-      targetSelector: '[data-tour="ai-picks"]',
-    },
-    {
-      title: "Parlay Builder",
-      description:
-        "Build your parlay here. Add selections from the live board and review the combined odds and projected payout.",
-      targetSelector: '[data-tour="parlay-builder"]',
-    },
-    {
-      title: "Live Sports Board",
-      description:
-        "This is your live sports board. Explore available games, compare connected sportsbook prices, and add selections to your parlay.",
-      targetSelector: '[data-tour="live-markets"]',
-    },
-  ];
-
-  const [showLeKenyaWelcome, setShowLeKenyaWelcome] = useState(false);
-
-  const {
-    isOpen: leKenyaTourOpen,
-    stepIndex: leKenyaStepIndex,
-    currentStep: leKenyaCurrentStep,
-    totalSteps: leKenyaTotalSteps,
-    openTour: openLeKenyaTour,
-    nextStep: nextLeKenyaStep,
-    previousStep: previousLeKenyaStep,
-    skipTour: skipLeKenyaTour,
-  } = useGuidedTour({
-    steps: leKenyaSteps,
-
-    onComplete: () => {
-      try {
-        localStorage.setItem(
-          "kbetz-lekenya-tour-complete",
-          "true"
-        );
-      } catch {}
-    },
-
-    onSkip: () => {
-      try {
-        localStorage.setItem(
-          "kbetz-lekenya-tour-complete",
-          "true"
-        );
-      } catch {}
-    },
-  });
-
-  useEffect(() => {
-    if (!mounted) return;
-
-    try {
-      const completed =
-        localStorage.getItem(
-          "kbetz-lekenya-tour-complete"
-        ) === "true";
-
-      if (!completed) {
-        setShowLeKenyaWelcome(true);
-      }
-    } catch {
-      setShowLeKenyaWelcome(true);
-    }
-  }, [mounted]);
-
-  useEffect(() => {
-    if (
-      !leKenyaTourOpen ||
-      !leKenyaCurrentStep?.targetSelector
-    ) {
-      return;
-    }
-
-    const target = document.querySelector(
-      leKenyaCurrentStep.targetSelector
-    );
-
-    if (target) {
-      target.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }
-  }, [leKenyaTourOpen, leKenyaCurrentStep]);
 
   if (!mounted) {
   return (
@@ -1540,7 +1580,11 @@ ${analysis}`
           </h2>
 
           {!isPro && (
-            <button style={styles.upgradeBtn} onClick={upgrade}>
+            <button
+              data-tour="pro-features"
+              style={styles.upgradeBtn}
+              onClick={upgrade}
+            >
               🔓 Upgrade to PRO
             </button>
           )}
@@ -1604,6 +1648,7 @@ ${analysis}`
   games={games}
   lineHistory={lineHistory}
 />
+ <div data-tour="arbitrage">
  <SplitSummary
   styles={styles}
   arbOps={arbOps}
@@ -1611,6 +1656,7 @@ ${analysis}`
   isPro={isPro}
   upgrade={upgrade}
 />
+ </div>
 
 <div data-tour="parlay-builder">
 <ParlayBuilder
@@ -1624,13 +1670,15 @@ ${analysis}`
 />
 </div>
 
+  <div data-tour="history-tracker">
   <HistoryPanel
   styles={styles}
   history={history}
   handleViewHistory={handleViewHistory}
   isPro={isPro}
   upgrade={upgrade}
-/>
+  />
+  </div>
 
      <div data-tour="live-markets">
      <LiveMarkets
@@ -1648,41 +1696,7 @@ ${analysis}`
 
      
 
-        <WelcomeModal
-          open={showLeKenyaWelcome}
-          firstName=""
-          onStartTour={() => {
-            setShowLeKenyaWelcome(false);
-            openLeKenyaTour(0);
-          }}
-          onSkip={() => {
-            setShowLeKenyaWelcome(false);
-
-            try {
-              localStorage.setItem(
-                "kbetz-lekenya-tour-complete",
-                "true"
-              );
-            } catch {}
-          }}
-        />
-
-        <TourOverlay
-          open={leKenyaTourOpen}
-          targetSelector={
-            leKenyaCurrentStep?.targetSelector || ""
-          }
-        />
-
-        <GuidedTour
-          open={leKenyaTourOpen}
-          currentStep={leKenyaCurrentStep || {}}
-          stepIndex={leKenyaStepIndex}
-          totalSteps={leKenyaTotalSteps}
-          onNext={nextLeKenyaStep}
-          onPrevious={previousLeKenyaStep}
-          onSkip={skipLeKenyaTour}
-        />
+        <LeKenyaHost authEmail={authEmail} />
 
       <footer style={styles.footer}>
         REAL-TIME DATA • AI POWERED • SHARP ADVANTAGE
