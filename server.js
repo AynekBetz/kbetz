@@ -461,6 +461,153 @@ function pickBestLine(game) {
   return `${game.away} ML`;
 }
 
+
+/*
+ * VERIFIED MARKET ANALYSIS
+ *
+ * This is market intelligence, not an independent predictive model.
+ * It uses only genuine sportsbook prices already attached to the game.
+ *
+ * It intentionally does NOT manufacture EV, predictive edge, injuries,
+ * pitcher ratings, recent form, or an artificial win probability.
+ */
+function analyzeVerifiedMarket(game) {
+  const books = Array.isArray(game?.books)
+    ? game.books.filter(
+        (book) =>
+          Number.isFinite(Number(book?.homeOdds)) &&
+          Number.isFinite(Number(book?.awayOdds)) &&
+          Number(book.homeOdds) !== 0 &&
+          Number(book.awayOdds) !== 0
+      )
+    : [];
+
+  if (!books.length) {
+    return null;
+  }
+
+  const bookMarkets = books.map((book) => {
+    const market = getFairMarketProbabilities(
+      Number(book.homeOdds),
+      Number(book.awayOdds)
+    );
+
+    return {
+      name: book.name || "Book",
+      homeOdds: Number(book.homeOdds),
+      awayOdds: Number(book.awayOdds),
+      homeFair: market.homeFair,
+      awayFair: market.awayFair,
+      vig: market.vig,
+      homeDelta: Number.isFinite(Number(book.homeDelta))
+        ? Number(book.homeDelta)
+        : 0,
+      awayDelta: Number.isFinite(Number(book.awayDelta))
+        ? Number(book.awayDelta)
+        : 0,
+    };
+  });
+
+  const homeConsensus =
+    bookMarkets.reduce((sum, book) => sum + book.homeFair, 0) /
+    bookMarkets.length;
+
+  const awayConsensus =
+    bookMarkets.reduce((sum, book) => sum + book.awayFair, 0) /
+    bookMarkets.length;
+
+  const bestHomeBook = bookMarkets.reduce((best, book) =>
+    book.homeOdds > best.homeOdds ? book : best
+  );
+
+  const bestAwayBook = bookMarkets.reduce((best, book) =>
+    book.awayOdds > best.awayOdds ? book : best
+  );
+
+  const recommendedSide =
+    homeConsensus >= awayConsensus ? "home" : "away";
+
+  const recommendedTeam =
+    recommendedSide === "home" ? game.home : game.away;
+
+  const consensusProbability =
+    recommendedSide === "home"
+      ? homeConsensus
+      : awayConsensus;
+
+  const bestBook =
+    recommendedSide === "home"
+      ? bestHomeBook
+      : bestAwayBook;
+
+  const movementValues = bookMarkets
+    .map((book) =>
+      recommendedSide === "home"
+        ? Number(book.homeDelta)
+        : Number(book.awayDelta)
+    )
+    .filter((value) => Number.isFinite(value) && value !== 0);
+
+  const movementAgreement =
+    movementValues.length > 0
+      ? movementValues.filter(
+          (value) => Math.sign(value) === Math.sign(movementValues[0])
+        ).length / movementValues.length
+      : 0;
+
+  /*
+   * Market quality ranks the reliability/depth of the observed market.
+   * It is NOT a predicted win probability and NOT expected value.
+   *
+   * 70% consensus strength
+   * 20% sportsbook coverage (up to 3 currently requested books)
+   * 10% directional movement agreement when movement exists
+   */
+  const coverageScore = Math.min(bookMarkets.length / 3, 1);
+
+  const marketQualityScore = Number(
+    (
+      consensusProbability * 70 +
+      coverageScore * 20 +
+      movementAgreement * 10
+    ).toFixed(2)
+  );
+
+  return {
+    recommended: `${recommendedTeam} ML`,
+    recommendedSide,
+
+    marketConfidence: Math.round(consensusProbability * 100),
+    marketConsensusProbability: Number(
+      (consensusProbability * 100).toFixed(2)
+    ),
+
+    marketQualityScore,
+
+    bestOdds: Number(
+      recommendedSide === "home"
+        ? bestBook.homeOdds
+        : bestBook.awayOdds
+    ),
+    bestBook: bestBook.name,
+
+    bestHomeOdds: bestHomeBook.homeOdds,
+    bestHomeBook: bestHomeBook.name,
+    bestAwayOdds: bestAwayBook.awayOdds,
+    bestAwayBook: bestAwayBook.name,
+
+    booksUsed: bookMarkets.length,
+    movementAgreement: Number(
+      (movementAgreement * 100).toFixed(2)
+    ),
+
+    // Until KBETZ has a separately validated predictive probability,
+    // these remain neutral rather than fabricated.
+    edge: 0,
+    expectedValue: null,
+  };
+}
+
 /* ================= HEALTH ================= */
 app.get("/", (req, res) => {
   res.json({
@@ -538,6 +685,10 @@ app.get("/api/supported-sports", async (req, res) => {
 const pickLogSchema = new mongoose.Schema(
   {
     pickKey: { type: String, unique: true, index: true },
+    releaseDate: { type: String, default: "" },
+    releaseSet: { type: String, default: "" },
+    releaseLabel: { type: String, default: "" },
+    releaseNumber: { type: Number, default: 0 },
     gameId: String,
     sport: String,
     league: String,
@@ -1688,8 +1839,41 @@ function normalizeTheRundownEvent(event, sportLabel = "MLB", index = 0) {
     pitcherAway: event?.pitcher_away?.name || null,
   };
 
-  game.bestLine = pickBestLine(game);
-  game.recommended = game.bestLine;
+  // Apply verified multi-book market analysis to TheRundown MLB.
+  // This remains market intelligence, not an independent prediction model.
+  const verifiedMarket = analyzeVerifiedMarket(game);
+
+  if (verifiedMarket) {
+    game.recommended = verifiedMarket.recommended;
+    game.bestLine = verifiedMarket.recommended;
+
+    game.confidence = verifiedMarket.marketConfidence;
+    game.marketConfidence = verifiedMarket.marketConfidence;
+    game.marketConsensusProbability =
+      verifiedMarket.marketConsensusProbability;
+
+    game.marketQualityScore =
+      verifiedMarket.marketQualityScore;
+
+    game.bestOdds = verifiedMarket.bestOdds;
+    game.bestBook = verifiedMarket.bestBook;
+
+    game.bestHomeOdds = verifiedMarket.bestHomeOdds;
+    game.bestHomeBook = verifiedMarket.bestHomeBook;
+    game.bestAwayOdds = verifiedMarket.bestAwayOdds;
+    game.bestAwayBook = verifiedMarket.bestAwayBook;
+
+    game.booksUsed = verifiedMarket.booksUsed;
+    game.movementAgreement =
+      verifiedMarket.movementAgreement;
+
+    game.edge = 0;
+    game.expectedValue = null;
+  } else {
+    // Preserve existing behavior if multi-book analysis is unavailable.
+    game.bestLine = pickBestLine(game);
+    game.recommended = game.bestLine;
+  }
 
   return game;
 }
@@ -2383,12 +2567,91 @@ app.get("/api/sportsdata/nfl/timeframes", async (req, res) => {
 });
 
 /* ================= PICK LOG / PUBLIC RECORD ================= */
-function buildPickFromGame(game, oddsPayload) {
+function getOfficialPickRelease(releaseSet) {
+  const releases = {
+    morning: {
+      releaseSet: "morning",
+      releaseLabel: "Morning Picks",
+      releaseNumber: 1,
+      releaseHour: 9,
+      releaseTime: "9:00 AM ET",
+    },
+    afternoon: {
+      releaseSet: "afternoon",
+      releaseLabel: "Afternoon Picks",
+      releaseNumber: 2,
+      releaseHour: 14,
+      releaseTime: "2:00 PM ET",
+    },
+    evening: {
+      releaseSet: "evening",
+      releaseLabel: "Evening Picks",
+      releaseNumber: 3,
+      releaseHour: 19,
+      releaseTime: "7:00 PM ET",
+    },
+  };
+
+  return releases[String(releaseSet || "").toLowerCase()] || null;
+}
+
+function getEasternClock(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(date);
+
+  const hour = Number(
+    parts.find((part) => part.type === "hour")?.value || 0
+  );
+
+  const minute = Number(
+    parts.find((part) => part.type === "minute")?.value || 0
+  );
+
+  return {
+    hour,
+    minute,
+    totalMinutes: hour * 60 + minute,
+  };
+}
+
+function isOfficialReleaseAvailable(release, date = new Date()) {
+  if (!release) return false;
+
+  const clock = getEasternClock(date);
+  const releaseMinutes = Number(release.releaseHour) * 60;
+
+  return clock.totalMinutes >= releaseMinutes;
+}
+
+function getEasternReleaseDate(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function buildPickFromGame(game, oddsPayload, release) {
   const recommended =
     game.recommended || game.bestLine || `${game.home || "Home"} ML`;
 
+  const releaseDate = getEasternReleaseDate();
+
   return {
-    pickKey: `${game.id}:${recommended}:${game.commenceTime || ""}`,
+    pickKey:
+      `${releaseDate}:${release.releaseSet}:` +
+      `${game.id}:${recommended}:${game.commenceTime || ""}`,
+
+    releaseDate,
+    releaseSet: release.releaseSet,
+    releaseLabel: release.releaseLabel,
+    releaseNumber: release.releaseNumber,
+
     gameId: game.id,
     sport: game.sport || game.league || "SPORT",
     league: game.league || game.sport || "SPORT",
@@ -2411,7 +2674,65 @@ function buildPickFromGame(game, oddsPayload) {
 
 app.post("/api/picks/snapshot", async (req, res) => {
   try {
-    const limit = Math.min(Number(req.query.limit || 10), 25);
+    const release = getOfficialPickRelease(req.query.release);
+
+    if (!release) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Official release required: morning, afternoon, or evening",
+      });
+    }
+
+    const releaseDate = getEasternReleaseDate();
+
+    // Official customer releases cannot be published before
+    // their scheduled Eastern Time release.
+    if (!isOfficialReleaseAvailable(release)) {
+      return res.status(409).json({
+        success: false,
+        releaseDate,
+        releaseSet: release.releaseSet,
+        releaseLabel: release.releaseLabel,
+        releaseNumber: release.releaseNumber,
+        releaseTime: release.releaseTime,
+        locked: false,
+        alreadyPublished: false,
+        error:
+          `${release.releaseLabel} unlock at ${release.releaseTime}.`,
+      });
+    }
+
+    // A published Official Picks set is immutable.
+    // If this release already exists for today, return the locked
+    // records instead of creating or adding any new picks.
+    const existingReleasePicks = await PickLog.find({
+      releaseDate,
+      releaseSet: release.releaseSet,
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    if (existingReleasePicks.length > 0) {
+      return res.json({
+        success: true,
+        releaseDate,
+        releaseSet: release.releaseSet,
+        releaseLabel: release.releaseLabel,
+        releaseNumber: release.releaseNumber,
+        releaseTime: release.releaseTime,
+        locked: true,
+        alreadyPublished: true,
+        saved: existingReleasePicks.length,
+        picks: existingReleasePicks,
+      });
+    }
+
+    const limit = Math.min(
+      Math.max(Number(req.query.limit || 3), 1),
+      3
+    );
+
     const oddsPayload = await getCachedOdds();
 
     const games = (oddsPayload.games || [])
@@ -2436,7 +2757,12 @@ app.post("/api/picks/snapshot", async (req, res) => {
     const pickKeys = [];
 
     for (const game of games) {
-      const pick = buildPickFromGame(game, oddsPayload);
+      const pick = buildPickFromGame(
+        game,
+        oddsPayload,
+        release
+      );
+
       pickKeys.push(pick.pickKey);
 
       await PickLog.updateOne(
@@ -2452,6 +2778,13 @@ app.post("/api/picks/snapshot", async (req, res) => {
 
     res.json({
       success: true,
+      releaseDate,
+      releaseSet: release.releaseSet,
+      releaseLabel: release.releaseLabel,
+      releaseNumber: release.releaseNumber,
+      releaseTime: release.releaseTime,
+      locked: true,
+      alreadyPublished: false,
       source: oddsPayload.source,
       cached: oddsPayload.cached,
       cacheAgeSeconds: oddsPayload.cacheAgeSeconds,

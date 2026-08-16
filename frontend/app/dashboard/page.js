@@ -1369,22 +1369,79 @@ window.location.href = data.url;
     }
   };
 
-  const topAiPicks = [...games]
-    .filter(
-      (g) =>
-        g?.hasOdds === true &&
-        Number.isFinite(Number(g?.homeOdds)) &&
-        Number.isFinite(Number(g?.awayOdds)) &&
-        Number.isFinite(Number(g?.confidence)) &&
-        Number(g?.confidence) > 0 &&
-        Array.isArray(g?.books) &&
-        g.books.length > 0
-    )
-    .sort(
-      (a, b) =>
-        Number(b.confidence || 0) - Number(a.confidence || 0)
-    )
-    .slice(0, 3);
+  /*
+   * OFFICIAL PICKS
+   *
+   * Customer-facing picks come from the locked PickLog releases,
+   * NOT from the continuously moving live games array.
+   *
+   * Morning   = Set #1
+   * Afternoon = Set #2
+   * Evening   = Set #3
+   *
+   * Once published by the backend, each set remains unchanged.
+   */
+  const officialPicks = Array.isArray(history)
+    ? history.filter(
+        (pick) =>
+          ["morning", "afternoon", "evening"].includes(
+            String(pick?.releaseSet || "").toLowerCase()
+          ) &&
+          pick?.releaseDate
+      )
+    : [];
+
+  const todayEastern = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const todaysOfficialPicks = officialPicks.filter(
+    (pick) => pick.releaseDate === todayEastern
+  );
+
+  const releaseOrder = {
+    morning: 1,
+    afternoon: 2,
+    evening: 3,
+  };
+
+  const publishedReleaseNumbers = todaysOfficialPicks.map(
+    (pick) =>
+      releaseOrder[
+        String(pick?.releaseSet || "").toLowerCase()
+      ] || 0
+  );
+
+  const latestPublishedRelease = publishedReleaseNumbers.length
+    ? Math.max(...publishedReleaseNumbers)
+    : 0;
+
+  const activeReleaseSet =
+    latestPublishedRelease === 3
+      ? "evening"
+      : latestPublishedRelease === 2
+        ? "afternoon"
+        : latestPublishedRelease === 1
+          ? "morning"
+          : "";
+
+  const topAiPicks = activeReleaseSet
+    ? todaysOfficialPicks
+        .filter(
+          (pick) =>
+            String(pick?.releaseSet || "").toLowerCase() ===
+            activeReleaseSet
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt || a.postedAt || 0) -
+            new Date(b.createdAt || b.postedAt || 0)
+        )
+        .slice(0, 3)
+    : [];
 
   const hasPerformanceData =
     roi &&
