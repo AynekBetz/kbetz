@@ -1443,6 +1443,36 @@ window.location.href = data.url;
         .slice(0, 3)
     : [];
 
+  /*
+   * OFFICIAL PICKS CUSTOMER RELEASE DISPLAY
+   *
+   * The live market may continue moving throughout the day,
+   * but the published Official Picks shown to customers stay locked.
+   */
+  const officialReleaseDisplay = {
+    morning: {
+      label: "Morning Picks",
+      published: "9:00 AM ET",
+      nextLabel: "Afternoon Picks",
+      nextTime: "2:00 PM ET",
+    },
+    afternoon: {
+      label: "Afternoon Picks",
+      published: "2:00 PM ET",
+      nextLabel: "Evening Picks",
+      nextTime: "7:00 PM ET",
+    },
+    evening: {
+      label: "Evening Picks",
+      published: "7:00 PM ET",
+      nextLabel: "Tomorrow's Morning Picks",
+      nextTime: "9:00 AM ET",
+    },
+  };
+
+  const activeReleaseInfo =
+    officialReleaseDisplay[activeReleaseSet] || null;
+
   const hasPerformanceData =
     roi &&
     (
@@ -1689,6 +1719,120 @@ ${analysis}`
       </section>
 
    <div data-tour="ai-picks">
+     <div
+       style={{
+         marginBottom: 14,
+         padding: "14px 18px",
+         borderRadius: 14,
+         border: "1px solid rgba(0,255,225,0.22)",
+         background:
+           "linear-gradient(135deg, rgba(0,255,225,0.08), rgba(124,58,237,0.10))",
+         boxShadow: "0 0 24px rgba(0,255,225,0.06)",
+       }}
+     >
+       {activeReleaseInfo ? (
+         <>
+           <div
+             style={{
+               display: "flex",
+               alignItems: "center",
+               justifyContent: "space-between",
+               gap: 12,
+               flexWrap: "wrap",
+             }}
+           >
+             <div
+               style={{
+                 fontSize: 15,
+                 fontWeight: 900,
+                 letterSpacing: "0.04em",
+               }}
+             >
+               {activeReleaseInfo.label} 🔒
+               <span
+                 style={{
+                   marginLeft: 9,
+                   fontSize: 11,
+                   color: "#00ffe1",
+                   letterSpacing: "0.12em",
+                 }}
+               >
+                 LOCKED
+               </span>
+             </div>
+
+             <div
+               style={{
+                 fontSize: 12,
+                 opacity: 0.72,
+                 fontWeight: 700,
+               }}
+             >
+               Published {activeReleaseInfo.published}
+             </div>
+           </div>
+
+           <div
+             style={{
+               marginTop: 7,
+               fontSize: 13,
+               lineHeight: 1.5,
+               opacity: 0.82,
+             }}
+           >
+             These Official Picks stay locked after publication.
+             Live sportsbook markets may continue to move.
+           </div>
+
+           <div
+             style={{
+               marginTop: 8,
+               fontSize: 13,
+               fontWeight: 800,
+               color: "#c9b8ff",
+             }}
+           >
+             Next Release: {activeReleaseInfo.nextLabel} —{" "}
+             {activeReleaseInfo.nextTime}
+           </div>
+         </>
+       ) : (
+         <>
+           <div
+             style={{
+               fontSize: 15,
+               fontWeight: 900,
+               letterSpacing: "0.04em",
+             }}
+           >
+             Official Picks
+           </div>
+
+           <div
+             style={{
+               marginTop: 7,
+               fontSize: 13,
+               lineHeight: 1.5,
+               opacity: 0.82,
+             }}
+           >
+             No Official Picks have been published yet today.
+           </div>
+
+           <div
+             style={{
+               marginTop: 8,
+               fontSize: 13,
+               fontWeight: 800,
+               color: "#c9b8ff",
+             }}
+           >
+             Daily Releases: 9:00 AM • 2:00 PM • 7:00 PM ET
+           </div>
+         </>
+       )}
+     </div>
+
    <AIPicks
     topAiPicks={topAiPicks}
     games={games}
