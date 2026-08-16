@@ -788,17 +788,15 @@ export default function LeKenyaHost({
                 width: presenterCompact ? 68 : 126,
                 minWidth: presenterCompact ? 68 : 126,
                 height: presenterCompact ? 68 : 184,
-                borderRadius: presenterCompact ? "50%" : "58px 58px 24px 24px",
-                overflow: "hidden",
-                border: "1px solid rgba(0,255,225,.32)",
-                background:
-                  "linear-gradient(180deg,rgba(0,255,225,.035),rgba(5,5,15,.72))",
-                boxShadow:
-                  speaking
-                    ? "0 12px 34px rgba(0,0,0,.38), 0 0 30px rgba(0,255,225,.24)"
-                    : "0 12px 30px rgba(0,0,0,.32), 0 0 20px rgba(0,255,225,.11)",
+                borderRadius: 0,
+                overflow: "visible",
+                border: "none",
+                background: "transparent",
+                boxShadow: speaking
+                  ? "0 12px 28px rgba(0,0,0,.18)"
+                  : "none",
                 transition:
-                  "width .35s ease, min-width .35s ease, height .35s ease, border-radius .35s ease",
+                  "width .35s ease, min-width .35s ease, height .35s ease",
               }}
             >
               <img
@@ -807,7 +805,7 @@ export default function LeKenyaHost({
                   speaking ? "is-speaking" : "",
                   hostSide === "left" ? "face-right" : "face-left",
                 ].join(" ")}
-                src="/lekenya-kbetz-portrait.png"
+                src="/lekenya-kbetz-presenter.png"
                 alt="Le'Kenya, KBETZ AI Guide"
                 style={{
                   width: "100%",
@@ -817,26 +815,7 @@ export default function LeKenyaHost({
                 }}
               />
 
-              {!presenterCompact ? (
-              <div
-                style={{
-                  position: "absolute",
-                  left: 12,
-                  right: 12,
-                  bottom: 8,
-                  padding: "4px 7px",
-                  borderRadius: 999,
-                  textAlign: "center",
-                  fontSize: 8,
-                  fontWeight: 1000,
-                  letterSpacing: 1,
-                  color: "#00ffe1",
-                  background: "rgba(0,0,0,.72)",
-                }}
-              >
-                AI GUIDE
-              </div>
-              ) : null}
+
             </div>
 
             {!presenterCompact ? (
@@ -844,17 +823,13 @@ export default function LeKenyaHost({
               style={{
                 flex: 1,
                 minWidth: 0,
-                padding: "13px 14px",
-                borderRadius:
-                  hostSide === "left"
-                    ? "18px 5px 18px 18px"
-                    : "5px 18px 18px 18px",
-                border: "1px solid rgba(0,255,225,.20)",
-                background:
-                  "linear-gradient(145deg,rgba(4,14,18,.94),rgba(17,7,29,.91))",
-                boxShadow:
-                  "0 14px 34px rgba(0,0,0,.30), 0 0 22px rgba(0,255,225,.08)",
-                backdropFilter: "blur(14px)",
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(0,255,225,.16)",
+                background: "rgba(3,10,15,.72)",
+                boxShadow: "0 8px 20px rgba(0,0,0,.18)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
               }}
             >
               <div
@@ -914,7 +889,7 @@ export default function LeKenyaHost({
                 }}
               >
                 {isWelcome
-                  ? "I'll guide you through KBETZ without covering your dashboard. You stay in control—I'll only move when you press Next."
+                  ? "I'm Le'Kenya, your KBETZ AI Guide. I'll stay right here while I guide you through the dashboard and highlight each feature."
                   : currentStep?.description}
               </p>
 
