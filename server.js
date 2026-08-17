@@ -2735,7 +2735,20 @@ app.post("/api/picks/snapshot", async (req, res) => {
 
     const oddsPayload = await getCachedOdds();
 
-    const games = (oddsPayload.games || [])
+    /*
+     * KBETZ V3 OFFICIAL PICK QUALITY GATE
+     *
+     * Official Picks are NOT automatically the three biggest
+     * sportsbook favorites.
+     *
+     * A game must first meet verified market-quality standards.
+     * KBETZ may publish fewer than three picks when the available
+     * slate does not provide enough qualified opportunities.
+     *
+     * This score ranks market evidence. It is NOT represented as
+     * an independent predicted win probability.
+     */
+    const qualifiedGames = (oddsPayload.games || [])
       .filter(
         (game) =>
           game &&
@@ -2745,13 +2758,83 @@ app.post("/api/picks/snapshot", async (req, res) => {
           Number.isFinite(Number(game.homeOdds)) &&
           Number.isFinite(Number(game.awayOdds)) &&
           Array.isArray(game.books) &&
-          game.books.length > 0
+          game.books.length >= 2 &&
+          Number.isFinite(Number(game.marketQualityScore)) &&
+          Number.isFinite(Number(game.marketConsensusProbability)) &&
+          Number.isFinite(Number(game.movementAgreement))
       )
-      .sort((a, b) => {
-        const scoreA = Number(a.confidence || 0) + Number(a.edge || 0);
-        const scoreB = Number(b.confidence || 0) + Number(b.edge || 0);
-        return scoreB - scoreA;
+      .map((game) => {
+        const consensus =
+          Number(game.marketConsensusProbability || 0);
+
+        const quality =
+          Number(game.marketQualityScore || 0);
+
+        const movement =
+          Number(game.movementAgreement || 0);
+
+        const books =
+          Number(game.booksUsed || game.books.length || 0);
+
+        /*
+         * Qualification rules:
+         *
+         * - At least two genuine sportsbook prices
+         * - Consensus must show a meaningful lean
+         * - Market quality must clear the minimum standard
+         * - Conflicting line movement is penalized
+         *
+         * Movement is supporting evidence, not a requirement,
+         * because zero movement can simply mean a stable market.
+         */
+        /*
+         * KBETZ V3 VERIFIED QUALITY THRESHOLDS
+         *
+         * Zero movement is NEUTRAL — it is not confirmation.
+         * Positive movement must show meaningful agreement.
+         *
+         * We intentionally prefer publishing fewer qualified
+         * Official Picks instead of forcing weak selections.
+         */
+        const consensusQualified = consensus >= 58;
+        const qualityQualified = quality >= 60;
+
+        const movementAvailable = movement > 0;
+        const movementQualified =
+          !movementAvailable || movement >= 60;
+
+        const qualified =
+          books >= 2 &&
+          consensusQualified &&
+          qualityQualified &&
+          movementQualified;
+
+        /*
+         * Ranking score combines independent market observations.
+         * This is a selection score only — NOT customer-facing
+         * win probability and NOT fabricated predictive edge.
+         */
+        const selectionScore =
+          quality * 0.50 +
+          consensus * 0.30 +
+          Math.min(books / 3, 1) * 10 +
+          (movement > 0 ? movement * 0.10 : 0);
+
+        return {
+          ...game,
+          kbetzQualified: qualified,
+          kbetzSelectionScore:
+            Number(selectionScore.toFixed(2)),
+        };
       })
+      .filter((game) => game.kbetzQualified === true);
+
+    const games = qualifiedGames
+      .sort(
+        (a, b) =>
+          Number(b.kbetzSelectionScore || 0) -
+          Number(a.kbetzSelectionScore || 0)
+      )
       .slice(0, limit);
 
     const pickKeys = [];
