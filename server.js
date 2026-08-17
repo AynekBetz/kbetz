@@ -1878,6 +1878,96 @@ function normalizeTheRundownEvent(event, sportLabel = "MLB", index = 0) {
   return game;
 }
 
+
+/*
+ * TEMPORARY OWNER-PROTECTED THERUNDOWN SCORE INSPECTOR
+ *
+ * Used only to identify TheRundown's real score fields so the
+ * MLB grader can be wired correctly. No API key is returned.
+ */
+app.get(
+  "/api/debug/therundown-score",
+  requireOwnerSecret,
+  async (req, res) => {
+    try {
+      if (!THERUNDOWN_API_KEY) {
+        return res.status(503).json({
+          success: false,
+          error: "TheRundown is not configured",
+        });
+      }
+
+      const requestedDate =
+        String(req.query.date || "").trim() ||
+        new Date().toISOString().slice(0, 10);
+
+      const url =
+        `https://therundown.io/api/v2/sports/3/events/${requestedDate}` +
+        `?market_ids=1&affiliate_ids=19,22,23&main_line=true&offset=300`;
+
+      const response = await fetch(url, {
+        headers: {
+          "X-TheRundown-Key": THERUNDOWN_API_KEY,
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+
+        return res.status(response.status).json({
+          success: false,
+          error: `TheRundown request failed: ${body.slice(0, 300)}`,
+        });
+      }
+
+      const data = await response.json();
+
+      const events = Array.isArray(data?.events)
+        ? data.events
+        : [];
+
+      return res.json({
+        success: true,
+        date: requestedDate,
+        count: events.length,
+
+        events: events.slice(0, 20).map((event) => ({
+          eventId:
+            event?.event_id ||
+            event?.event_uuid ||
+            null,
+
+          eventDate: event?.event_date || null,
+
+          teams: Array.isArray(event?.teams)
+            ? event.teams.map((team) => ({
+                teamId: team?.team_id,
+                name: team?.name,
+                mascot: team?.mascot,
+                abbreviation: team?.abbreviation,
+                isHome: Boolean(team?.is_home),
+                isAway: Boolean(team?.is_away),
+              }))
+            : [],
+
+          score: event?.score || null,
+        })),
+      });
+    } catch (err) {
+      console.error(
+        "❌ TheRundown score inspector error:",
+        err?.message || err
+      );
+
+      return res.status(500).json({
+        success: false,
+        error: "Could not inspect TheRundown scores",
+      });
+    }
+  }
+);
+
 async function fetchTheRundownMLB() {
   if (!THERUNDOWN_API_KEY) {
     console.log("ℹ️ TheRundown is not configured.");
