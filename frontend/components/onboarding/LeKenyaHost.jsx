@@ -823,13 +823,14 @@ export default function LeKenyaHost({
               style={{
                 flex: 1,
                 minWidth: 0,
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(0,255,225,.16)",
-                background: "rgba(3,10,15,.72)",
-                boxShadow: "0 8px 20px rgba(0,0,0,.18)",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
+                padding: "8px 8px 8px 4px",
+                borderRadius: 0,
+                border: "none",
+                background: "transparent",
+                boxShadow: "none",
+                backdropFilter: "none",
+                WebkitBackdropFilter: "none",
+                textShadow: "0 2px 8px rgba(0,0,0,.92)",
               }}
             >
               <div
@@ -883,9 +884,11 @@ export default function LeKenyaHost({
                 className="kbetz-lekenya-description"
                 style={{
                   margin: "8px 0 0",
-                  color: "rgba(255,255,255,.68)",
+                  color: "rgba(255,255,255,.86)",
                   fontSize: 11,
                   lineHeight: 1.55,
+                  textShadow:
+                    "0 2px 5px rgba(0,0,0,1), 0 0 12px rgba(0,0,0,.92)",
                 }}
               >
                 {isWelcome
@@ -909,7 +912,12 @@ export default function LeKenyaHost({
           </div>
 
           {!presenterCompact && isTour ? (
-            <div style={{ marginTop: 12 }}>
+            <div
+              style={{
+                marginTop: 10,
+                paddingLeft: presenterCompact ? 0 : 140,
+              }}
+            >
               <div
                 style={{
                   display: "flex",
