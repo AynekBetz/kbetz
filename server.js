@@ -2672,16 +2672,32 @@ function buildPickFromGame(game, oddsPayload, release) {
   };
 }
 
-app.post("/api/picks/snapshot", async (req, res) => {
+/*
+ * ============================================================
+ * KBETZ V3 OFFICIAL PICKS PUBLISHER
+ * ============================================================
+ *
+ * One internal publisher is shared by:
+ *
+ * 1. Automatic scheduled releases
+ * 2. Protected owner/manual publishing
+ *
+ * Existing PickLog release locking remains authoritative.
+ * A release already published today will NOT be duplicated.
+ */
+async function publishOfficialPickRelease(
+  releaseSet,
+  requestedLimit = 3
+) {
   try {
-    const release = getOfficialPickRelease(req.query.release);
+    const release = getOfficialPickRelease(releaseSet);
 
     if (!release) {
-      return res.status(400).json({
+      return {
         success: false,
         error:
           "Official release required: morning, afternoon, or evening",
-      });
+      };
     }
 
     const releaseDate = getEasternReleaseDate();
@@ -2689,7 +2705,7 @@ app.post("/api/picks/snapshot", async (req, res) => {
     // Official customer releases cannot be published before
     // their scheduled Eastern Time release.
     if (!isOfficialReleaseAvailable(release)) {
-      return res.status(409).json({
+      return {
         success: false,
         releaseDate,
         releaseSet: release.releaseSet,
@@ -2700,7 +2716,7 @@ app.post("/api/picks/snapshot", async (req, res) => {
         alreadyPublished: false,
         error:
           `${release.releaseLabel} unlock at ${release.releaseTime}.`,
-      });
+      };
     }
 
     // A published Official Picks set is immutable.
@@ -2714,7 +2730,7 @@ app.post("/api/picks/snapshot", async (req, res) => {
       .lean();
 
     if (existingReleasePicks.length > 0) {
-      return res.json({
+      return {
         success: true,
         releaseDate,
         releaseSet: release.releaseSet,
@@ -2725,11 +2741,11 @@ app.post("/api/picks/snapshot", async (req, res) => {
         alreadyPublished: true,
         saved: existingReleasePicks.length,
         picks: existingReleasePicks,
-      });
+      };
     }
 
     const limit = Math.min(
-      Math.max(Number(req.query.limit || 3), 1),
+      Math.max(Number(requestedLimit || 3), 1),
       3
     );
 
@@ -2859,7 +2875,7 @@ app.post("/api/picks/snapshot", async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    res.json({
+    return {
       success: true,
       releaseDate,
       releaseSet: release.releaseSet,
@@ -2873,15 +2889,158 @@ app.post("/api/picks/snapshot", async (req, res) => {
       cacheAgeSeconds: oddsPayload.cacheAgeSeconds,
       saved: picks.length,
       picks,
-    });
+    };
+
   } catch (err) {
-    console.error("❌ /api/picks/snapshot error:", err.message);
-    res.status(500).json({
+    console.error(
+      `❌ Official Picks ${releaseSet} publish error:`,
+      err.message
+    );
+
+    return {
       success: false,
       error: "Could not save pick snapshot",
-    });
+    };
   }
-});
+}
+
+
+/*
+ * PROTECTED MANUAL OFFICIAL PICKS ENDPOINT
+ *
+ * This remains available for owner emergency/manual use,
+ * but public visitors cannot trigger an Official Picks release.
+ */
+app.post(
+  "/api/picks/snapshot",
+  requireOwnerSecret,
+  async (req, res) => {
+    const result = await publishOfficialPickRelease(
+      req.query.release,
+      req.query.limit
+    );
+
+    if (!result.success) {
+      const status =
+        String(result.error || "").includes("unlock at")
+          ? 409
+          : String(result.error || "").includes(
+              "Official release required"
+            )
+          ? 400
+          : 500;
+
+      return res.status(status).json(result);
+    }
+
+    return res.json(result);
+  }
+);
+
+
+/*
+ * ============================================================
+ * KBETZ V3 AUTOMATIC OFFICIAL RELEASE SCHEDULER
+ * ============================================================
+ *
+ * Official release times:
+ *
+ * Morning   9:00 AM ET
+ * Afternoon 2:00 PM ET
+ * Evening   7:00 PM ET
+ *
+ * The scheduler checks once per minute.
+ *
+ * It does NOT blindly create picks every minute.
+ * publishOfficialPickRelease() checks PickLog first.
+ * Once a release exists, it remains locked and immutable.
+ */
+
+let officialReleaseSchedulerBusy = false;
+
+async function runOfficialReleaseScheduler() {
+  if (officialReleaseSchedulerBusy) {
+    return;
+  }
+
+  officialReleaseSchedulerBusy = true;
+
+  try {
+    const clock = getEasternClock();
+
+    const releases = [
+      getOfficialPickRelease("morning"),
+      getOfficialPickRelease("afternoon"),
+      getOfficialPickRelease("evening"),
+    ].filter(Boolean);
+
+    for (const release of releases) {
+      const releaseMinutes =
+        Number(release.releaseHour) * 60;
+
+      /*
+       * Only attempt releases whose scheduled ET time
+       * has already arrived.
+       *
+       * The publisher itself performs the database lock
+       * check, so server restarts remain safe.
+       */
+      if (clock.totalMinutes < releaseMinutes) {
+        continue;
+      }
+
+      const result = await publishOfficialPickRelease(
+        release.releaseSet,
+        3
+      );
+
+      if (
+        result?.success &&
+        result?.alreadyPublished === false
+      ) {
+        console.log(
+          `✅ KBETZ AUTO RELEASE: ${release.releaseLabel} — ` +
+          `${result.saved} qualified pick(s) locked.`
+        );
+      }
+    }
+  } catch (err) {
+    console.error(
+      "❌ KBETZ Official Picks scheduler error:",
+      err.message
+    );
+  } finally {
+    officialReleaseSchedulerBusy = false;
+  }
+}
+
+
+/*
+ * Run shortly after startup so a Render restart does not
+ * cause KBETZ to miss a release that should already exist.
+ */
+setTimeout(() => {
+  runOfficialReleaseScheduler().catch((err) => {
+    console.error(
+      "❌ Initial Official Picks scheduler error:",
+      err.message
+    );
+  });
+}, 15000);
+
+
+/*
+ * Thereafter check release state once per minute.
+ */
+setInterval(() => {
+  runOfficialReleaseScheduler().catch((err) => {
+    console.error(
+      "❌ Official Picks scheduler interval error:",
+      err.message
+    );
+  });
+}, 60000);
+
 
 app.get("/api/picks/public", async (req, res) => {
   try {
