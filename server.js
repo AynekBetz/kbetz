@@ -3565,6 +3565,486 @@ app.post("/api/picks/auto-grade-nfl-all", async (req, res) => {
   }
 });
 
+
+/* ================= MLB AUTO GRADING ================= */
+
+const MLB_TEAM_CANONICAL = {
+  "arizona diamondbacks": "ARI",
+  "atlanta braves": "ATL",
+  "baltimore orioles": "BAL",
+  "boston red sox": "BOS",
+  "chicago cubs": "CHC",
+  "chicago white sox": "CWS",
+  "cincinnati reds": "CIN",
+  "cleveland guardians": "CLE",
+  "colorado rockies": "COL",
+  "detroit tigers": "DET",
+  "houston astros": "HOU",
+  "kansas city royals": "KC",
+  "los angeles angels": "LAA",
+  "la angels": "LAA",
+  "los angeles dodgers": "LAD",
+  "miami marlins": "MIA",
+  "milwaukee brewers": "MIL",
+  "minnesota twins": "MIN",
+  "new york mets": "NYM",
+  "new york yankees": "NYY",
+  "oakland athletics": "ATH",
+  "athletics": "ATH",
+  "sacramento athletics": "ATH",
+  "philadelphia phillies": "PHI",
+  "pittsburgh pirates": "PIT",
+  "san diego padres": "SD",
+  "san francisco giants": "SF",
+  "seattle mariners": "SEA",
+  "st louis cardinals": "STL",
+  "st. louis cardinals": "STL",
+  "tampa bay rays": "TB",
+  "texas rangers": "TEX",
+  "toronto blue jays": "TOR",
+  "washington nationals": "WSH"
+};
+
+function normalizeMlbTeamName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[.'’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function mlbTeamKey(value) {
+  const normalized = normalizeMlbTeamName(value);
+
+  if (!normalized) return "";
+
+  if (MLB_TEAM_CANONICAL[normalized]) {
+    return MLB_TEAM_CANONICAL[normalized];
+  }
+
+  /*
+   * Safe fallback for provider naming differences.
+   * Only used if a known full MLB team name was not matched.
+   */
+  const aliases = [
+    ["diamondbacks", "ARI"],
+    ["braves", "ATL"],
+    ["orioles", "BAL"],
+    ["red sox", "BOS"],
+    ["cubs", "CHC"],
+    ["white sox", "CWS"],
+    ["reds", "CIN"],
+    ["guardians", "CLE"],
+    ["rockies", "COL"],
+    ["tigers", "DET"],
+    ["astros", "HOU"],
+    ["royals", "KC"],
+    ["angels", "LAA"],
+    ["dodgers", "LAD"],
+    ["marlins", "MIA"],
+    ["brewers", "MIL"],
+    ["twins", "MIN"],
+    ["mets", "NYM"],
+    ["yankees", "NYY"],
+    ["athletics", "ATH"],
+    ["phillies", "PHI"],
+    ["pirates", "PIT"],
+    ["padres", "SD"],
+    ["giants", "SF"],
+    ["mariners", "SEA"],
+    ["cardinals", "STL"],
+    ["rays", "TB"],
+    ["rangers", "TEX"],
+    ["blue jays", "TOR"],
+    ["nationals", "WSH"]
+  ];
+
+  for (const [alias, key] of aliases) {
+    if (
+      normalized === alias ||
+      normalized.endsWith(` ${alias}`)
+    ) {
+      return key;
+    }
+  }
+
+  return normalized.toUpperCase();
+}
+
+function mlbGameMatchKey(away, home) {
+  const awayKey = mlbTeamKey(away);
+  const homeKey = mlbTeamKey(home);
+
+  if (!awayKey || !homeKey) return "";
+
+  return `${awayKey}@${homeKey}`;
+}
+
+function mlbSelectedTeamKey(pick) {
+  const recommended = normalizeMlbTeamName(
+    pick?.recommended || pick?.bestLine || ""
+  );
+
+  const home = normalizeMlbTeamName(pick?.home);
+  const away = normalizeMlbTeamName(pick?.away);
+
+  if (home && recommended.includes(home)) {
+    return mlbTeamKey(pick.home);
+  }
+
+  if (away && recommended.includes(away)) {
+    return mlbTeamKey(pick.away);
+  }
+
+  /*
+   * Fall back to canonical team aliases if the recommendation
+   * uses a shortened provider name.
+   */
+  const homeKey = mlbTeamKey(pick?.home);
+  const awayKey = mlbTeamKey(pick?.away);
+
+  for (const teamName of [pick?.home, pick?.away]) {
+    const key = mlbTeamKey(teamName);
+    const normalizedTeam = normalizeMlbTeamName(teamName);
+
+    const words = normalizedTeam.split(" ");
+    const mascot =
+      words.length >= 2
+        ? words.slice(-2).join(" ")
+        : normalizedTeam;
+
+    if (
+      normalizedTeam &&
+      recommended.includes(normalizedTeam)
+    ) {
+      return key;
+    }
+
+    if (mascot && recommended.includes(mascot)) {
+      return key;
+    }
+  }
+
+  if (recommended.includes(homeKey.toLowerCase())) {
+    return homeKey;
+  }
+
+  if (recommended.includes(awayKey.toLowerCase())) {
+    return awayKey;
+  }
+
+  return "";
+}
+
+function apiSportsBaseballIsFinal(game) {
+  const status = String(
+    game?.status?.short ||
+    game?.status?.long ||
+    game?.status ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+
+  return [
+    "ft",
+    "final",
+    "finished",
+    "completed",
+    "game finished",
+    "ended"
+  ].includes(status);
+}
+
+function apiSportsBaseballScores(game) {
+  const awayRaw =
+    game?.scores?.away?.total ??
+    game?.scores?.away ??
+    game?.score?.away ??
+    null;
+
+  const homeRaw =
+    game?.scores?.home?.total ??
+    game?.scores?.home ??
+    game?.score?.home ??
+    null;
+
+  const awayScore = Number(awayRaw);
+  const homeScore = Number(homeRaw);
+
+  if (
+    awayRaw === null ||
+    awayRaw === undefined ||
+    homeRaw === null ||
+    homeRaw === undefined ||
+    !Number.isFinite(awayScore) ||
+    !Number.isFinite(homeScore)
+  ) {
+    return null;
+  }
+
+  return {
+    awayScore,
+    homeScore
+  };
+}
+
+function easternDateFromValue(value) {
+  const date = value ? new Date(value) : new Date();
+
+  if (Number.isNaN(date.getTime())) {
+    return getEasternReleaseDate();
+  }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+app.post("/api/picks/auto-grade-mlb", async (req, res) => {
+  try {
+    if (!requireGradeSecret(req, res)) return;
+
+    const pendingPicks = await PickLog.find({
+      result: "pending",
+      $or: [
+        { sport: /^MLB$/i },
+        { league: /^MLB$/i },
+        { sport: /^BASEBALL$/i },
+        { league: /baseball/i }
+      ]
+    });
+
+    const graded = [];
+    const skipped = [];
+
+    if (!pendingPicks.length) {
+      return res.json({
+        success: true,
+        source: "api-sports",
+        sport: "MLB",
+        checked: 0,
+        gradedCount: 0,
+        skippedCount: 0,
+        graded: [],
+        skipped: [],
+        message: "No pending MLB picks"
+      });
+    }
+
+    /*
+     * Pull only dates actually needed by pending KBETZ picks.
+     */
+    const dates = Array.from(
+      new Set(
+        pendingPicks.map((pick) =>
+          pick.releaseDate ||
+          easternDateFromValue(pick.commenceTime || pick.createdAt)
+        )
+      )
+    ).filter(Boolean);
+
+    const scoresByMatchAndDate = new Map();
+    const datesChecked = [];
+
+    for (const date of dates) {
+      try {
+        const games = await fetchApiSportsJson(
+          `https://v1.baseball.api-sports.io/games?date=${date}`
+        );
+
+        const scoreList = Array.isArray(games) ? games : [];
+
+        datesChecked.push({
+          date,
+          count: scoreList.length,
+          success: true
+        });
+
+        for (const game of scoreList) {
+          const awayName =
+            game?.teams?.away?.name ||
+            game?.away?.name ||
+            game?.awayTeam ||
+            "";
+
+          const homeName =
+            game?.teams?.home?.name ||
+            game?.home?.name ||
+            game?.homeTeam ||
+            "";
+
+          const matchKey = mlbGameMatchKey(
+            awayName,
+            homeName
+          );
+
+          if (!matchKey) continue;
+
+          scoresByMatchAndDate.set(
+            `${date}:${matchKey}`,
+            game
+          );
+        }
+      } catch (dateErr) {
+        datesChecked.push({
+          date,
+          count: 0,
+          success: false,
+          error: dateErr.message
+        });
+      }
+    }
+
+    for (const pick of pendingPicks) {
+      const date =
+        pick.releaseDate ||
+        easternDateFromValue(
+          pick.commenceTime || pick.createdAt
+        );
+
+      const matchKey = mlbGameMatchKey(
+        pick.away,
+        pick.home
+      );
+
+      const game = scoresByMatchAndDate.get(
+        `${date}:${matchKey}`
+      );
+
+      if (!game) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          release: pick.releaseLabel,
+          game: `${pick.away} @ ${pick.home}`,
+          reason: "No matching API-Sports MLB game"
+        });
+        continue;
+      }
+
+      if (!apiSportsBaseballIsFinal(game)) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          release: pick.releaseLabel,
+          game: `${pick.away} @ ${pick.home}`,
+          reason: "Game is not final",
+          status:
+            game?.status?.short ||
+            game?.status?.long ||
+            game?.status ||
+            "unknown"
+        });
+        continue;
+      }
+
+      const scores = apiSportsBaseballScores(game);
+
+      if (!scores) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          release: pick.releaseLabel,
+          game: `${pick.away} @ ${pick.home}`,
+          reason: "Final score missing"
+        });
+        continue;
+      }
+
+      const awayTeam =
+        game?.teams?.away?.name ||
+        pick.away;
+
+      const homeTeam =
+        game?.teams?.home?.name ||
+        pick.home;
+
+      const awayKey = mlbTeamKey(awayTeam);
+      const homeKey = mlbTeamKey(homeTeam);
+      const selectedTeam = mlbSelectedTeamKey(pick);
+
+      if (!selectedTeam) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          release: pick.releaseLabel,
+          game: `${pick.away} @ ${pick.home}`,
+          recommended: pick.recommended,
+          reason: "Could not identify selected MLB team"
+        });
+        continue;
+      }
+
+      let result = "push";
+
+      if (scores.awayScore !== scores.homeScore) {
+        const winner =
+          scores.awayScore > scores.homeScore
+            ? awayKey
+            : homeKey;
+
+        result =
+          selectedTeam === winner
+            ? "win"
+            : "loss";
+      }
+
+      const profit = calculatePickProfit(
+        pick,
+        result
+      );
+
+      pick.result = result;
+      pick.status = result;
+      pick.finalScore =
+        `${awayTeam} ${scores.awayScore} - ` +
+        `${homeTeam} ${scores.homeScore}`;
+      pick.notes =
+        `Auto-graded from API-Sports MLB ${date}`;
+      pick.profit = profit;
+
+      await pick.save();
+
+      graded.push({
+        pickKey: pick.pickKey,
+        release: pick.releaseLabel,
+        game: `${pick.away} @ ${pick.home}`,
+        recommended: pick.recommended,
+        result,
+        profit,
+        finalScore: pick.finalScore
+      });
+    }
+
+    return res.json({
+      success: true,
+      source: "api-sports",
+      sport: "MLB",
+      datesChecked,
+      checked: pendingPicks.length,
+      matchedGames: scoresByMatchAndDate.size,
+      gradedCount: graded.length,
+      skippedCount: skipped.length,
+      graded,
+      skipped
+    });
+  } catch (err) {
+    console.error(
+      "❌ /api/picks/auto-grade-mlb error:",
+      err.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      error:
+        err.message ||
+        "Could not auto-grade MLB picks"
+    });
+  }
+});
+
+
 app.get("/api/picks/record", async (req, res) => {
   try {
     const picks = await PickLog.find({}).lean();
