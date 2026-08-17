@@ -73,28 +73,29 @@ export default function AIPicks({
   formatOdds,
   handleViewPick,
 }) {
-  const realPicks = topAiPicks
-    .filter(
-      (game) =>
-        game?.hasOdds === true &&
-        Number.isFinite(Number(game?.homeOdds)) &&
-        Number.isFinite(Number(game?.confidence)) &&
-        Number.isFinite(Number(game?.edge)) &&
-        Number(game?.confidence) > 0 &&
-        Array.isArray(game?.books) &&
-        game.books.length > 0
-    )
-    .sort((a, b) => {
-      const confidenceDifference =
-        Number(b.confidence || 0) - Number(a.confidence || 0);
-
-      if (confidenceDifference !== 0) {
-        return confidenceDifference;
-      }
-
-      return Number(b.edge || 0) - Number(a.edge || 0);
-    })
-    .slice(0, 3);
+  /*
+   * LOCKED OFFICIAL PICKS
+   *
+   * topAiPicks is already selected from today's locked
+   * Morning / Afternoon / Evening PickLog release.
+   *
+   * Do not require live-market-only fields such as
+   * hasOdds or books here.
+   */
+  const realPicks = Array.isArray(topAiPicks)
+    ? topAiPicks
+        .filter(
+          (game) =>
+            game &&
+            (game.recommended || game.bestLine) &&
+            game.away &&
+            game.home &&
+            game.commenceTime &&
+            Number.isFinite(Number(game.confidence)) &&
+            Number(game.confidence) > 0
+        )
+        .slice(0, 3)
+    : [];
 
   const scheduleCount = Array.isArray(games) ? games.length : 0;
 
@@ -243,7 +244,7 @@ export default function AIPicks({
                 </span>
 
                 <span style={{ color: "#ffd966" }}>
-                  Books: {game.books.length}
+                  Books: {Array.isArray(game.books) ? game.books.length : "Locked"}
                 </span>
               </div>
 
@@ -285,7 +286,9 @@ export default function AIPicks({
                     fontSize: 16,
                   }}
                 >
-                  KBETZ Intelligence Engine is monitoring the board
+                  {isPro
+                    ? "No Qualified Official Picks for This Release"
+                    : "KBETZ Intelligence Engine is monitoring the board"}
                 </strong>
 
                 <span
@@ -295,9 +298,9 @@ export default function AIPicks({
                     lineHeight: 1.65,
                   }}
                 >
-                  Real schedules are available now. Picks, confidence scores,
-                  and betting edges will activate automatically when genuine
-                  sportsbook prices are available.
+                  {isPro
+                    ? "KBETZ did not identify a market that met its Official Pick quality standards for this release. We would rather pass than force a weaker selection."
+                    : "Real schedules are available now. Official Picks activate from verified sportsbook market data when a qualified release is available."}
                 </span>
               </div>
 
@@ -311,7 +314,7 @@ export default function AIPicks({
                   fontWeight: 1000,
                 }}
               >
-                WAITING FOR ODDS
+                {isPro ? "QUALITY GATE — PASS" : "WAITING FOR RELEASE"}
               </span>
             </div>
 
