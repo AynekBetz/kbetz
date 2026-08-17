@@ -252,8 +252,8 @@ export default function LeKenyaHost({
           .filter(Boolean).length;
 
         const readingDelay = Math.max(
-          4200,
-          Math.min(8500, words * 115)
+          7000,
+          Math.min(14000, words * 185)
         );
 
         advanceTimerRef.current = window.setTimeout(() => {
@@ -289,7 +289,7 @@ export default function LeKenyaHost({
 
           advanceTimerRef.current = window.setTimeout(() => {
             autoAdvanceRef.current?.();
-          }, 4500);
+          }, 8000);
         };
 
         await audio.play();
@@ -299,7 +299,7 @@ export default function LeKenyaHost({
 
         advanceTimerRef.current = window.setTimeout(() => {
           autoAdvanceRef.current?.();
-        }, 4500);
+        }, 8000);
       }
     },
     [stopNarration]
@@ -610,7 +610,8 @@ export default function LeKenyaHost({
         }
 
         .kbetz-lekenya-portrait {
-          animation: kbetzLeKenyaFloat 3.8s ease-in-out infinite;
+          animation: none;
+          transform-origin: 50% 92%;
         }
 
         .kbetz-lekenya-pointer {
@@ -742,13 +743,41 @@ export default function LeKenyaHost({
           style={{
             position: "fixed",
 
-            // Le'Kenya remains a stable live dashboard presenter.
-            // The dashboard scrolls and the feature highlight moves;
-            // the presenter herself does not chase targets around the page.
-            bottom: 82,
-            right: 22,
-            left: "auto",
-            top: "auto",
+            // During the tour Le'Kenya follows the feature being presented.
+            // Welcome/finish states remain safely anchored in the corner.
+            bottom:
+              isTour && targetRect
+                ? "auto"
+                : 82,
+
+            top:
+              isTour && targetRect
+                ? Math.max(
+                    18,
+                    Math.min(
+                      window.innerHeight - 260,
+                      targetRect.top + targetRect.height / 2 - 110
+                    )
+                  )
+                : "auto",
+
+            left:
+              isTour && targetRect
+                ? hostSide === "left"
+                  ? Math.max(
+                      18,
+                      targetRect.left - 378
+                    )
+                  : Math.min(
+                      window.innerWidth - 378,
+                      targetRect.right + 18
+                    )
+                : "auto",
+
+            right:
+              isTour && targetRect
+                ? "auto"
+                : 22,
 
             width: presenterCompact ? 74 : 360,
             maxWidth: "calc(100vw - 28px)",
