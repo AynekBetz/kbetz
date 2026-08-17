@@ -279,7 +279,7 @@ export default function LeKenyaHost({
 
           advanceTimerRef.current = window.setTimeout(() => {
             autoAdvanceRef.current?.();
-          }, 850);
+          }, 2600);
         };
 
         audio.onerror = () => {
@@ -486,7 +486,7 @@ export default function LeKenyaHost({
     scrollTimerRef.current = window.setTimeout(() => {
       updateTarget();
       playNarration(currentStep);
-    }, element ? 520 : 120);
+    }, element ? 950 : 500);
 
     return () => {
       if (scrollTimerRef.current) {
@@ -619,17 +619,14 @@ export default function LeKenyaHost({
         }
 
         @keyframes kbetzPresenterSpeak {
-          0% {
+          0%, 100% {
             transform: translateY(0) rotate(0deg) scale(1);
           }
-          30% {
-            transform: translateY(-2px) rotate(-0.8deg) scale(1.012);
+          35% {
+            transform: translateY(-0.5px) rotate(-0.08deg) scale(1.002);
           }
-          65% {
-            transform: translateY(1px) rotate(0.7deg) scale(1.008);
-          }
-          100% {
-            transform: translateY(0) rotate(0deg) scale(1);
+          70% {
+            transform: translateY(0) rotate(0.06deg) scale(1.001);
           }
         }
 
@@ -648,8 +645,8 @@ export default function LeKenyaHost({
 
         .kbetz-lekenya-portrait.is-speaking {
           animation:
-            kbetzPresenterSpeak 1.45s ease-in-out infinite,
-            kbetzPresenterGlow 2.1s ease-in-out infinite;
+            kbetzPresenterSpeak 3.8s ease-in-out infinite,
+            kbetzPresenterGlow 3.6s ease-in-out infinite;
         }
 
         .kbetz-lekenya-portrait.face-left {
