@@ -615,7 +615,7 @@ export default function LeKenyaHost({
         }
 
         .kbetz-lekenya-pointer {
-          animation: kbetzLeKenyaPulse 1.4s ease-in-out infinite;
+          animation: none;
         }
 
         @keyframes kbetzPresenterSpeak {
@@ -644,9 +644,7 @@ export default function LeKenyaHost({
         }
 
         .kbetz-lekenya-portrait.is-speaking {
-          animation:
-            kbetzPresenterSpeak 3.8s ease-in-out infinite,
-            kbetzPresenterGlow 3.6s ease-in-out infinite;
+          animation: kbetzPresenterGlow 4.8s ease-in-out infinite;
         }
 
         .kbetz-lekenya-portrait.face-left {
@@ -663,16 +661,16 @@ export default function LeKenyaHost({
 
         @media (max-width: 760px) {
           .kbetz-lekenya-host {
-            left: 12px !important;
-            right: 12px !important;
-            bottom: 72px !important;
-            width: auto !important;
+            left: 10px !important;
+            right: auto !important;
+            bottom: 68px !important;
+            width: min(390px, calc(100vw - 20px)) !important;
           }
 
           .kbetz-lekenya-portrait-wrap {
-            width: 78px !important;
-            min-width: 78px !important;
-            height: 104px !important;
+            width: 112px !important;
+            min-width: 112px !important;
+            height: 168px !important;
           }
 
           .kbetz-lekenya-description {
@@ -740,47 +738,28 @@ export default function LeKenyaHost({
           style={{
             position: "fixed",
 
-            // During the tour Le'Kenya follows the feature being presented.
-            // Welcome/finish states remain safely anchored in the corner.
-            bottom:
-              isTour && targetRect
-                ? "auto"
-                : 82,
+            // Le'Kenya is a grounded dashboard presenter.
+            // The dashboard scrolls to each subject while she remains
+            // visually planted near the bottom of the screen.
+            bottom: 74,
 
-            top:
-              isTour && targetRect
-                ? Math.max(
-                    18,
-                    Math.min(
-                      window.innerHeight - 260,
-                      targetRect.top + targetRect.height / 2 - 110
-                    )
-                  )
-                : "auto",
+            top: "auto",
 
             left:
-              isTour && targetRect
-                ? hostSide === "left"
-                  ? Math.max(
-                      18,
-                      targetRect.left - 378
-                    )
-                  : Math.min(
-                      window.innerWidth - 378,
-                      targetRect.right + 18
-                    )
+              isTour && hostSide === "left"
+                ? 20
                 : "auto",
 
             right:
-              isTour && targetRect
+              isTour && hostSide === "left"
                 ? "auto"
-                : 22,
+                : 20,
 
-            width: presenterCompact ? 74 : 360,
-            maxWidth: "calc(100vw - 28px)",
+            width: presenterCompact ? 92 : 430,
+            maxWidth: "calc(100vw - 32px)",
 
             transition:
-              "top .42s cubic-bezier(.22,1,.36,1), left .42s cubic-bezier(.22,1,.36,1), width .35s ease, opacity .32s ease, transform .32s ease",
+              "left .65s cubic-bezier(.22,1,.36,1), right .65s cubic-bezier(.22,1,.36,1), width .4s ease, opacity .35s ease",
 
             zIndex: 9000,
 
@@ -811,18 +790,16 @@ export default function LeKenyaHost({
               className="kbetz-lekenya-portrait-wrap"
               style={{
                 position: "relative",
-                width: presenterCompact ? 68 : 126,
-                minWidth: presenterCompact ? 68 : 126,
-                height: presenterCompact ? 68 : 184,
+                width: presenterCompact ? 82 : 176,
+                minWidth: presenterCompact ? 82 : 176,
+                height: presenterCompact ? 112 : 258,
                 borderRadius: 0,
                 overflow: "visible",
                 border: "none",
                 background: "transparent",
-                boxShadow: speaking
-                  ? "0 12px 28px rgba(0,0,0,.18)"
-                  : "none",
+                boxShadow: "none",
                 transition:
-                  "width .35s ease, min-width .35s ease, height .35s ease",
+                  "width .45s ease, min-width .45s ease, height .45s ease",
               }}
             >
               <img
@@ -836,8 +813,11 @@ export default function LeKenyaHost({
                 style={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover",
-                  objectPosition: "center top",
+                  objectFit: "contain",
+                  objectPosition: "center bottom",
+                  display: "block",
+                  filter:
+                    "drop-shadow(0 12px 14px rgba(0,0,0,.42))",
                 }}
               />
 
@@ -941,7 +921,7 @@ export default function LeKenyaHost({
             <div
               style={{
                 marginTop: 10,
-                paddingLeft: presenterCompact ? 0 : 140,
+                paddingLeft: presenterCompact ? 0 : 190,
               }}
             >
               <div
