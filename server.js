@@ -3915,7 +3915,7 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
     if (!pendingPicks.length) {
       return res.json({
         success: true,
-        source: "api-sports",
+        source: "therundown",
         sport: "MLB",
         checked: 0,
         gradedCount: 0,
@@ -3946,11 +3946,33 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
 
     for (const date of dates) {
       try {
-        const games = await fetchApiSportsJson(
-          `https://v1.baseball.api-sports.io/games?date=${date}`
-        );
+        if (!THERUNDOWN_API_KEY) {
+          throw new Error("THERUNDOWN_API_KEY is not configured");
+        }
 
-        const scoreList = Array.isArray(games) ? games : [];
+        const url =
+          `https://therundown.io/api/v2/sports/3/events/${date}` +
+          `?market_ids=1&affiliate_ids=19,22,23&main_line=true&offset=300`;
+
+        const response = await fetch(url, {
+          headers: {
+            "X-TheRundown-Key": THERUNDOWN_API_KEY,
+            Accept: "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          const body = await response.text().catch(() => "");
+          throw new Error(
+            `TheRundown MLB score request failed with ${response.status}: ${body.slice(0, 300)}`
+          );
+        }
+
+        const data = await response.json();
+
+        const scoreList = Array.isArray(data?.events)
+          ? data.events
+          : [];
 
         datesChecked.push({
           date,
@@ -3959,17 +3981,22 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
         });
 
         for (const game of scoreList) {
+          const teams =
+            Array.isArray(game?.teams) ? game.teams : [];
+
+          const awayObj = teams.find(
+            (team) => team?.is_away === true
+          );
+
+          const homeObj = teams.find(
+            (team) => team?.is_home === true
+          );
+
           const awayName =
-            game?.teams?.away?.name ||
-            game?.away?.name ||
-            game?.awayTeam ||
-            "";
+            `${awayObj?.name || ""} ${awayObj?.mascot || ""}`.trim();
 
           const homeName =
-            game?.teams?.home?.name ||
-            game?.home?.name ||
-            game?.homeTeam ||
-            "";
+            `${homeObj?.name || ""} ${homeObj?.mascot || ""}`.trim();
 
           const matchKey = mlbGameMatchKey(
             awayName,
@@ -4017,27 +4044,33 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
           pickKey: pick.pickKey,
           release: pick.releaseLabel,
           game: `${pick.away} @ ${pick.home}`,
-          reason: "No matching API-Sports MLB game"
+          reason: "No matching TheRundown MLB game"
         });
         continue;
       }
 
-      if (!apiSportsBaseballIsFinal(game)) {
+      if (game?.score?.event_status !== "STATUS_FINAL") {
         skipped.push({
           pickKey: pick.pickKey,
           release: pick.releaseLabel,
           game: `${pick.away} @ ${pick.home}`,
           reason: "Game is not final",
           status:
-            game?.status?.short ||
-            game?.status?.long ||
-            game?.status ||
+            game?.score?.event_status ||
+            game?.score?.event_status_detail ||
             "unknown"
         });
         continue;
       }
 
-      const scores = apiSportsBaseballScores(game);
+      const awayScore = Number(game?.score?.score_away);
+      const homeScore = Number(game?.score?.score_home);
+
+      const scores =
+        Number.isFinite(awayScore) &&
+        Number.isFinite(homeScore)
+          ? { awayScore, homeScore }
+          : null;
 
       if (!scores) {
         skipped.push({
@@ -4049,12 +4082,23 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
         continue;
       }
 
+      const gameTeams =
+        Array.isArray(game?.teams) ? game.teams : [];
+
+      const awayGameTeam = gameTeams.find(
+        (team) => team?.is_away === true
+      );
+
+      const homeGameTeam = gameTeams.find(
+        (team) => team?.is_home === true
+      );
+
       const awayTeam =
-        game?.teams?.away?.name ||
+        `${awayGameTeam?.name || ""} ${awayGameTeam?.mascot || ""}`.trim() ||
         pick.away;
 
       const homeTeam =
-        game?.teams?.home?.name ||
+        `${homeGameTeam?.name || ""} ${homeGameTeam?.mascot || ""}`.trim() ||
         pick.home;
 
       const awayKey = mlbTeamKey(awayTeam);
@@ -4097,7 +4141,7 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
         `${awayTeam} ${scores.awayScore} - ` +
         `${homeTeam} ${scores.homeScore}`;
       pick.notes =
-        `Auto-graded from API-Sports MLB ${date}`;
+        `Auto-graded from TheRundown MLB ${date}`;
       pick.profit = profit;
 
       await pick.save();
@@ -4115,7 +4159,7 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
 
     return res.json({
       success: true,
-      source: "api-sports",
+      source: "therundown",
       sport: "MLB",
       datesChecked,
       checked: pendingPicks.length,
