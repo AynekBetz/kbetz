@@ -3932,8 +3932,11 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
     const dates = Array.from(
       new Set(
         pendingPicks.map((pick) =>
-          pick.releaseDate ||
-          easternDateFromValue(pick.commenceTime || pick.createdAt)
+          easternDateFromValue(
+            pick.commenceTime ||
+            pick.createdAt ||
+            pick.releaseDate
+          )
         )
       )
     ).filter(Boolean);
@@ -3991,10 +3994,13 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
     }
 
     for (const pick of pendingPicks) {
+      // Grade against the actual scheduled game date,
+      // not the date KBETZ published the pick.
       const date =
-        pick.releaseDate ||
         easternDateFromValue(
-          pick.commenceTime || pick.createdAt
+          pick.commenceTime ||
+          pick.createdAt ||
+          pick.releaseDate
         );
 
       const matchKey = mlbGameMatchKey(
