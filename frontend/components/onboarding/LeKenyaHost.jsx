@@ -695,7 +695,7 @@ export default function LeKenyaHost({
               boxShadow:
                 "0 0 18px rgba(0,255,225,.48), 0 0 36px rgba(124,58,237,.28), inset 0 0 22px rgba(0,255,225,.055)",
               pointerEvents: "none",
-              zIndex: 8000,
+              zIndex: 999997,
               transition:
                 "top .35s ease, left .35s ease, width .35s ease, height .35s ease",
             }}
@@ -711,7 +711,7 @@ export default function LeKenyaHost({
                 hostSide === "right"
                   ? Math.max(20, targetRect.right - 14)
                   : Math.max(20, targetRect.left - 14),
-              zIndex: 8001,
+              zIndex: 999998,
               width: 34,
               height: 34,
               borderRadius: "50%",
@@ -761,7 +761,7 @@ export default function LeKenyaHost({
             transition:
               "left .65s cubic-bezier(.22,1,.36,1), right .65s cubic-bezier(.22,1,.36,1), width .4s ease, opacity .35s ease",
 
-            zIndex: 9000,
+            zIndex: 1000001,
 
             // The host itself is now visually transparent.
             // Le'Kenya + her speech panel are the visible presentation.
@@ -1077,7 +1077,7 @@ export default function LeKenyaHost({
             position: "fixed",
             right: 18,
             bottom: 18,
-            zIndex: 8500,
+            zIndex: 1000002,
             padding: "10px 14px",
             borderRadius: 999,
             border: "1px solid rgba(0,255,225,.28)",
