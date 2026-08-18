@@ -3943,11 +3943,23 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
 
     const scoresByMatchAndDate = new Map();
     const datesChecked = [];
+    const failedDates = new Map();
 
-    for (const date of dates) {
+    for (let dateIndex = 0; dateIndex < dates.length; dateIndex += 1) {
+      const date = dates[dateIndex];
+
       try {
         if (!THERUNDOWN_API_KEY) {
           throw new Error("THERUNDOWN_API_KEY is not configured");
+        }
+
+        // TheRundown free tier allows only one request per second.
+        // Space date requests apart so a multi-date grading run does
+        // not cause the next date to receive HTTP 429.
+        if (dateIndex > 0) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, 1500)
+          );
         }
 
         const url =
@@ -4011,6 +4023,11 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
           );
         }
       } catch (dateErr) {
+        failedDates.set(
+          date,
+          dateErr.message || "TheRundown date request failed"
+        );
+
         datesChecked.push({
           date,
           count: 0,
@@ -4038,6 +4055,17 @@ app.post("/api/picks/auto-grade-mlb", async (req, res) => {
       const game = scoresByMatchAndDate.get(
         `${date}:${matchKey}`
       );
+
+      if (failedDates.has(date)) {
+        skipped.push({
+          pickKey: pick.pickKey,
+          release: pick.releaseLabel,
+          game: `${pick.away} @ ${pick.home}`,
+          reason: "TheRundown date fetch failed",
+          providerError: failedDates.get(date)
+        });
+        continue;
+      }
 
       if (!game) {
         skipped.push({
