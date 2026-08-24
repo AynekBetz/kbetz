@@ -2888,20 +2888,47 @@ async function publishOfficialPickRelease(
      * This score ranks market evidence. It is NOT represented as
      * an independent predicted win probability.
      */
+    /*
+     * OFFICIAL PICKS GAME-TIME WINDOW
+     *
+     * Only consider games that:
+     * 1. Have a real scheduled start time
+     * 2. Have not already started
+     * 3. Begin within the next 48 hours
+     *
+     * This prevents a current Official Picks release from selecting
+     * a high-quality market scheduled weeks into the future.
+     */
+    const officialPickNow = Date.now();
+    const officialPickMaxTime =
+      officialPickNow + 48 * 60 * 60 * 1000;
+
     const qualifiedGames = (oddsPayload.games || [])
       .filter(
-        (game) =>
-          game &&
-          ["live", "therundown"].includes(
-            String(game.source || "").toLowerCase()
-          ) &&
-          Number.isFinite(Number(game.homeOdds)) &&
-          Number.isFinite(Number(game.awayOdds)) &&
-          Array.isArray(game.books) &&
-          game.books.length >= 2 &&
-          Number.isFinite(Number(game.marketQualityScore)) &&
-          Number.isFinite(Number(game.marketConsensusProbability)) &&
-          Number.isFinite(Number(game.movementAgreement))
+        (game) => {
+          if (!game) return false;
+
+          const commenceMs = Date.parse(game.commenceTime || "");
+
+          const gameTimeQualified =
+            Number.isFinite(commenceMs) &&
+            commenceMs > officialPickNow &&
+            commenceMs <= officialPickMaxTime;
+
+          return (
+            gameTimeQualified &&
+            ["live", "therundown"].includes(
+              String(game.source || "").toLowerCase()
+            ) &&
+            Number.isFinite(Number(game.homeOdds)) &&
+            Number.isFinite(Number(game.awayOdds)) &&
+            Array.isArray(game.books) &&
+            game.books.length >= 2 &&
+            Number.isFinite(Number(game.marketQualityScore)) &&
+            Number.isFinite(Number(game.marketConsensusProbability)) &&
+            Number.isFinite(Number(game.movementAgreement))
+          );
+        }
       )
       .map((game) => {
         const consensus =
