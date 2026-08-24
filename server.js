@@ -3193,6 +3193,78 @@ setInterval(() => {
 }, 60000);
 
 
+
+/*
+ * TEMPORARY OWNER-PROTECTED OFFICIAL PICKS RESET
+ * Removes only pending picks for one exact release date + release set.
+ */
+app.post(
+  "/api/picks/reset-official-release",
+  requireOwnerSecret,
+  async (req, res) => {
+    try {
+      const releaseDate = String(req.body?.releaseDate || "").trim();
+      const releaseSet = String(req.body?.releaseSet || "")
+        .trim()
+        .toLowerCase();
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+        return res.status(400).json({
+          success: false,
+          error: "Valid releaseDate required: YYYY-MM-DD",
+        });
+      }
+
+      if (!["morning", "afternoon", "evening"].includes(releaseSet)) {
+        return res.status(400).json({
+          success: false,
+          error: "releaseSet must be morning, afternoon, or evening",
+        });
+      }
+
+      const query = {
+        releaseDate,
+        releaseSet,
+        result: "pending",
+      };
+
+      const matches = await PickLog.find(query).lean();
+
+      if (!matches.length) {
+        return res.json({
+          success: true,
+          deletedCount: 0,
+          releaseDate,
+          releaseSet,
+          message: "No pending picks matched this release.",
+        });
+      }
+
+      const result = await PickLog.deleteMany(query);
+
+      return res.json({
+        success: true,
+        releaseDate,
+        releaseSet,
+        deletedCount: result.deletedCount,
+        deletedPicks: matches.map((pick) => ({
+          pickKey: pick.pickKey,
+          away: pick.away,
+          home: pick.home,
+          commenceTime: pick.commenceTime,
+        })),
+      });
+    } catch (err) {
+      console.error("Official release reset error:", err.message);
+
+      return res.status(500).json({
+        success: false,
+        error: "Could not reset Official Picks release",
+      });
+    }
+  }
+);
+
 app.get("/api/picks/public", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit || 50), 100);
