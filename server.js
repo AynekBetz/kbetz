@@ -1333,8 +1333,42 @@ function normalizeOddsGame(rawGame, sportLabel, index = 0) {
     },
   };
 
-  game.bestLine = pickBestLine(game);
-  game.recommended = game.bestLine;
+  /*
+   * Apply verified multi-book market analysis to live Odds API games.
+   * This supplies the market fields required by Official Picks.
+   */
+  const verifiedMarket = analyzeVerifiedMarket(game);
+
+  if (verifiedMarket) {
+    game.recommended = verifiedMarket.recommended;
+    game.bestLine = verifiedMarket.recommended;
+
+    game.confidence = verifiedMarket.marketConfidence;
+    game.marketConfidence = verifiedMarket.marketConfidence;
+    game.marketConsensusProbability =
+      verifiedMarket.marketConsensusProbability;
+
+    game.marketQualityScore =
+      verifiedMarket.marketQualityScore;
+
+    game.bestOdds = verifiedMarket.bestOdds;
+    game.bestBook = verifiedMarket.bestBook;
+
+    game.bestHomeOdds = verifiedMarket.bestHomeOdds;
+    game.bestHomeBook = verifiedMarket.bestHomeBook;
+    game.bestAwayOdds = verifiedMarket.bestAwayOdds;
+    game.bestAwayBook = verifiedMarket.bestAwayBook;
+
+    game.booksUsed = verifiedMarket.booksUsed;
+    game.movementAgreement =
+      verifiedMarket.movementAgreement;
+
+    game.edge = 0;
+    game.expectedValue = null;
+  } else {
+    game.bestLine = pickBestLine(game);
+    game.recommended = game.bestLine;
+  }
 
   return game;
 }
