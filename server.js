@@ -2632,7 +2632,7 @@ app.get("/api/apisports/games", async (req, res) => {
 /* ================= ODDS ROUTES ================= */
 
 /* ================= ODDS CACHE ================= */
-const ODDS_CACHE_MS = Number(process.env.ODDS_CACHE_MS || 300000);
+const ODDS_CACHE_MS = Number(process.env.ODDS_CACHE_MS || 1800000);
 let oddsCache = null;
 let oddsRefreshPromise = null;
 async function getCachedOdds() {
