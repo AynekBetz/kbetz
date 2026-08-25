@@ -548,11 +548,23 @@ function analyzeVerifiedMarket(game) {
     )
     .filter((value) => Number.isFinite(value) && value !== 0);
 
+  /*
+   * Measure sportsbook movement agreement by majority direction.
+   *
+   * Do not anchor agreement to whichever sportsbook happens to
+   * appear first. Only direction matters here; the raw magnitude
+   * of a provider price_delta does not increase the score.
+   */
+  const positiveMovements =
+    movementValues.filter((value) => value > 0).length;
+
+  const negativeMovements =
+    movementValues.filter((value) => value < 0).length;
+
   const movementAgreement =
     movementValues.length > 0
-      ? movementValues.filter(
-          (value) => Math.sign(value) === Math.sign(movementValues[0])
-        ).length / movementValues.length
+      ? Math.max(positiveMovements, negativeMovements) /
+        movementValues.length
       : 0;
 
   /*
