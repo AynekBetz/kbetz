@@ -77,9 +77,39 @@ export default function ParlayBuilder({
         <div style={styles.purpleOdds}>{parlayOdds}</div>
       </div>
 
-      <button style={styles.clearBtn} onClick={clearParlay}>
-        🗑 Clear Parlay
-      </button>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+          alignItems: "stretch",
+        }}
+      >
+        <a
+          href="/parlay"
+          style={{
+            color: "#ffffff",
+            textDecoration: "none",
+            fontWeight: 1000,
+            fontSize: "12px",
+            textAlign: "center",
+            padding: "11px 14px",
+            borderRadius: "999px",
+            border: "1px solid rgba(103,232,249,.65)",
+            background:
+              "linear-gradient(90deg, rgba(124,58,237,.82), rgba(6,182,212,.82))",
+            boxShadow:
+              "0 0 24px rgba(103,232,249,.22), 0 0 18px rgba(210,45,255,.16)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ✨ READY-MADE AI PARLAYS
+        </a>
+
+        <button style={styles.clearBtn} onClick={clearParlay}>
+          🗑 Clear Manual Parlay
+        </button>
+      </div>
     </section>
   );
 }
