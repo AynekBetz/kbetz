@@ -1442,6 +1442,29 @@ async function fetchActiveSports() {
   return activeSports.slice(0, ODDS_MAX_SPORTS);
 }
 
+app.get("/api/debug/active-sports", async (req, res) => {
+  try {
+    const sports = await fetchActiveSports();
+
+    return res.json({
+      success: true,
+      count: sports.length,
+      maxSports: ODDS_MAX_SPORTS,
+      sports,
+    });
+  } catch (err) {
+    console.error(
+      "❌ Active sports inspector error:",
+      err?.message || err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: err?.message || "Could not load active sports",
+    });
+  }
+});
+
 async function fetchSportOdds(sport) {
   if (!ODDS_API_KEY) {
     throw new Error("Missing ODDS_API_KEY");
