@@ -88,6 +88,71 @@ const API_SPORTS_LOOKAHEAD_DAYS = Math.min(
 let apiSportsCache = null;
 let apiSportsRefreshPromise = null;
 
+/*
+ * KBETZ PROVIDER PROTECTION
+ *
+ * Prevent repeated requests after a provider explicitly reports
+ * quota exhaustion, suspension, or rate limiting.
+ *
+ * These cooldowns live in server memory and reset naturally when
+ * Render restarts/redeploys.
+ */
+const ODDS_PROVIDER_COOLDOWN_MS = Number(
+  process.env.ODDS_PROVIDER_COOLDOWN_MS || 21600000
+); // 6 hours
+
+const APISPORTS_PROVIDER_COOLDOWN_MS = Number(
+  process.env.APISPORTS_PROVIDER_COOLDOWN_MS || 21600000
+); // 6 hours
+
+const THERUNDOWN_PROVIDER_COOLDOWN_MS = Number(
+  process.env.THERUNDOWN_PROVIDER_COOLDOWN_MS || 900000
+); // 15 minutes
+
+let oddsProviderBlockedUntil = 0;
+let apiSportsProviderBlockedUntil = 0;
+let theRundownProviderBlockedUntil = 0;
+
+function providerIsCoolingDown(blockedUntil) {
+  return Number(blockedUntil || 0) > Date.now();
+}
+
+function providerCooldownMinutes(blockedUntil) {
+  return Math.max(
+    0,
+    Math.ceil((Number(blockedUntil || 0) - Date.now()) / 60000)
+  );
+}
+
+function isOddsQuotaError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+
+  return (
+    message.includes("usage quota") ||
+    message.includes("quota has been reached") ||
+    message.includes("out of requests")
+  );
+}
+
+function isApiSportsSuspendedError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+
+  return (
+    message.includes("account is suspended") ||
+    message.includes('"access"') && message.includes("suspended")
+  );
+}
+
+function isTheRundownRateLimitError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+
+  return (
+    message.includes("rate limit") ||
+    message.includes("status 429") ||
+    message.includes("with 429")
+  );
+}
+
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || "";
 const STRIPE_WEBHOOK_SECRET =
@@ -1645,6 +1710,14 @@ async function fetchApiSportsGamesFresh() {
     return [];
   }
 
+  if (providerIsCoolingDown(apiSportsProviderBlockedUntil)) {
+    console.log(
+      `🛡️ API-Sports cooling down for approximately ` +
+        `${providerCooldownMinutes(apiSportsProviderBlockedUntil)} more minute(s).`
+    );
+    return [];
+  }
+
   const allGames = [];
   const labels = ["Baseball", "Basketball", "Soccer", "Hockey"];
 
@@ -1677,7 +1750,21 @@ async function fetchApiSportsGamesFresh() {
         `⚠️ API-Sports ${labels[index]} error for ${date}:`,
         result.reason?.message || result.reason
       );
+
+      if (isApiSportsSuspendedError(result.reason)) {
+        apiSportsProviderBlockedUntil =
+          Date.now() + APISPORTS_PROVIDER_COOLDOWN_MS;
+      }
     });
+
+    if (providerIsCoolingDown(apiSportsProviderBlockedUntil)) {
+      console.log(
+        `🛡️ API-Sports suspended response detected. ` +
+          `Pausing provider for approximately ` +
+          `${providerCooldownMinutes(apiSportsProviderBlockedUntil)} minute(s).`
+      );
+      break;
+    }
 
     const uniqueCount = new Set(
       allGames.map(
@@ -2131,6 +2218,14 @@ async function fetchTheRundownMLB() {
     return [];
   }
 
+  if (providerIsCoolingDown(theRundownProviderBlockedUntil)) {
+    console.log(
+      `🛡️ TheRundown cooling down for approximately ` +
+        `${providerCooldownMinutes(theRundownProviderBlockedUntil)} more minute(s).`
+    );
+    return [];
+  }
+
   const date = new Date().toISOString().slice(0, 10);
 
   const url =
@@ -2146,6 +2241,16 @@ async function fetchTheRundownMLB() {
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
+
+    if (response.status === 429) {
+      theRundownProviderBlockedUntil =
+        Date.now() + THERUNDOWN_PROVIDER_COOLDOWN_MS;
+
+      console.log(
+        `🛡️ TheRundown rate limit detected. Pausing provider for approximately ` +
+          `${providerCooldownMinutes(theRundownProviderBlockedUntil)} minute(s).`
+      );
+    }
 
     throw new Error(
       `TheRundown MLB request failed with ${response.status}: ${body.slice(0, 300)}`
@@ -2173,6 +2278,28 @@ async function fetchTheRundownMLB() {
 
 async function fetchOdds() {
   try {
+    if (providerIsCoolingDown(oddsProviderBlockedUntil)) {
+      console.log(
+        `🛡️ The Odds API quota cooldown is active for approximately ` +
+          `${providerCooldownMinutes(oddsProviderBlockedUntil)} more minute(s).`
+      );
+
+      try {
+        const rundownGames = await fetchTheRundownMLB();
+
+        if (rundownGames.length > 0) {
+          return rundownGames;
+        }
+      } catch (rundownError) {
+        console.log(
+          "⚠️ TheRundown fallback error:",
+          rundownError?.message || rundownError
+        );
+      }
+
+      return await fetchApiSportsGames();
+    }
+
     const activeSports = await fetchActiveSports();
 
     console.log(
@@ -2192,6 +2319,11 @@ async function fetchOdds() {
         "⚠️ Odds sport fetch failed:",
         result.reason?.message || result.reason
       );
+
+      if (isOddsQuotaError(result.reason)) {
+        oddsProviderBlockedUntil =
+          Date.now() + ODDS_PROVIDER_COOLDOWN_MS;
+      }
 
       return [];
     });
@@ -2217,6 +2349,12 @@ async function fetchOdds() {
      * The special "upcoming" key returns real live events and the next
      * upcoming events across multiple sports. It does not create demo games.
      */
+    if (providerIsCoolingDown(oddsProviderBlockedUntil)) {
+      throw new Error(
+        "Usage quota has been reached. Provider cooldown activated."
+      );
+    }
+
     console.log(
       "ℹ️ No markets from selected sports. Checking real upcoming markets."
     );
@@ -2257,6 +2395,17 @@ async function fetchOdds() {
 
       return await fetchApiSportsGames();
   } catch (err) {
+      if (isOddsQuotaError(err)) {
+        oddsProviderBlockedUntil =
+          Date.now() + ODDS_PROVIDER_COOLDOWN_MS;
+
+        console.log(
+          `🛡️ The Odds API quota exhaustion detected. ` +
+            `Pausing provider for approximately ` +
+            `${providerCooldownMinutes(oddsProviderBlockedUntil)} minute(s).`
+        );
+      }
+
       console.log("⚠️ The Odds API error:", err?.message || err);
       console.log("🛟 Switching to TheRundown fallback.");
 
