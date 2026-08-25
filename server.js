@@ -2228,11 +2228,12 @@ app.get("/api/debug/therundown-football", async (req, res) => {
 
 const THERUNDOWN_SPORTS = [
   // Current priority sports.
-  // Keep this list intentionally small to protect provider usage.
-  { id: 3, label: "MLB" },
+  // Football goes first during football season so a provider
+  // rate limit cannot allow MLB to consume the first request.
   { id: 25, label: "NFL Preseason" },
   { id: 2, label: "NFL" },
   { id: 1, label: "NCAA Football" },
+  { id: 3, label: "MLB" },
   { id: 8, label: "WNBA" },
   { id: 10, label: "MLS" },
 ];
