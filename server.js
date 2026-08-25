@@ -2212,24 +2212,45 @@ app.get("/api/debug/therundown-football", async (req, res) => {
   }
 });
 
-async function fetchTheRundownMLB() {
-  if (!THERUNDOWN_API_KEY) {
-    console.log("ℹ️ TheRundown is not configured.");
-    return [];
-  }
+/*
+ * THERUNDOWN MULTI-SPORT FALLBACK
+ *
+ * Controlled fallback for real sportsbook markets.
+ *
+ * Important:
+ * - Sequential requests instead of a large parallel burst.
+ * - Stops immediately when TheRundown returns 429.
+ * - Uses its own cache so repeated KBETZ refreshes do not refetch every sport.
+ * - Empty sports are allowed and never become fake/demo games.
+ * - Existing normalizeTheRundownEvent() continues to apply KBETZ
+ *   Verified Market analysis to usable sportsbook markets.
+ */
 
+const THERUNDOWN_SPORTS = [
+  // Current priority sports.
+  // Keep this list intentionally small to protect provider usage.
+  { id: 3, label: "MLB" },
+  { id: 25, label: "NFL Preseason" },
+  { id: 2, label: "NFL" },
+  { id: 1, label: "NCAA Football" },
+  { id: 8, label: "WNBA" },
+  { id: 10, label: "MLS" },
+];
+
+const THERUNDOWN_CACHE_MS = Number(
+  process.env.THERUNDOWN_CACHE_MS || 900000
+); // 15 minutes
+
+let theRundownCache = null;
+let theRundownRefreshPromise = null;
+
+async function fetchTheRundownSport(sport, date) {
   if (providerIsCoolingDown(theRundownProviderBlockedUntil)) {
-    console.log(
-      `🛡️ TheRundown cooling down for approximately ` +
-        `${providerCooldownMinutes(theRundownProviderBlockedUntil)} more minute(s).`
-    );
     return [];
   }
-
-  const date = new Date().toISOString().slice(0, 10);
 
   const url =
-    `https://therundown.io/api/v2/sports/3/events/${date}` +
+    `https://therundown.io/api/v2/sports/${sport.id}/events/${date}` +
     `?market_ids=1&affiliate_ids=19,22,23&main_line=true&offset=300`;
 
   const response = await fetch(url, {
@@ -2247,17 +2268,21 @@ async function fetchTheRundownMLB() {
         Date.now() + THERUNDOWN_PROVIDER_COOLDOWN_MS;
 
       console.log(
-        `🛡️ TheRundown rate limit detected. Pausing provider for approximately ` +
+        `🛡️ TheRundown rate limit detected while checking ${sport.label}. ` +
+          `Pausing provider for approximately ` +
           `${providerCooldownMinutes(theRundownProviderBlockedUntil)} minute(s).`
+      );
+    } else {
+      console.log(
+        `⚠️ TheRundown ${sport.label} request failed with ` +
+          `${response.status}: ${body.slice(0, 200)}`
       );
     }
 
-    throw new Error(
-      `TheRundown MLB request failed with ${response.status}: ${body.slice(0, 300)}`
-    );
+    return [];
   }
 
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
 
   const events = Array.isArray(data?.events)
     ? data.events
@@ -2265,15 +2290,151 @@ async function fetchTheRundownMLB() {
 
   const games = events
     .map((event, index) =>
-      normalizeTheRundownEvent(event, "MLB", index)
+      normalizeTheRundownEvent(event, sport.label, index)
     )
     .filter(Boolean);
 
   console.log(
-    `✅ TheRundown MLB loaded: ${games.length} real sportsbook games`
+    `🏟️ TheRundown ${sport.label}: ` +
+      `${events.length} event(s), ${games.length} usable sportsbook game(s)`
   );
 
   return games;
+}
+
+async function fetchTheRundownMultiSport() {
+  if (!THERUNDOWN_API_KEY) {
+    console.log("ℹ️ TheRundown is not configured.");
+    return [];
+  }
+
+  const now = Date.now();
+
+  if (
+    theRundownCache &&
+    Array.isArray(theRundownCache.games) &&
+    now - theRundownCache.updatedAt < THERUNDOWN_CACHE_MS
+  ) {
+    console.log(
+      `♻️ Using cached TheRundown multi-sport data ` +
+        `(${Math.round((now - theRundownCache.updatedAt) / 60000)} minute(s) old)`
+    );
+
+    return theRundownCache.games;
+  }
+
+  if (providerIsCoolingDown(theRundownProviderBlockedUntil)) {
+    console.log(
+      `🛡️ TheRundown cooling down for approximately ` +
+        `${providerCooldownMinutes(theRundownProviderBlockedUntil)} more minute(s).`
+    );
+
+    /*
+     * If a previous successful cache exists, preserve it during a temporary
+     * provider cooldown instead of discarding known real markets.
+     */
+    if (
+      theRundownCache &&
+      Array.isArray(theRundownCache.games) &&
+      theRundownCache.games.length > 0
+    ) {
+      console.log(
+        "♻️ Serving last successful TheRundown cache during cooldown."
+      );
+
+      return theRundownCache.games;
+    }
+
+    return [];
+  }
+
+  if (theRundownRefreshPromise) {
+    console.log("⏳ Waiting for current TheRundown refresh.");
+    return theRundownRefreshPromise;
+  }
+
+  theRundownRefreshPromise = (async () => {
+    const date = new Date().toISOString().slice(0, 10);
+    const allGames = [];
+
+    for (const sport of THERUNDOWN_SPORTS) {
+      /*
+       * Stop immediately if an earlier sport triggered provider protection.
+       * This prevents a 429 from turning into eight more wasted requests.
+       */
+      if (providerIsCoolingDown(theRundownProviderBlockedUntil)) {
+        console.log(
+          "🛡️ Stopping TheRundown multi-sport scan because cooldown is active."
+        );
+        break;
+      }
+
+      try {
+        const games = await fetchTheRundownSport(sport, date);
+        allGames.push(...games);
+      } catch (error) {
+        console.log(
+          `⚠️ TheRundown ${sport.label} error:`,
+          error?.message || error
+        );
+      }
+    }
+
+    const uniqueGames = Array.from(
+      new Map(
+        allGames.map((game) => [
+          game.id ||
+            `${game.sport}-${game.away}-${game.home}-${game.commenceTime}`,
+          game,
+        ])
+      ).values()
+    );
+
+    uniqueGames.sort((a, b) => {
+      const aTime = new Date(a.commenceTime || 0).getTime();
+      const bTime = new Date(b.commenceTime || 0).getTime();
+
+      return aTime - bTime;
+    });
+
+    /*
+     * Only replace a successful cache when this refresh actually returned
+     * real usable games. This protects KBETZ from replacing good data with
+     * an empty result caused by a temporary provider problem.
+     */
+    if (uniqueGames.length > 0) {
+      theRundownCache = {
+        games: uniqueGames.slice(0, 80),
+        updatedAt: Date.now(),
+      };
+    }
+
+    console.log(
+      `✅ TheRundown multi-sport loaded: ` +
+        `${uniqueGames.length} real sportsbook game(s)`
+    );
+
+    return uniqueGames.length > 0
+      ? uniqueGames.slice(0, 80)
+      : Array.isArray(theRundownCache?.games)
+        ? theRundownCache.games
+        : [];
+  })();
+
+  try {
+    return await theRundownRefreshPromise;
+  } finally {
+    theRundownRefreshPromise = null;
+  }
+}
+
+/*
+ * Compatibility wrapper.
+ * Existing callers can continue using this name until all fallback
+ * references are migrated below.
+ */
+async function fetchTheRundownMLB() {
+  return fetchTheRundownMultiSport();
 }
 
 async function fetchOdds() {
