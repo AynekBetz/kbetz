@@ -140,10 +140,27 @@ function uniqueQualifiedLegs(games = []) {
      * One selection per actual event.
      * Prevents duplicate/conflicting legs from the same game.
      */
-    const gameKey = String(
-      leg.id ||
-      `${leg.away}|${leg.home}|${leg.commenceTime}`
-    ).toLowerCase();
+    const awayKey = String(leg.away || "")
+      .trim()
+      .toLowerCase();
+
+    const homeKey = String(leg.home || "")
+      .trim()
+      .toLowerCase();
+
+    const commenceMs = Date.parse(leg.commenceTime || "");
+
+    const timeKey = Number.isFinite(commenceMs)
+      ? String(commenceMs)
+      : String(leg.commenceTime || "").trim().toLowerCase();
+
+    /*
+     * Deduplicate by actual matchup + scheduled start time instead
+     * of provider event ID. The same event can arrive more than once
+     * from market/provider normalization with different IDs or prices.
+     */
+    const gameKey =
+      `${awayKey}|${homeKey}|${timeKey}`;
 
     if (seenGames.has(gameKey)) continue;
 

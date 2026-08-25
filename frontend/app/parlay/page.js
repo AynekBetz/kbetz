@@ -31,6 +31,25 @@ function matchupFor(leg) {
   return `${leg?.away || "Away"} @ ${leg?.home || "Home"}`;
 }
 
+function formatGameTime(value) {
+  if (!value) return "Time TBD";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Time TBD";
+  }
+
+  return date.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
 export default function ParlayPage() {
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -275,6 +294,10 @@ export default function ParlayPage() {
                 {matchupFor(leg)}
               </p>
 
+              <p className="gameTime">
+                🕒 {formatGameTime(leg.commenceTime)}
+              </p>
+
               <div className="grid">
                 <p>
                   <span>Odds</span>
@@ -511,6 +534,14 @@ export default function ParlayPage() {
 
         .card {
           padding: 18px;
+        }
+
+        .gameTime {
+          margin: 8px 0 14px;
+          color: #67e8f9;
+          font-size: 14px;
+          font-weight: 900;
+          letter-spacing: 0.02em;
         }
 
         .top {
