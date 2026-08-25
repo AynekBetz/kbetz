@@ -4491,6 +4491,82 @@ app.get("/api/roi", requireAuth, async (req, res) => {
 });
 
 /* ================= STRIPE WEBHOOK ================= */
+
+/*
+ * Keep KBETZ PRO access synchronized with Stripe.
+ *
+ * PRO access is allowed only while Stripe reports the subscription
+ * as trialing or active.
+ *
+ * trialUsed remains true after a trial begins so the same KBETZ
+ * account cannot repeatedly start new free trials.
+ */
+async function syncStripeSubscriptionAccess(subscription) {
+  const email = normalizeEmail(subscription?.metadata?.email);
+
+  if (!email) {
+    console.warn(
+      "⚠️ Stripe subscription event missing KBETZ email metadata:",
+      subscription?.id || "unknown"
+    );
+
+    return {
+      updated: false,
+      reason: "missing_email",
+    };
+  }
+
+  const status = String(subscription?.status || "").toLowerCase();
+
+  const hasProAccess =
+    status === "trialing" ||
+    status === "active";
+
+  const update = {
+    isPro: hasProAccess,
+  };
+
+  /*
+   * Once Stripe has actually created a trial/active subscription,
+   * remember that this account has consumed its free trial.
+   */
+  if (status === "trialing" || status === "active") {
+    update.trialUsed = true;
+  }
+
+  const user = await User.findOneAndUpdate(
+    { email },
+    { $set: update },
+    { new: true }
+  );
+
+  if (!user) {
+    console.warn(
+      "⚠️ Stripe subscription belongs to unknown KBETZ account:",
+      email
+    );
+
+    return {
+      updated: false,
+      reason: "user_not_found",
+      email,
+      status,
+    };
+  }
+
+  console.log(
+    `✅ Stripe subscription sync: ${email} | status=${status} | PRO=${hasProAccess}`
+  );
+
+  return {
+    updated: true,
+    email,
+    status,
+    isPro: hasProAccess,
+  };
+}
+
+
 app.post(
   "/api/stripe/webhook",
   express.raw({ type: "application/json" }),
@@ -4530,48 +4606,58 @@ app.post(
         );
 
         if (email && session.mode === "subscription") {
+          /*
+           * Checkout completion means the customer successfully
+           * established the subscription checkout. PRO is enabled
+           * for the trial immediately. Future subscription events
+           * remain authoritative for continued access.
+           */
           await User.findOneAndUpdate(
             { email },
-            { isPro: true, trialUsed: true }
+            {
+              $set: {
+                isPro: true,
+                trialUsed: true,
+              },
+            }
           );
 
           console.log(
-            "✅ Stripe webhook activated PRO:",
+            "✅ Stripe checkout activated KBETZ trial/PRO:",
             email
           );
         }
       }
 
       if (
+        event.type === "customer.subscription.created" ||
         event.type === "customer.subscription.updated" ||
         event.type === "customer.subscription.deleted"
       ) {
-        const subscription = event.data.object;
+        await syncStripeSubscriptionAccess(event.data.object);
+      }
 
-        const email = normalizeEmail(
-          subscription.metadata?.email
+      /*
+       * A failed invoice is useful operational information.
+       * Stripe subscription status remains authoritative for access.
+       * We do not guess at access from the invoice alone.
+       */
+      if (event.type === "invoice.payment_failed") {
+        const invoice = event.data.object;
+
+        console.warn(
+          "⚠️ Stripe invoice payment failed:",
+          invoice?.id || "unknown"
         );
+      }
 
-        if (email) {
-          const active =
-            event.type !== "customer.subscription.deleted" &&
-            (
-              subscription.status === "active" ||
-              subscription.status === "trialing"
-            );
+      if (event.type === "invoice.paid") {
+        const invoice = event.data.object;
 
-          await User.findOneAndUpdate(
-            { email },
-            { isPro: active }
-          );
-
-          console.log(
-            `✅ Stripe subscription ${subscription.status}:`,
-            email,
-            "PRO:",
-            active
-          );
-        }
+        console.log(
+          "✅ Stripe invoice paid:",
+          invoice?.id || "unknown"
+        );
       }
 
       return res.json({ received: true });
