@@ -3279,20 +3279,119 @@ app.post(
 
 app.get("/api/picks/public", async (req, res) => {
   try {
-    const limit = Math.min(Number(req.query.limit || 50), 100);
+    const limit = Math.min(
+      Math.max(Number(req.query.limit || 50), 1),
+      100
+    );
 
-    const picks = await PickLog.find({})
+    /*
+     * Keep complete Morning / Afternoon / Evening release history,
+     * but calculate KBETZ performance from unique actual selections.
+     *
+     * The same game + recommendation may legitimately appear in more
+     * than one locked release. That history stays visible, but it must
+     * not multiply the overall W-L-P record or profit.
+     */
+    /*
+     * Load the complete record for lifetime performance calculations.
+     * Only the release-history response is limited for payload size.
+     */
+    const allPicks = await PickLog.find({})
       .sort({ createdAt: -1 })
-      .limit(limit)
       .lean();
+
+    const picks = allPicks.slice(0, limit);
+
+    const uniquePerformanceMap = new Map();
+
+    for (const pick of allPicks) {
+      const gameIdentity = String(
+        pick.gameId ||
+        `${pick.away || ""}|${pick.home || ""}|${pick.commenceTime || ""}`
+      )
+        .trim()
+        .toLowerCase();
+
+      const recommendation = String(
+        pick.recommended || pick.bestLine || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      const performanceKey =
+        `${gameIdentity}|${recommendation}`;
+
+      /*
+       * Picks are newest-first. Keep the newest stored copy as the
+       * representative record for this actual selection.
+       */
+      if (!uniquePerformanceMap.has(performanceKey)) {
+        uniquePerformanceMap.set(performanceKey, pick);
+      }
+    }
+
+    const performancePicks =
+      Array.from(uniquePerformanceMap.values());
+
+    const performance = performancePicks.reduce(
+      (summary, pick) => {
+        const result = String(
+          pick.result || pick.status || "pending"
+        ).toLowerCase();
+
+        if (result === "win") summary.wins += 1;
+        else if (result === "loss") summary.losses += 1;
+        else if (result === "push") summary.pushes += 1;
+        else summary.pending += 1;
+
+        if (
+          result === "win" ||
+          result === "loss" ||
+          result === "push"
+        ) {
+          summary.profit += Number(pick.profit || 0);
+        }
+
+        return summary;
+      },
+      {
+        wins: 0,
+        losses: 0,
+        pushes: 0,
+        pending: 0,
+        profit: 0,
+      }
+    );
+
+    performance.profit =
+      Number(performance.profit.toFixed(2));
+
+    performance.graded =
+      performance.wins +
+      performance.losses +
+      performance.pushes;
+
+    performance.totalUniquePicks =
+      performancePicks.length;
 
     res.json({
       success: true,
+
+      /*
+       * Backward-compatible release-history fields.
+       */
       count: picks.length,
       picks,
+
+      /*
+       * Deduplicated public performance record.
+       */
+      performance,
+      performancePicks,
     });
   } catch (err) {
     console.error("❌ /api/picks/public error:", err.message);
+
     res.status(500).json({
       success: false,
       error: "Could not load public picks",
