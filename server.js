@@ -2037,6 +2037,94 @@ app.get(
   }
 );
 
+app.get("/api/debug/therundown-football", async (req, res) => {
+  try {
+    if (!THERUNDOWN_API_KEY) {
+      return res.status(503).json({
+        success: false,
+        configured: false,
+        error: "THERUNDOWN_API_KEY is not configured",
+      });
+    }
+
+    const date = new Date().toISOString().slice(0, 10);
+
+    const sports = [
+      { id: 1, label: "NCAA Football" },
+      { id: 2, label: "NFL" },
+    ];
+
+    const results = [];
+
+    for (const sport of sports) {
+      const url =
+        `https://therundown.io/api/v2/sports/${sport.id}/events/${date}` +
+        `?market_ids=1&affiliate_ids=19,22,23&main_line=true&offset=300`;
+
+      const response = await fetch(url, {
+        headers: {
+          "X-TheRundown-Key": THERUNDOWN_API_KEY,
+          Accept: "application/json",
+        },
+      });
+
+      const raw = await response.text();
+
+      let data = null;
+
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = null;
+      }
+
+      const events = Array.isArray(data?.events)
+        ? data.events
+        : [];
+
+      const normalized = events
+        .map((event, index) =>
+          normalizeTheRundownEvent(event, sport.label, index)
+        )
+        .filter(Boolean);
+
+      results.push({
+        sportId: sport.id,
+        sport: sport.label,
+        providerStatus: response.status,
+        success: response.ok,
+        rawEvents: events.length,
+        usableGames: normalized.length,
+        error:
+          response.ok
+            ? null
+            : data?.message ||
+              data?.error ||
+              raw.slice(0, 200),
+      });
+    }
+
+    return res.json({
+      success: true,
+      provider: "TheRundown",
+      date,
+      results,
+    });
+  } catch (err) {
+    console.error(
+      "❌ TheRundown football diagnostic error:",
+      err?.message || err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error:
+        err?.message ||
+        "Could not inspect TheRundown football",
+    });
+  }
+});
+
 async function fetchTheRundownMLB() {
   if (!THERUNDOWN_API_KEY) {
     console.log("ℹ️ TheRundown is not configured.");
