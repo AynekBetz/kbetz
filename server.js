@@ -1993,6 +1993,27 @@ function normalizeTheRundownEvent(event, sportLabel = "MLB", index = 0) {
 
     pitcherHome: event?.pitcher_home?.name || null,
     pitcherAway: event?.pitcher_away?.name || null,
+
+    awayRecord: awayTeam?.record || null,
+    homeRecord: homeTeam?.record || null,
+
+    awayWinPct: (() => {
+      const match = String(awayTeam?.record || "").match(/^(\d+)-(\d+)$/);
+      if (!match) return null;
+      const wins = Number(match[1]);
+      const losses = Number(match[2]);
+      const total = wins + losses;
+      return total > 0 ? Number((wins / total).toFixed(4)) : null;
+    })(),
+
+    homeWinPct: (() => {
+      const match = String(homeTeam?.record || "").match(/^(\d+)-(\d+)$/);
+      if (!match) return null;
+      const wins = Number(match[1]);
+      const losses = Number(match[2]);
+      const total = wins + losses;
+      return total > 0 ? Number((wins / total).toFixed(4)) : null;
+    })(),
   };
 
   // Apply verified multi-book market analysis to TheRundown MLB.
@@ -3415,17 +3436,76 @@ async function publishOfficialPickRelease(
          * This is a selection score only — NOT customer-facing
          * win probability and NOT fabricated predictive edge.
          */
+        /*
+         * KBETZ V4 MLB TEAM-STRENGTH CONFIRMATION
+         *
+         * Season record is supporting evidence only.
+         * Gaps below 5 percentage points are neutral.
+         * Disagreement penalty is capped at -4 ranking points.
+         */
+        let recordGapPct = 0;
+        let recordAgreement = null;
+        let recordAdjustment = 0;
+
+        const isMlb =
+          String(game.sport || "").toUpperCase() === "MLB";
+
+        const homeWinPct = game.homeWinPct == null ? NaN : Number(game.homeWinPct);
+        const awayWinPct = game.awayWinPct == null ? NaN : Number(game.awayWinPct);
+
+        if (
+          isMlb &&
+          Number.isFinite(homeWinPct) &&
+          Number.isFinite(awayWinPct)
+        ) {
+          recordGapPct =
+            Math.abs(homeWinPct - awayWinPct) * 100;
+
+          const recordLeader =
+            homeWinPct > awayWinPct
+              ? String(game.home || "")
+              : awayWinPct > homeWinPct
+                ? String(game.away || "")
+                : "";
+
+          const recommendedTeam = String(
+            game.recommended || game.bestLine || ""
+          )
+            .replace(/\s+ML$/i, "")
+            .trim();
+
+          if (recordLeader && recommendedTeam) {
+            recordAgreement =
+              recommendedTeam === recordLeader;
+
+            if (recordGapPct >= 5) {
+              const recordSignalStrength = Math.min(
+                Math.max((recordGapPct - 5) / 15, 0),
+                1
+              );
+
+              recordAdjustment =
+                recordSignalStrength *
+                (recordAgreement ? 0 : -4);
+            }
+          }
+        }
+
         const selectionScore =
           quality * 0.50 +
           consensus * 0.30 +
           Math.min(books / 3, 1) * 10 +
-          (movement > 0 ? movement * 0.10 : 0);
+          (movement > 0 ? movement * 0.10 : 0) +
+          recordAdjustment;
 
         return {
           ...game,
           kbetzQualified: qualified,
           kbetzSelectionScore:
             Number(selectionScore.toFixed(2)),
+          kbetzRecordGapPct: Number(recordGapPct.toFixed(2)),
+          kbetzRecordAgreement: recordAgreement,
+          kbetzRecordAdjustment: Number(recordAdjustment.toFixed(2)),
         };
       })
       .filter((game) => game.kbetzQualified === true);
