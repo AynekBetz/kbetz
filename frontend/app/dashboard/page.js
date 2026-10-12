@@ -1444,7 +1444,24 @@ export default function Dashboard() {
     }
   };
 
-  const topAiPicks = games.filter((g) => Number(g.edge) > 0).slice(0, 3);
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  const topAiPicks = games
+    .filter((g) => {
+      const sportText = String(g.sport || g.league || g.sportTitle || "").toLowerCase();
+      const gameDate = String(g.commenceTime || g.commence_time || g.date || "").slice(0, 10);
+
+      const isNfl =
+        sportText.includes("nfl") ||
+        sportText.includes("americanfootball_nfl") ||
+        sportText.includes("football");
+
+      const isToday = !gameDate || gameDate === todayKey;
+
+      return isNfl && isToday && Number(g.edge) > 0;
+    })
+    .sort((a, b) => Number(b.edge || 0) - Number(a.edge || 0))
+    .slice(0, 4);
 
   const roiValue = roi?.roi ?? (isPro ? "18.47" : "--");
   const profitValue = roi?.profit ?? (isPro ? "4529.10" : "--");
@@ -1804,7 +1821,7 @@ export default function Dashboard() {
 
               <div style={styles.booksCell}>
                 {(g.books || [{ name: "DK" }, { name: "FD" }, { name: "MGM" }])
-                  .slice(0, 3)
+                  .slice(0, 4)
                   .map((b, idx) => (
                     <span key={idx} style={styles.bookBadge}>
                       {b.name?.slice(0, 2) || "BK"}
