@@ -1466,7 +1466,7 @@ export default function Dashboard() {
         ? pick
         : pick?.team || pick?.pick || pick?.name || "AI Pick";
 
-    alert(`KBETZ AI Pick: ${label}`);
+    alert(`KBETZ NFL Pick: ${label}`);
   };
 
   const handleViewHistory = () => {
@@ -1571,7 +1571,7 @@ export default function Dashboard() {
         <div style={styles.iconPink}>🧠</div>
 
         <div>
-          <h2 style={styles.featureTitle}>AI PICKS</h2>
+          <h2 style={styles.featureTitle}>NFL TOP 4 PICKS TODAY</h2>
           <p style={styles.featureSubtitle}>Top AI generated edges in real-time</p>
         </div>
 
