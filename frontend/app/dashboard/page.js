@@ -33,6 +33,119 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const existing = document.getElementById("kbetz-inline-grid-mobile-fix");
+    if (existing) existing.remove();
+
+    const style = document.createElement("style");
+    style.id = "kbetz-inline-grid-mobile-fix";
+    style.innerHTML = `
+      @media (max-width: 768px) {
+        html,
+        body,
+        body > div {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }
+
+        body div {
+          box-sizing: border-box !important;
+        }
+
+        body div[style*="grid-template-columns"] {
+          grid-template-columns: 1fr !important;
+          width: 100% !important;
+          max-width: calc(100vw - 16px) !important;
+          overflow-x: hidden !important;
+        }
+
+        body section[style*="grid-template-columns"] {
+          grid-template-columns: 1fr !important;
+          width: 100% !important;
+          max-width: calc(100vw - 16px) !important;
+          overflow-x: hidden !important;
+        }
+
+        body div[style*="display: grid"],
+        body section[style*="display: grid"] {
+          grid-template-columns: 1fr !important;
+          width: 100% !important;
+          max-width: calc(100vw - 16px) !important;
+        }
+
+        body div[style*="display: flex"],
+        body section[style*="display: flex"] {
+          flex-wrap: wrap !important;
+          width: 100% !important;
+          max-width: calc(100vw - 16px) !important;
+        }
+
+        body div[style*="min-width"],
+        body section[style*="min-width"],
+        body article[style*="min-width"],
+        body button[style*="min-width"] {
+          min-width: 0 !important;
+        }
+
+        body div[style*="width"],
+        body section[style*="width"],
+        body article[style*="width"] {
+          max-width: calc(100vw - 16px) !important;
+        }
+
+        body button,
+        body a {
+          max-width: 100% !important;
+          white-space: normal !important;
+        }
+
+        body img {
+          max-width: 100% !important;
+          height: auto !important;
+          object-fit: contain !important;
+        }
+
+        body h1,
+        body h2,
+        body h3,
+        body p,
+        body span {
+          max-width: 100% !important;
+          overflow-wrap: break-word !important;
+        }
+
+        body h1 {
+          font-size: clamp(30px, 11vw, 44px) !important;
+          line-height: 1 !important;
+        }
+
+        body h2 {
+          font-size: clamp(26px, 9vw, 38px) !important;
+          line-height: 1.05 !important;
+        }
+
+        #kbetz-quick-links {
+          width: calc(100vw - 16px) !important;
+          max-width: calc(100vw - 16px) !important;
+          left: 8px !important;
+          right: 8px !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      const node = document.getElementById("kbetz-inline-grid-mobile-fix");
+      if (node) node.remove();
+    };
+  }, []);
+
+
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const existing = document.getElementById("kbetz-mobile-shrink-final");
     if (existing) existing.remove();
 
