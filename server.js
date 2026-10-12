@@ -1635,8 +1635,7 @@ app.post("/api/pro/confirm", async (req, res) => {
     const paid =
       session.payment_status === "paid" ||
       session.status === "complete" ||
-      session.subscription?.status === "active" ||
-      session.subscription?.status === "trialing";
+      session.subscription?.status === "active";
 
     if (!email) {
       return res.status(400).json({
