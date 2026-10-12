@@ -33,6 +33,183 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const existing = document.getElementById("kbetz-mobile-shrink-final");
+    if (existing) existing.remove();
+
+    const style = document.createElement("style");
+    style.id = "kbetz-mobile-shrink-final";
+    style.innerHTML = `
+      @media (max-width: 768px) {
+        html,
+        body {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }
+
+        main {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+          padding-left: 10px !important;
+          padding-right: 10px !important;
+        }
+
+        main * {
+          max-width: 100% !important;
+          box-sizing: border-box !important;
+        }
+
+        img {
+          max-width: 100% !important;
+          height: auto !important;
+          object-fit: contain !important;
+        }
+
+        h1,
+        h2,
+        h3,
+        p,
+        span,
+        div,
+        button,
+        a {
+          overflow-wrap: break-word !important;
+          word-break: normal !important;
+        }
+
+        h1 {
+          font-size: clamp(34px, 13vw, 54px) !important;
+          line-height: 0.95 !important;
+          letter-spacing: 0.02em !important;
+        }
+
+        h2 {
+          font-size: clamp(24px, 8vw, 36px) !important;
+        }
+
+        h3 {
+          font-size: clamp(20px, 7vw, 28px) !important;
+        }
+
+        p,
+        span {
+          font-size: clamp(14px, 4.2vw, 18px) !important;
+        }
+
+        button,
+        a {
+          white-space: normal !important;
+        }
+
+        section,
+        article,
+        header,
+        footer {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }
+
+        div[style*="grid-template-columns"] {
+          grid-template-columns: 1fr !important;
+        }
+
+        div[style*="display: grid"],
+        section[style*="display: grid"] {
+          grid-template-columns: 1fr !important;
+        }
+
+        div[style*="display: flex"],
+        section[style*="display: flex"] {
+          flex-wrap: wrap !important;
+        }
+
+        div[style*="font-size"] {
+          max-width: 100% !important;
+        }
+
+        div[style*="min-width"],
+        button[style*="min-width"],
+        a[style*="min-width"] {
+          min-width: 0 !important;
+        }
+
+        #kbetz-quick-links {
+          position: fixed !important;
+          left: 8px !important;
+          right: 8px !important;
+          bottom: 70px !important;
+          width: calc(100vw - 16px) !important;
+          max-width: calc(100vw - 16px) !important;
+          display: flex !important;
+          flex-wrap: wrap !important;
+          justify-content: center !important;
+          gap: 6px !important;
+          z-index: 9999 !important;
+        }
+
+        #kbetz-quick-links a {
+          flex: 1 1 44% !important;
+          min-width: 0 !important;
+          max-width: 170px !important;
+          font-size: 10px !important;
+          padding: 8px 6px !important;
+          text-align: center !important;
+          white-space: nowrap !important;
+        }
+
+        #kbetz-session-control {
+          transform: scale(0.82) !important;
+          transform-origin: bottom right !important;
+          right: 8px !important;
+          bottom: 8px !important;
+          top: auto !important;
+        }
+
+        [class*="guide"],
+        [id*="guide"],
+        [class*="Guide"],
+        [id*="Guide"] {
+          max-width: calc(100vw - 20px) !important;
+          overflow: hidden !important;
+        }
+      }
+
+      @media (max-width: 430px) {
+        main {
+          padding-left: 6px !important;
+          padding-right: 6px !important;
+        }
+
+        h1 {
+          font-size: clamp(30px, 12vw, 46px) !important;
+        }
+
+        #kbetz-quick-links {
+          bottom: 66px !important;
+        }
+
+        #kbetz-quick-links a {
+          font-size: 9px !important;
+          padding: 7px 5px !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      const node = document.getElementById("kbetz-mobile-shrink-final");
+      if (node) node.remove();
+    };
+  }, []);
+
+
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const existing = document.getElementById("kbetz-hard-phone-clamp");
     if (existing) existing.remove();
 
