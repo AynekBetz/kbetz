@@ -33,6 +33,99 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const existing = document.getElementById("kbetz-sports-wallpaper-v1");
+    if (existing) existing.remove();
+
+    const style = document.createElement("style");
+    style.id = "kbetz-sports-wallpaper-v1";
+    style.innerHTML = `
+      @keyframes kbetzOddsFloat {
+        0% { transform: translate3d(0, 0, 0) rotate(-8deg); }
+        50% { transform: translate3d(-26px, 18px, 0) rotate(-8deg); }
+        100% { transform: translate3d(0, 0, 0) rotate(-8deg); }
+      }
+
+      @keyframes kbetzGlowPulse {
+        0%, 100% { opacity: 0.44; filter: blur(0px); }
+        50% { opacity: 0.78; filter: blur(1px); }
+      }
+
+      body {
+        background:
+          radial-gradient(circle at 12% 18%, rgba(255, 0, 221, 0.24), transparent 28%),
+          radial-gradient(circle at 88% 20%, rgba(0, 255, 255, 0.28), transparent 30%),
+          radial-gradient(circle at 50% 95%, rgba(119, 0, 255, 0.34), transparent 34%),
+          linear-gradient(135deg, #02040a 0%, #061321 42%, #02030a 100%) !important;
+        overflow-x: hidden !important;
+      }
+
+      body::before {
+        content: "+145  -110  68%  32%  O/U 47.5  NFL  TOP 4  +3.5  -105  +120  72%  28%  -130  +250";
+        position: fixed;
+        inset: -20vh -40vw auto -20vw;
+        height: 45vh;
+        z-index: 0;
+        pointer-events: none;
+        color: rgba(103, 232, 249, 0.18);
+        font-size: clamp(28px, 7vw, 86px);
+        font-weight: 1000;
+        letter-spacing: 0.18em;
+        white-space: nowrap;
+        text-shadow:
+          0 0 18px rgba(34, 211, 238, 0.55),
+          0 0 32px rgba(217, 70, 239, 0.34);
+        animation: kbetzOddsFloat 11s ease-in-out infinite;
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(34,211,238,0.18) 1px, transparent 1px),
+          linear-gradient(0deg, rgba(217,70,239,0.10) 1px, transparent 1px),
+          radial-gradient(circle at 14% 78%, rgba(34,211,238,0.22), transparent 18%),
+          radial-gradient(circle at 90% 72%, rgba(217,70,239,0.24), transparent 20%);
+        background-size: 80px 80px, 80px 80px, auto, auto;
+        opacity: 0.38;
+        animation: kbetzGlowPulse 7s ease-in-out infinite;
+      }
+
+      body > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      @media (max-width: 768px) {
+        body::before {
+          top: 8vh;
+          left: -70vw;
+          font-size: clamp(22px, 10vw, 48px);
+          opacity: 0.75;
+        }
+
+        body::after {
+          opacity: 0.26;
+          background-size: 54px 54px, 54px 54px, auto, auto;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      const node = document.getElementById("kbetz-sports-wallpaper-v1");
+      if (node) node.remove();
+    };
+  }, []);
+
+
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const existing = document.getElementById("kbetz-inline-grid-mobile-fix");
     if (existing) existing.remove();
 
