@@ -33,6 +33,136 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    const existing = document.getElementById("kbetz-hard-phone-clamp");
+    if (existing) existing.remove();
+
+    const style = document.createElement("style");
+    style.id = "kbetz-hard-phone-clamp";
+    style.innerHTML = `
+      @media (max-width: 768px) {
+        html,
+        body {
+          width: 100vw !important;
+          max-width: 100vw !important;
+          overflow-x: hidden !important;
+        }
+
+        body > * {
+          max-width: 100vw !important;
+          overflow-x: hidden !important;
+        }
+
+        main,
+        main * {
+          max-width: 100% !important;
+          min-width: 0 !important;
+          box-sizing: border-box !important;
+        }
+
+        main {
+          width: 100vw !important;
+          padding-left: 8px !important;
+          padding-right: 8px !important;
+          overflow-x: hidden !important;
+        }
+
+        main > div,
+        main section,
+        main article,
+        main header,
+        main footer {
+          width: 100% !important;
+          max-width: 100% !important;
+          overflow-x: hidden !important;
+        }
+
+        main div[style*="display: grid"],
+        main div[style*="display:grid"],
+        main section[style*="display: grid"],
+        main section[style*="display:grid"] {
+          grid-template-columns: 1fr !important;
+        }
+
+        main div[style*="min-width"],
+        main section[style*="min-width"],
+        main article[style*="min-width"] {
+          min-width: 0 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+
+        main div[style*="width:"],
+        main section[style*="width:"],
+        main article[style*="width:"] {
+          max-width: 100% !important;
+        }
+
+        table,
+        thead,
+        tbody,
+        tr,
+        td,
+        th {
+          max-width: 100% !important;
+        }
+
+        table {
+          display: block !important;
+          width: 100% !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
+        pre,
+        code {
+          white-space: pre-wrap !important;
+          word-break: break-word !important;
+        }
+
+        h1,
+        h2,
+        h3,
+        p,
+        span,
+        strong,
+        div {
+          overflow-wrap: anywhere !important;
+        }
+
+        button,
+        a,
+        input,
+        select {
+          max-width: 100% !important;
+          white-space: normal !important;
+        }
+
+        #kbetz-quick-links {
+          width: calc(100vw - 16px) !important;
+          max-width: calc(100vw - 16px) !important;
+          left: 8px !important;
+          right: 8px !important;
+        }
+
+        #kbetz-session-control {
+          max-width: calc(100vw - 20px) !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      const node = document.getElementById("kbetz-hard-phone-clamp");
+      if (node) node.remove();
+    };
+  }, []);
+
+
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const existing = document.getElementById("kbetz-final-phone-fit");
     if (existing) existing.remove();
 
