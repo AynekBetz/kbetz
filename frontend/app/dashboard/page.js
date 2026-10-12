@@ -52,10 +52,14 @@ export default function Dashboard() {
 
       body {
         background:
-          radial-gradient(circle at 12% 18%, rgba(255, 0, 221, 0.42), transparent 30%),
-          radial-gradient(circle at 88% 20%, rgba(0, 255, 255, 0.44), transparent 32%),
-          radial-gradient(circle at 50% 95%, rgba(119, 0, 255, 0.52), transparent 38%),
+          linear-gradient(rgba(2, 4, 10, 0.70), rgba(2, 4, 10, 0.84)),
+          radial-gradient(circle at 12% 18%, rgba(255, 0, 221, 0.36), transparent 30%),
+          radial-gradient(circle at 88% 20%, rgba(0, 255, 255, 0.36), transparent 32%),
+          url("/kbetz-stadium-wallpaper.png"),
           linear-gradient(135deg, #02040a 0%, #061321 42%, #02030a 100%) !important;
+        background-size: cover, auto, auto, cover, auto !important;
+        background-position: center, center, center, center top, center !important;
+        background-attachment: fixed !important;
         overflow-x: hidden !important;
       }
 
