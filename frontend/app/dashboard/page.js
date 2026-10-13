@@ -568,7 +568,7 @@ export default function Dashboard() {
         width: 100% !important;
         max-width: 100% !important;
         overflow-x: hidden !important;
-        background: #020707 !important;
+        background: transparent !important;
       }
 
       * {
@@ -2033,7 +2033,7 @@ const styles = {
     minHeight: "100vh",
     padding: 28,
     background:
-      "radial-gradient(circle at top left, rgba(0,255,225,0.18), transparent 26%), radial-gradient(circle at top right, rgba(180,48,255,0.32), transparent 32%), linear-gradient(180deg,#020407 0%,#02070a 45%,#000 100%)",
+      "radial-gradient(circle at top left, rgba(0,255,225,0.10), transparent 26%), radial-gradient(circle at top right, rgba(180,48,255,0.14), transparent 32%), rgba(0,0,0,0.18)",
     color: "#ffffff",
     fontFamily:
       "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
