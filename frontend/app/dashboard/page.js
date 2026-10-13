@@ -46,13 +46,13 @@ export default function Dashboard() {
       }
 
       @keyframes kbetzGlowPulse {
-        0%, 100% { opacity: 0.44; filter: blur(0px); }
+        0%, 100% { opacity: 0.10; filter: blur(0px); }
         50% { opacity: 0.78; filter: blur(1px); }
       }
 
       body {
         background:
-          linear-gradient(rgba(2, 4, 10, 0.38), rgba(2, 4, 10, 0.64)),
+          linear-gradient(rgba(2, 4, 10, 0.08), rgba(2, 4, 10, 0.34)),
           radial-gradient(circle at 12% 18%, rgba(255, 0, 221, 0.36), transparent 30%),
           radial-gradient(circle at 88% 20%, rgba(0, 255, 255, 0.36), transparent 32%),
           url("/kbetz-stadium-wallpaper.png"),
@@ -70,7 +70,7 @@ export default function Dashboard() {
         height: 45vh;
         z-index: 0;
         pointer-events: none;
-        color: rgba(103, 232, 249, 0.22);
+        color: rgba(103, 232, 249, 0.10);
         font-size: clamp(28px, 7vw, 86px);
         font-weight: 1000;
         letter-spacing: 0.18em;
@@ -93,7 +93,7 @@ export default function Dashboard() {
           radial-gradient(circle at 14% 78%, rgba(34,211,238,0.22), transparent 18%),
           radial-gradient(circle at 90% 72%, rgba(217,70,239,0.24), transparent 20%);
         background-size: 80px 80px, 80px 80px, auto, auto;
-        opacity: 0.62;
+        opacity: 0.12;
         animation: kbetzGlowPulse 7s ease-in-out infinite;
       }
 
@@ -107,11 +107,11 @@ export default function Dashboard() {
           top: 8vh;
           left: -70vw;
           font-size: clamp(22px, 10vw, 48px);
-          opacity: 0.95;
+          opacity: 0.16;
         }
 
         body::after {
-          opacity: 0.44;
+          opacity: 0.10;
           background-size: 54px 54px, 54px 54px, auto, auto;
         }
       }
