@@ -21,8 +21,7 @@ export default function HomePage() {
     <main
       style={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at 18% 20%, rgba(0,255,214,.18), transparent 30%), radial-gradient(circle at 86% 18%, rgba(210,45,255,.24), transparent 30%), linear-gradient(135deg, #020707, #041313 42%, #090212)",
+        background: "linear-gradient(rgba(0,0,0,.28), rgba(0,0,0,.64)), radial-gradient(circle at 18% 20%, rgba(0,255,214,.18), transparent 30%), radial-gradient(circle at 86% 18%, rgba(210,45,255,.24), transparent 30%), url('/kbetz-stadium-wallpaper.png') center top / cover fixed no-repeat",
         color: "#fff",
         display: "flex",
         alignItems: "center",
@@ -36,7 +35,7 @@ export default function HomePage() {
           borderRadius: 20,
           border: "1px solid rgba(0,255,214,.45)",
           background:
-            "linear-gradient(145deg, rgba(3,19,22,.95), rgba(12,3,24,.93))",
+            "linear-gradient(145deg, rgba(3,19,22,.72), rgba(12,3,24,.68))",
           boxShadow: "0 0 38px rgba(0,255,214,.18)",
           textAlign: "center",
         }}
