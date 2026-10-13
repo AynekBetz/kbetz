@@ -52,7 +52,7 @@ export default function Dashboard() {
 
       body {
         background:
-          linear-gradient(rgba(2, 4, 10, 0.70), rgba(2, 4, 10, 0.84)),
+          linear-gradient(rgba(2, 4, 10, 0.38), rgba(2, 4, 10, 0.64)),
           radial-gradient(circle at 12% 18%, rgba(255, 0, 221, 0.36), transparent 30%),
           radial-gradient(circle at 88% 20%, rgba(0, 255, 255, 0.36), transparent 32%),
           url("/kbetz-stadium-wallpaper.png"),
@@ -70,7 +70,7 @@ export default function Dashboard() {
         height: 45vh;
         z-index: 0;
         pointer-events: none;
-        color: rgba(103, 232, 249, 0.34);
+        color: rgba(103, 232, 249, 0.22);
         font-size: clamp(28px, 7vw, 86px);
         font-weight: 1000;
         letter-spacing: 0.18em;
@@ -119,7 +119,14 @@ export default function Dashboard() {
 
     document.head.appendChild(style);
 
-    return () => {
+    
+      if (!document.getElementById("kbetz-stadium-visibility-layer")) {
+        const bg = document.createElement("div");
+        bg.id = "kbetz-stadium-visibility-layer";
+        document.body.prepend(bg);
+      }
+
+      return () => {
       const node = document.getElementById("kbetz-sports-wallpaper-v1");
       if (node) node.remove();
     };
