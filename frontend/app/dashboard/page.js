@@ -1335,6 +1335,12 @@ export default function Dashboard() {
     const source = Array.isArray(rawGames) && rawGames.length ? rawGames : fallbackGames;
 
     return source.map((g, index) => ({
+      ...g,
+      commenceTime:
+        g.commenceTime || g.commence_time ||
+        g.startTime || g.start_time || null,
+      modelConfidence:
+        g.modelConfidence ?? g.modelProbability ?? null,
       id: g.id || `game-${index}`,
       away: g.away || g.awayTeam || g.teams?.away || "Away",
       home: g.home || g.homeTeam || g.teams?.home || "Home",
@@ -1548,19 +1554,90 @@ export default function Dashboard() {
     }
   };
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+
+  const easternDateKey = (value) => {
+    if (!value) return "";
+
+    const raw = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+
+    const get = (type) => parts.find((p) => p.type === type)?.value;
+    return `${get("year")}-${get("month")}-${get("day")}`;
+  };
+
+  const formatPickStart = (g) => {
+    const value = g.commenceTime || g.commence_time ||
+      g.startTime || g.start_time || g.date;
+
+    if (!value) return "Schedule unavailable";
+
+    const raw = String(value);
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Schedule unavailable";
+
+    const dateLabel = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(date);
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return `${dateLabel} · Time TBD`;
+    }
+
+    const timeLabel = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date);
+
+    return `${dateLabel} · ${timeLabel}`;
+  };
+
+  const formatModelConfidence = (g) => {
+    const raw = g.modelConfidence;
+    if (raw === null || raw === undefined || raw === "") {
+      return "Confidence: N/A";
+    }
+
+    const number = Number(raw);
+    if (!Number.isFinite(number) || number < 0 || number > 100) {
+      return "Confidence: N/A";
+    }
+
+    const percent = number <= 1 ? number * 100 : number;
+    return `Model confidence: ${percent.toFixed(1)}%`;
+  };
+
+  const todayKey = easternDateKey(new Date().toISOString());
+
 
   const topAiPicks = games
     .filter((g) => {
       const sportText = String(g.sport || g.league || g.sportTitle || "").toLowerCase();
-      const gameDate = String(g.commenceTime || g.commence_time || g.date || "").slice(0, 10);
+      const gameDate = easternDateKey(
+        g.commenceTime || g.commence_time || g.startTime ||
+        g.start_time || g.date
+      );
 
       const isNfl =
         sportText.includes("nfl") ||
         sportText.includes("americanfootball_nfl") ||
         sportText.includes("football");
 
-      const isToday = !gameDate || gameDate === todayKey;
+      const isToday = Boolean(gameDate) && gameDate === todayKey;
 
       return isNfl && isToday && Number(g.edge) > 0;
     })
@@ -1700,10 +1777,23 @@ export default function Dashboard() {
           {topAiPicks.length ? (
             topAiPicks.map((g, i) => (
               <div key={i} style={styles.aiMiniRow}>
-                <span>
-                  {g.home} {formatOdds(g.homeOdds)}
+                <span style={{ display: "grid", gap: 5, minWidth: 0 }}>
+                  <strong>{g.away} @ {g.home}</strong>
+                  <span style={{ fontSize: 12, opacity: 0.8 }}>
+                    {formatPickStart(g)}
+                  </span>
+                  <span style={{ fontSize: 12, opacity: 0.85 }}>
+                    Home odds: {formatOdds(g.homeOdds)}
+                  </span>
                 </span>
-                <span style={styles.confidence}>EDGE {g.edge.toFixed(1)}%</span>
+                <span style={{ display: "grid", gap: 5 }}>
+                  <strong style={styles.confidence}>
+                    EST. EDGE {Number(g.edge).toFixed(1)}%
+                  </strong>
+                  <span style={{ fontSize: 12, opacity: 0.85 }}>
+                    {formatModelConfidence(g)}
+                  </span>
+                </span>
                 <button style={styles.smallViewBtn} onClick={() => handleViewPick(g)}>
                   View Pick
                 </button>
@@ -2063,7 +2153,7 @@ const styles = {
     fontWeight: 950,
     fontStyle: "italic",
     letterSpacing: 1,
-    background: "linear-gradient(90deg,#8b5cf6 0%,#00ffe1 47%,#a855f7 100%)",
+    background: "linear-gradient(90deg,#ff77c8 0%,#ff35b8 22%,#a855f7 45%,#5965ff 70%,#00eaff 100%)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     textShadow:
@@ -2083,7 +2173,7 @@ const styles = {
     fontWeight: 950,
     fontStyle: "italic",
     letterSpacing: 1,
-    background: "linear-gradient(90deg,#00ffe1 0%,#795cff 52%,#ff3df2 100%)",
+    background: "linear-gradient(90deg,#ff77c8 0%,#ff35b8 22%,#a855f7 45%,#5965ff 70%,#00eaff 100%)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     textShadow:

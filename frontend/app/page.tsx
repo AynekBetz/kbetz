@@ -84,7 +84,7 @@ export default function HomePage() {
             fontWeight: 1000,
             letterSpacing: 2,
             background:
-              "linear-gradient(90deg, #00ffd6, #63eaff, #d72dff, #ff4fd8)",
+              "linear-gradient(90deg, #ff77c8, #ff35b8, #a855f7, #5965ff, #00eaff)",
             WebkitBackgroundClip: "text",
             color: "transparent",
           }}
